@@ -1,0 +1,1 @@
+"""VocaDox backend application package."""
