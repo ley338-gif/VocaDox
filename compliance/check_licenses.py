@@ -2,15 +2,22 @@
 """
 compliance/check_licenses.py
 
-Loads compliance/license-policy.yml, compliance/dependency-inventory.yml,
+Loads compliance/license-policy.yml, compliance/dependency-inventory.yml
+(direct deps), compliance/dependency-inventory-transitive.yml (full
+resolved dependency tree — see generate_transitive_inventory.py),
 compliance/container-inventory.yml and compliance/model-inventory.yml,
-computes approved/review_required/blocked/unknown counts across
-dependencies, containers, and models, prints a summary table, and exits
-non-zero if anything is blocked or unknown.
+computes approved/review_required/blocked/unknown counts across all four,
+prints a summary, and exits non-zero if anything is blocked or unknown in
+ANY of them — a blocked/unknown license three levels deep in the
+transitive tree fails the build exactly like a direct one does.
 
 Run from repo root as:
 
     python compliance/check_licenses.py
+
+The transitive inventory must be regenerated first if it's stale relative
+to the lockfiles — see generate_transitive_inventory.py's docstring for the
+exact commands (also run as a CI step; see .github/workflows/ci.yml).
 
 Dev-only dependency: PyYAML (``pip install pyyaml``). Not part of the
 runtime application dependency set.
@@ -34,6 +41,7 @@ except ImportError:  # pragma: no cover
 COMPLIANCE_DIR = Path(__file__).resolve().parent
 POLICY_FILE = COMPLIANCE_DIR / "license-policy.yml"
 DEPENDENCY_FILE = COMPLIANCE_DIR / "dependency-inventory.yml"
+TRANSITIVE_FILE = COMPLIANCE_DIR / "dependency-inventory-transitive.yml"
 CONTAINER_FILE = COMPLIANCE_DIR / "container-inventory.yml"
 MODEL_FILE = COMPLIANCE_DIR / "model-inventory.yml"
 
@@ -84,14 +92,25 @@ def print_table(title: str, rows: list[tuple[str, str, str]]) -> None:
 def main() -> int:
     policy = load_yaml(POLICY_FILE)
     dep_data = load_yaml(DEPENDENCY_FILE)
+    transitive_data = load_yaml(TRANSITIVE_FILE)
     container_data = load_yaml(CONTAINER_FILE)
     model_data = load_yaml(MODEL_FILE)
 
     dependencies = dep_data.get("dependencies") or []
+    transitive_deps = transitive_data.get("dependencies") or []
     containers = container_data.get("containers") or []
     models = model_data.get("models") or []
 
-    counts = {s: 0 for s in STATUSES}
+    # Four independent categories, each counted separately (never summed
+    # into one blended "total") — dependency-inventory-transitive.yml is a
+    # superset of dependency-inventory.yml (it includes direct packages
+    # too, flagged direct: true), so adding both would double-count.
+    category_counts: dict[str, dict[str, int]] = {
+        "direct": {s: 0 for s in STATUSES},
+        "transitive": {s: 0 for s in STATUSES},
+        "containers": {s: 0 for s in STATUSES},
+        "models": {s: 0 for s in STATUSES},
+    }
     dep_rows: list[tuple[str, str, str]] = []
     container_rows: list[tuple[str, str, str]] = []
     model_rows: list[tuple[str, str, str]] = []
@@ -101,17 +120,27 @@ def main() -> int:
         name = dep.get("name", "<unnamed>")
         lic = dep.get("license", "UNKNOWN")
         status = resolve_status(dep, policy)
-        counts[status] = counts.get(status, 0) + 1
+        category_counts["direct"][status] += 1
         dep_rows.append((f"{name} ({dep.get('ecosystem', '?')})", lic, status))
         if status in ("blocked", "unknown"):
-            offenders.append(f"dependency:{name}")
+            offenders.append(f"direct:{name}")
+
+    transitive_offenders: list[str] = []
+    for dep in transitive_deps:
+        name = dep.get("name", "<unnamed>")
+        status = resolve_status(dep, policy)
+        category_counts["transitive"][status] += 1
+        if status in ("blocked", "unknown"):
+            marker = f"transitive:{dep.get('ecosystem', '?')}:{name}@{dep.get('version', '?')} (scope={dep.get('scope', '?')})"
+            offenders.append(marker)
+            transitive_offenders.append(marker)
 
     for container in containers:
         name = container.get("image", "<unnamed>")
         tag = container.get("tag", "")
         lic = container.get("license", "UNKNOWN")
         status = resolve_status(container, policy)
-        counts[status] = counts.get(status, 0) + 1
+        category_counts["containers"][status] += 1
         container_rows.append((f"{name}:{tag}", lic, status))
         if status in ("blocked", "unknown"):
             offenders.append(f"container:{name}:{tag}")
@@ -122,7 +151,7 @@ def main() -> int:
         name = model.get("name", "<unnamed>")
         lic = model.get("license", "UNKNOWN")
         status = resolve_status(model, policy)
-        counts[status] = counts.get(status, 0) + 1
+        category_counts["models"][status] += 1
         model_rows.append((name, lic, status))
         if status in ("blocked", "unknown"):
             offenders.append(f"model:{name}")
@@ -131,16 +160,32 @@ def main() -> int:
     print("VocaDox License Compliance Check")
     print("=" * 60)
 
-    print_table("Python / Node Dependencies", dep_rows)
+    print_table("Direct Python / Node Dependencies", dep_rows)
     print_table("Container Images", container_rows)
     print_table("Models", model_rows)
 
-    print("\nSummary")
-    print("-------")
-    total = sum(counts.values())
-    for status in STATUSES:
-        print(f"  {status:<16}{counts[status]}")
-    print(f"  {'total':<16}{total}")
+    print(f"\nTransitive Dependencies (full resolved tree, {len(transitive_deps)} packages)")
+    print("-" * 60)
+    if transitive_deps:
+        for status in STATUSES:
+            print(f"  {status:<16}{category_counts['transitive'][status]}")
+        if transitive_offenders:
+            print("  offenders:")
+            for o in transitive_offenders:
+                print(f"    - {o}")
+    else:
+        print(
+            "  (none found — run generate_transitive_inventory.py first; "
+            "an empty transitive file is NOT the same as a clean scan)"
+        )
+
+    print("\nSummary by category (never summed together — see report for why)")
+    print("-------------------------------------------------------------------")
+    header = f"  {'category':<14}" + "".join(f"{s:<17}" for s in STATUSES)
+    print(header)
+    for category, counts in category_counts.items():
+        row = f"  {category:<14}" + "".join(f"{counts[s]:<17}" for s in STATUSES)
+        print(row)
 
     if offenders:
         print("\nBLOCKED/UNKNOWN items found:")

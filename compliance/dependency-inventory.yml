@@ -121,19 +121,89 @@ dependencies:
 
   - name: pytest
     ecosystem: pypi
-    version_constraint: ">=8.3,<9.0 (installed: 8.4.2)"
+    version_constraint: ">=9.0.3,<10.0 (installed: 9.1.1)"
     license: MIT
     license_source_url: https://pypi.org/pypi/pytest/json
     approval_status: approved
-    notes: "info.license_expression = MIT (PyPI JSON). Dev/test-only dependency. Pinned <9.0 in pyproject.toml for stability."
+    notes: >
+      info.license_expression = MIT (PyPI JSON). Dev/test-only dependency.
+      Upgraded from the <9.0 pin during Phase 0 remediation (2026-08-17)
+      to fix PYSEC-2026-1845 / GHSA-6w46-j5rx-g56g (insecure /tmp/pytest-of-{user}
+      tmpdir handling on UNIX — local-only DoS/privilege issue, found via
+      pip-audit), patched at 9.0.3+. Verified: all 9 backend tests still
+      pass on 9.1.1.
 
   - name: pytest-asyncio
     ecosystem: pypi
-    version_constraint: ">=0.24,<1.0 (installed: 0.26.0)"
+    version_constraint: ">=1.0,<2.0 (installed: 1.4.0)"
     license: Apache-2.0
     license_source_url: https://pypi.org/pypi/pytest-asyncio/json
     approval_status: approved
-    notes: "info.license_expression = Apache-2.0 (PyPI JSON). Dev/test-only dependency. Pinned <1.0 in pyproject.toml for stability."
+    notes: >
+      info.license_expression = Apache-2.0 (PyPI JSON). Dev/test-only
+      dependency. Upgraded from the 0.24-0.x pin during Phase 0
+      remediation (2026-08-17) — required alongside the pytest 9.x
+      upgrade above, since pytest-asyncio 0.26.0 pinned `pytest<9`.
+
+  - name: setuptools
+    ecosystem: pypi
+    version_constraint: ">=83.0 (build-system requirement in pyproject.toml; installed: 84.0.0)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/setuptools/json
+    approval_status: approved
+    notes: >
+      PEP 517 build-backend requirement, not a runtime dependency (not
+      imported by the app; only used at package-build time, both for
+      local dev installs and inside backend/Dockerfile's `pip install .`
+      build step). Pinned >=83.0 during Phase 0 remediation (2026-08-17)
+      to fix PYSEC-2026-3447 / GHSA-h35f-9h28-mq5c (Unicode-normalization
+      MANIFEST.in exclude-pattern bypass on macOS APFS/HFS+ — irrelevant
+      to our Linux Docker build in practice, but patched anyway since
+      pip-audit flagged it). license = MIT per PyPI JSON.
+
+  - name: pip-licenses
+    ecosystem: pypi
+    version_constraint: ">=5.5,<6.0 (installed: 5.5.5)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/pip-licenses/json
+    approval_status: approved
+    notes: >
+      Build/compliance-tooling-only dependency, added during Phase 0
+      remediation to generate compliance/dependency-inventory-transitive.yml
+      from the real resolved dependency tree. Never imported by
+      application code, never shipped in the backend Docker image
+      (backend/Dockerfile installs `pip install .`, not `.[dev]`).
+      info.license_expression = MIT (PyPI JSON).
+
+  - name: pip-audit
+    ecosystem: pypi
+    version_constraint: ">=2.10,<3.0 (installed: 2.10.1)"
+    license: Apache-2.0
+    license_source_url: https://pypi.org/pypi/pip-audit/json
+    approval_status: approved
+    notes: >
+      Build/compliance-tooling-only dependency, added during Phase 0
+      remediation to scan the Python dependency tree for known
+      vulnerabilities (used in CI, see .github/workflows/ci.yml). Never
+      shipped in the backend Docker image. Apache Software License
+      classifier confirmed via PyPI JSON.
+
+  - name: license-checker
+    ecosystem: npm
+    version_constraint: "not persisted in package.json (installed on demand via `npm install --no-save -D license-checker`, pinned in CI to the version below)"
+    license: BSD-3-Clause
+    license_source_url: https://registry.npmjs.org/license-checker/latest
+    approval_status: approved
+    notes: >
+      Build/compliance-tooling-only dependency, added during Phase 0
+      remediation to generate the npm side of
+      dependency-inventory-transitive.yml. Deliberately installed with
+      `--no-save` (not added to package.json/package-lock.json) since it's
+      a one-shot compliance-report-generation tool, not a build
+      dependency the frontend needs to build/test/run — see
+      generate_transitive_inventory.py's docstring for the exact command.
+      Never shipped in the frontend build output. license = BSD-3-Clause
+      per npm registry.
 
   - name: httpx
     ecosystem: pypi
@@ -188,11 +258,42 @@ dependencies:
 
   - name: vite
     ecosystem: npm
-    version_constraint: "^5.4.8 (installed: 5.4.21)"
+    version_constraint: "^7.3.6 (installed: 7.3.6)"
     license: MIT
     license_source_url: https://registry.npmjs.org/vite/latest
     approval_status: approved
-    notes: "license = MIT (npm registry; verified against the latest published version, 8.2.1 at research time). Pinned to the 5.x line for stability. Dev-only dependency."
+    notes: >
+      license = MIT (npm registry, version 7.3.6). Dev-only dependency.
+      Upgraded from the 5.x line during Phase 0 remediation (2026-08-17)
+      to resolve npm audit findings GHSA-4w7w-66w2-5vf9 (path traversal in
+      optimized-deps .map handling), GHSA-fx2h-pf6j-xcff (server.fs.deny
+      bypass on Windows), GHSA-v6wh-96g9-6wx3 (launch-editor NTLMv2 hash
+      disclosure), and GHSA-g7r4-m6w7-qqqr (esbuild arbitrary file read on
+      Windows dev server) — fixed as of 7.3.4+. Initially tried jumping
+      straight to the 8.x line, but backed off: Vite 8 defaults to the
+      new Rolldown bundler, whose optional native binary packages hit a
+      known npm cross-platform-optional-dependency bug
+      (npm/cli#4828 — lockfile generated on Windows failed to resolve the
+      Linux native binding inside the Docker build). Vite 7.3.x still
+      uses the previous (esbuild/rollup) bundler and has none of that
+      friction, resolves the same CVEs, and required an
+      `@vitejs/plugin-react` downgrade to 5.2.0 (its 6.x line requires
+      vite ^8) — verified: lint, typecheck, all tests, `npm run build`,
+      and the actual `docker build` (frontend Dockerfile `build`/`runtime`
+      targets) all pass on this combination.
+
+  - name: "@vitejs/plugin-react"
+    ecosystem: npm
+    version_constraint: "^5.2.0 (installed: 5.2.0)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/@vitejs/plugin-react/latest
+    approval_status: approved
+    notes: >
+      license = MIT (npm registry). Dev-only dependency, not in the
+      original Phase 0 dependency list but tracked here since Phase 0
+      remediation (2026-08-17) explicitly pinned its version as part of
+      the vite CVE fix (see the vite entry's notes above for why 5.2.0
+      rather than the newer 6.x line, which requires vite ^8).
 
   - name: typescript
     ecosystem: npm
@@ -212,11 +313,19 @@ dependencies:
 
   - name: vitest
     ecosystem: npm
-    version_constraint: "^2.1.2 (installed: 2.1.9)"
+    version_constraint: "^4.1.10 (installed: 4.1.10)"
     license: MIT
     license_source_url: https://registry.npmjs.org/vitest/latest
     approval_status: approved
-    notes: "license = MIT (npm registry; verified against the latest published version, 4.1.10 at research time). Pinned to the 2.x line to match the installed Vite 5.x line. Dev/test-only dependency."
+    notes: >
+      license = MIT (npm registry, version 4.1.10). Dev/test-only
+      dependency. Upgraded from the 2.x line during Phase 0 remediation
+      (2026-08-17) to resolve npm audit finding GHSA-5xrq-8626-4rwp
+      (CRITICAL — Vitest UI server allowed arbitrary file read/execute),
+      fixed as of 3.2.6+; also required to match the vite 8.x upgrade
+      above (vitest 2.x's transitive vite/esbuild pin was the actual root
+      cause pulled in by npm audit). Verified: all tests still pass on
+      4.1.10.
 
   - name: "@testing-library/react"
     ecosystem: npm

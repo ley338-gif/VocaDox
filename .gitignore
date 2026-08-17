@@ -23,6 +23,10 @@ coverage/
 *.pem
 *.key
 
+# --- Compliance scan intermediates (regenerable, not source of truth) ---
+compliance/_raw_*.json
+compliance/_container-scan/
+
 # --- Local data / media ---
 data/
 *.sqlite3

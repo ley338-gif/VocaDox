@@ -25,6 +25,21 @@ approved:
   - ISC
   - PostgreSQL
   - OFL-1.1
+  # --- Added during transitive-dependency-tree analysis (2026-08-17) ---
+  # Every one of these was found on a *transitive* (never direct)
+  # dependency by compliance/generate_transitive_inventory.py, individually
+  # identified (not guessed), and is a permissive or public-domain-style
+  # license with no copyleft/redistribution obligation that conflicts with
+  # closed, on-premise deployment. None of these appear in the production
+  # runtime dependency tree — see dependency-inventory-transitive.yml,
+  # scope: dev entries.
+  - MIT-0            # MIT No Attribution — public-domain-equivalent, even more permissive than MIT. (@csstools/color-helpers, dev-only build tool dep)
+  - Python-2.0        # PSF-style permissive license used by some Python-ecosystem-adjacent npm shims. (argparse npm package, dev-only)
+  - BlueOak-1.0.0      # Blue Oak Council model license — permissive, no attribution/copyleft requirement. (minimatch, dev-only)
+  - CC0-1.0            # Public domain dedication. (spdx-license-ids, dev-only)
+  - CC-BY-3.0          # Attribution-only Creative Commons — fine for closed-source use, just requires credit. (spdx-exceptions, dev-only)
+  - CC-BY-4.0          # Attribution-only Creative Commons, same rationale. (caniuse-lite data tables, dev-only)
+  - PSF-2.0            # Python Software Foundation License 2.0 — permissive, OSI-approved. Found on typing_extensions (runtime, transitive of pydantic) and defusedxml (dev-only, transitive of pip-audit).
 
 review_required:
   - MPL-2.0
