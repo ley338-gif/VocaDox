@@ -18,7 +18,13 @@ RUN npm run build
 
 # --- runtime target: production image. Serves the static build output via
 # nginx — the Vite dev server MUST NOT run in production. ---
-FROM nginx:1.27.3-alpine3.20@sha256:814a8e88df978ade80e584cc5b333144b9372a8e3c98872d07137dbf3b44d0e4 AS runtime
+# Pinned to alpine3.24 (not the originally scaffolded alpine3.20): a Trivy
+# scan during Phase 0 remediation flagged alpine3.20 as EOL ("no longer
+# supported by the distribution" — security patches had stopped), which is
+# why its Alpine-packaged libssl/libxml2/libpng/musl/etc. all showed
+# unfixed HIGH/CRITICAL CVEs despite fixes existing upstream. alpine3.24 is
+# the current supported release and carries none of those findings.
+FROM nginx:1.31.3-alpine3.24@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752 AS runtime
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

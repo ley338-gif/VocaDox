@@ -4,8 +4,8 @@
 # root docker-compose.yml, backend/Dockerfile, frontend/Dockerfile) is
 # listed here with a pinned version tag AND digest — `latest` is never used.
 # All digests below were captured by actually pulling and inspecting the
-# images locally on 2026-08-17 (`docker inspect --format='{{index
-# .RepoDigests 0}}' <tag>`), not guessed.
+# images locally (`docker inspect --format='{{index .RepoDigests 0}}'
+# <tag>`), not guessed.
 #
 # The same GO/NO-GO rule as dependencies/models applies: any container with
 # approval_status blocked or unknown => NO-GO for Phase 1.
@@ -18,6 +18,32 @@
 # that transitive OS-package surface is a known limitation, documented in
 # PHASE_0_VALIDATION_REPORT.md's Known Limitations section, consistent with
 # how the software dependency inventory also scopes to direct dependencies.
+#
+# --- Vulnerability scanning (added Phase 0 remediation) ---
+# Tool: Trivy 0.56.2 (Apache-2.0 — license-checked before use, see
+# dependency-inventory.yml's entry for it as a build/scan-tool-only
+# dependency). Run via the official `aquasec/trivy` Docker image (pinned
+# tag+digest, never installed on the host) against the FINAL built images
+# — `vocadox-backend` (backend/Dockerfile's only stage) and
+# `vocadox-frontend` (frontend/Dockerfile's `runtime` target, i.e. exactly
+# what ships to a customer: nginx serving the static Vite build, NOT the
+# Vite dev server). Raw scan output: compliance/_container-scan/ (gitignored,
+# regenerate via the commands in PHASE_0_VALIDATION_REPORT.md's Security
+# Findings section).
+#
+# SCOPE: this covers the packages present in the final, shipped runtime
+# image only. `node:20.18.1-bookworm-slim` (frontend/Dockerfile's `base`/
+# `build`/`dev` stages) is explicitly OUT of this scope for two reasons:
+# (1) its filesystem is entirely discarded by the multi-stage build — the
+# `runtime` stage COPYs only `/app/dist` (built static assets) out of it,
+# so none of its OS packages reach the shipped image; (2) the `dev` stage
+# is used only as the local-development docker-compose service, never
+# deployed to a customer. It was still scanned for visibility (see the
+# `node` entry below) and does carry real CRITICAL/HIGH findings from a
+# stale Debian bookworm base with no newer non-EOL alternative currently
+# published upstream for the node:20 line — tracked as an open risk in
+# PHASE_0_VALIDATION_REPORT.md, not a gate blocker, per this explicit
+# build-stage-vs-runtime-image scoping.
 
 containers:
   - image: postgres
@@ -44,35 +70,97 @@ containers:
       dependency-inventory.yml).
 
   - image: python
-    tag: "3.11.10-slim-bookworm"
-    digest: "sha256:840e180ebcc6e5c8efab209c43f5e40fd2af98cb49db5c7103c90539c56bb30e"
-    purpose: "Backend build/runtime base image"
-    source: "docker.io/library/python (Docker Official Image, Debian bookworm base)"
+    tag: "3.11-slim-trixie"
+    digest: "sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7"
+    purpose: "Backend build/runtime base image (SHIPPED — this is the only stage in backend/Dockerfile)"
+    source: "docker.io/library/python (Docker Official Image, Debian trixie base)"
     license: "PSF-2.0 (Python interpreter); Debian base layer under mixed OS-package licenses (not individually audited — see header note)"
     pinned: true
     approval_status: approved
-    notes: "PSF-2.0 is a permissive license consistent with the approved policy list's intent (MIT/BSD/Apache-style)."
+    notes: >
+      PSF-2.0 is a permissive license consistent with the approved policy
+      list's intent (MIT/BSD/Apache-style). Switched from
+      python:3.11.10-slim-bookworm during Phase 0 remediation: a Trivy scan
+      found CRITICAL CVEs (perl-base, libsqlite3-0, zlib1g) with no fix
+      backported to bookworm on ANY point release (verified against the
+      Debian security tracker) — trixie carries fixed versions of
+      sqlite3/zlib/util-linux. backend/Dockerfile additionally runs
+      `apt-get upgrade` and purges perl-base entirely (unused by the
+      running application; was the source of trixie's remaining 4 CRITICAL
+      findings) — see PHASE_0_VALIDATION_REPORT.md, Security Findings, for
+      the full before/after scan results. Final scanned image
+      (vocadox-backend, this stage): 0 CRITICAL, 8 HIGH (all
+      no-upstream-fix-available OS packages unused by the app, or pip's
+      own internals — individually justified in the validation report).
 
   - image: node
     tag: "20.18.1-bookworm-slim"
     digest: "sha256:b2c8e0eb8a6aeeae33b2711f8f516003e27ee45804e270468d937b3214f2f0cc"
-    purpose: "Frontend build stage + local dev server base image"
+    purpose: "Frontend build stage (discarded — never reaches the shipped image) + local dev server base image (dev-only, never deployed to customers)"
     source: "docker.io/library/node (Docker Official Image, Debian bookworm base)"
     license: "MIT (Node.js runtime); Debian base layer under mixed OS-package licenses (not individually audited — see header note)"
     pinned: true
     approval_status: approved
+    notes: >
+      OUT OF SCOPE for the shipped-image vulnerability gate — see this
+      file's header note. Trivy found 8 CRITICAL / 48 HIGH on this base
+      image; re-checked against the current (non-pinned, freshly pulled)
+      node:20-bookworm-slim floating tag and it still showed 8
+      CRITICAL/38 HIGH, so — unlike python and nginx — this is not simply
+      a stale pin; no newer non-EOL Debian release is currently published
+      upstream for the official node:20 image line. Tracked as an open
+      risk in PHASE_0_VALIDATION_REPORT.md (affects local dev-compose
+      usage only, not anything shipped to a customer). Revisit when
+      an official node image on a newer Debian base becomes available, or
+      consider an Alpine-based node image for the dev/build stages.
 
   - image: nginx
-    tag: "1.27.3-alpine3.20"
-    digest: "sha256:814a8e88df978ade80e584cc5b333144b9372a8e3c98872d07137dbf3b44d0e4"
-    purpose: "Production frontend runtime — serves the static Vite build. The Vite dev server is never used in production; see frontend/Dockerfile `runtime` target."
+    tag: "1.31.3-alpine3.24"
+    digest: "sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752"
+    purpose: "Production frontend runtime (SHIPPED) — serves the static Vite build. The Vite dev server is never used in production; see frontend/Dockerfile `runtime` target."
     source: "docker.io/library/nginx (Docker Official Image, Alpine base)"
     license: "BSD-2-Clause (nginx license)"
     pinned: true
     approval_status: approved
+    notes: >
+      Switched from nginx:1.27.3-alpine3.20 during Phase 0 remediation: a
+      Trivy scan warned "This OS version is no longer supported by the
+      distribution" for Alpine 3.20 and found 3 CRITICAL / 35 HIGH findings
+      (libssl3, libcrypto3, libxml2, libpng, musl, ...) all with fixes
+      already published upstream — this was purely a stale/EOL base image
+      pin, not an unfixable issue. alpine3.24 is the current supported
+      Alpine release. Final scanned image (vocadox-frontend, `runtime`
+      stage — exactly what ships to a customer): 0 vulnerabilities of any
+      severity.
 
-# Summary (computed 2026-08-17, verified against license-policy.yml):
-#   approved: 5
+  - image: aquasec/trivy
+    tag: "0.56.2"
+    digest: "sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a"
+    purpose: "Vulnerability + SBOM scanning tool (CI/audit-only — never part of the deployed stack, never shipped to customers)"
+    source: "docker.io/aquasec/trivy (Aqua Security, official image)"
+    license: "Apache-2.0"
+    pinned: true
+    approval_status: approved
+    notes: >
+      Chosen over Docker Scout (bundled with Docker Desktop) specifically
+      because Docker Scout CLI's license is the proprietary "Docker
+      Subscription Service Agreement" — blocked per license-policy.yml —
+      whereas Trivy is Apache-2.0 (verified via its GitHub LICENSE file).
+      Run via this pinned official image (never installed as a host
+      binary) against the final backend/frontend runtime images; see
+      PHASE_0_VALIDATION_REPORT.md, Security Findings, for results and the
+      exact commands used (also wired into CI, see .github/workflows/ci.yml).
+
+# Summary (verified against license-policy.yml):
+#   approved: 6
 #   review_required: 0
 #   blocked: 0
 #   unknown: 0
+#
+# Vulnerability summary, SHIPPED runtime images only (vocadox-backend,
+# vocadox-frontend `runtime` stage) — see PHASE_0_VALIDATION_REPORT.md,
+# Security Findings, for the full package-by-package breakdown and
+# disposition of every CRITICAL/HIGH finding:
+#   vocadox-backend  (python:3.11-slim-trixie):  0 CRITICAL, 8 HIGH (documented/accepted)
+#   vocadox-frontend (nginx:1.31.3-alpine3.24):   0 CRITICAL, 0 HIGH
+#   node:20.18.1-bookworm-slim (build-stage/dev-only, NOT shipped): 8 CRITICAL, 48 HIGH — open risk, not a gate blocker

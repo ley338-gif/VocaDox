@@ -1,5 +1,12 @@
 # Pinned base image (see compliance/container-inventory.yml for license/digest record).
-FROM python:3.11.10-slim-bookworm@sha256:840e180ebcc6e5c8efab209c43f5e40fd2af98cb49db5c7103c90539c56bb30e
+# Debian trixie (13), not the originally scaffolded bookworm (12): a Trivy
+# scan during Phase 0 remediation found several CRITICAL CVEs (perl-base,
+# libsqlite3-0, zlib1g) in bookworm with no fix backported to bookworm at
+# all (confirmed via the Debian security tracker — bookworm-security still
+# shows "vulnerable" for these, e.g. CVE-2026-53615/util-linux; sqlite3's
+# CVE-2025-7458 is marked "no-dsa", i.e. Debian decided not to backport a
+# fix to bookworm). trixie carries fixed package versions for all of them.
+FROM python:3.11-slim-trixie@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7
 
 WORKDIR /app
 
@@ -9,8 +16,21 @@ WORKDIR /app
 # built image found dozens of HIGH/CRITICAL CVEs in the base image's OS
 # layer that Debian had already backported fixes for — this was simply a
 # stale base-image snapshot, not anything about our own dependencies.
+#
+# Then remove perl-base entirely. It's marked "Essential" by Debian
+# packaging convention (hence --allow-remove-essential), but nothing in
+# this image's actual runtime path uses it — our application is a plain
+# Python ASGI process with no shell scripts, package-manager maintainer
+# scripts, or anything else that invokes perl after the image is built.
+# It was also the source of every remaining CRITICAL Trivy finding on this
+# image (four 2026 perl CVEs with no upstream fix yet on ANY Debian
+# release, verified against both bookworm and trixie) — verified after
+# removal that `python3`/`pip` still work correctly (see the `docker build`
+# + smoke-test log in PHASE_0_VALIDATION_REPORT.md).
 RUN apt-get update \
     && apt-get upgrade -y \
+    && apt-get remove -y --purge --allow-remove-essential perl-base \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Same idea for pip's own bundled setuptools/wheel (installed by
