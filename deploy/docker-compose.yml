@@ -1,0 +1,72 @@
+# VocaDox Phase 0 development compose stack.
+#
+# No worker container yet (spec: workers ship alongside the async pipeline
+# in a later phase). The frontend service runs the Vite DEV server — this
+# is intentional for local development only; the production image
+# (frontend/Dockerfile `runtime` target) serves static assets via nginx and
+# never runs the dev server. See frontend/Dockerfile and README.md.
+#
+# All image tags below are pinned to a specific version (never `latest`);
+# see ../compliance/container-inventory.yml for the license/digest record.
+
+services:
+  postgres:
+    image: postgres:16.6-alpine3.20@sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vocadox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-vocadox}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - vocadox_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vocadox}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8.0.2-alpine@sha256:752ba000a58bc8925d11ee863a39b5225617cd2cb3dbc9ec8ac65268b65ebb6d
+    ports:
+      - "${VALKEY_PORT:-6379}:6379"
+    volumes:
+      - vocadox_valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
+      VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
+      VOCADOX_LOG_FORMAT: ${VOCADOX_LOG_FORMAT:-json}
+      VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
+      VOCADOX_VALKEY_URL: ${VOCADOX_VALKEY_URL:-valkey://valkey:6379/0}
+      VOCADOX_CORS_ALLOW_ORIGINS: ${VOCADOX_CORS_ALLOW_ORIGINS:-["http://localhost:5173"]}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+
+volumes:
+  vocadox_postgres_data:
+  vocadox_valkey_data:

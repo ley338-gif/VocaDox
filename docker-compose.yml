@@ -1,0 +1,6 @@
+# Root-level convenience wrapper so `docker compose up -d` works from the
+# repo root without callers needing to know the internal layout. The real
+# service definitions live in deploy/docker-compose.yml (single source of
+# truth) — this file does not duplicate them.
+include:
+  - deploy/docker-compose.yml
