@@ -1,0 +1,128 @@
+/*
+ * Design tokens (source: "VocaDox - Stylesystem.png").
+ * Light palette lives on bare :root; dark overrides apply via
+ * prefers-color-scheme AND via [data-theme="dark"] so an explicit user
+ * choice always wins over the OS preference.
+ */
+
+:root {
+  /* -- Brand / primary blue scale -- */
+  --color-primary-600: #2563eb;
+  --color-primary-500: #3b82f6;
+  --color-primary-400: #60a5fa;
+  --color-primary-300: #93c5fd;
+  --color-primary-100: #dbeafe;
+
+  /* -- Neutral gray scale -- */
+  --color-gray-900: #0f172a;
+  --color-gray-800: #1e293b;
+  --color-gray-700: #334155;
+  --color-gray-500: #64748b;
+  --color-gray-300: #cbd5e1;
+  --color-gray-200: #e2e8f0;
+  --color-gray-100: #f1f5f9;
+  --color-white: #ffffff;
+
+  /* -- Semantic colors -- */
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+  --color-info: #0284c7;
+  --color-purple: #7c3aed;
+  --color-teal: #0d9488;
+
+  /* -- Theme-mapped tokens (light, default) -- */
+  --surface-page: var(--color-gray-100);
+  --surface-raised: var(--color-white);
+  --surface-sunken: var(--color-gray-200);
+  --border-default: var(--color-gray-300);
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-700);
+  --text-muted: var(--color-gray-500);
+  --text-on-primary: var(--color-white);
+  --accent: var(--color-primary-600);
+  --accent-hover: var(--color-primary-500);
+  --accent-subtle: var(--color-primary-100);
+
+  /* -- Typography -- */
+  --font-family-base: "Inter", system-ui, -apple-system, sans-serif;
+
+  --font-h1-size: 2rem;      /* 32px */
+  --font-h1-line: 2.5rem;    /* 40px */
+  --font-h2-size: 1.5rem;    /* 24px */
+  --font-h2-line: 2rem;      /* 32px */
+  --font-h3-size: 1.25rem;   /* 20px */
+  --font-h3-line: 1.75rem;   /* 28px */
+  --font-h4-size: 1rem;      /* 16px */
+  --font-h4-line: 1.5rem;    /* 24px */
+  --font-h5-size: 0.875rem;  /* 14px */
+  --font-h5-line: 1.25rem;   /* 20px */
+  --font-h6-size: 0.75rem;   /* 12px */
+  --font-h6-line: 1rem;      /* 16px */
+  --font-body-lg-size: 1rem;
+  --font-body-lg-line: 1.5rem;
+  --font-body-base-size: 0.875rem;
+  --font-body-base-line: 1.25rem;
+  --font-body-sm-size: 0.75rem;
+  --font-body-sm-line: 1rem;
+  --font-caption-size: 0.6875rem; /* 11px */
+  --font-caption-line: 1rem;
+
+  /* -- Spacing (8pt scale) -- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* -- Radius -- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+
+  /* -- Shadows -- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 8px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --shadow-xl: 0 16px 48px rgba(15, 23, 42, 0.16);
+}
+
+/* OS-driven dark mode, unless the user explicitly chose light */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-page: var(--color-gray-900);
+    --surface-raised: var(--color-gray-800);
+    --surface-sunken: #16213a;
+    --border-default: var(--color-gray-700);
+    --text-primary: var(--color-gray-100);
+    --text-secondary: var(--color-gray-300);
+    --text-muted: var(--color-gray-500);
+    --text-on-primary: var(--color-white);
+    --accent: var(--color-primary-500);
+    --accent-hover: var(--color-primary-400);
+    --accent-subtle: #1e3a5f;
+  }
+}
+
+/* Explicit user choice always wins */
+:root[data-theme="dark"] {
+  --surface-page: var(--color-gray-900);
+  --surface-raised: var(--color-gray-800);
+  --surface-sunken: #16213a;
+  --border-default: var(--color-gray-700);
+  --text-primary: var(--color-gray-100);
+  --text-secondary: var(--color-gray-300);
+  --text-muted: var(--color-gray-500);
+  --text-on-primary: var(--color-white);
+  --accent: var(--color-primary-500);
+  --accent-hover: var(--color-primary-400);
+  --accent-subtle: #1e3a5f;
+}
