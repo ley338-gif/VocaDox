@@ -1,0 +1,45 @@
+# compliance/license-policy.yml
+#
+# Encodes the VocaDox dependency license policy (spec §10).
+# Every dependency in dependency-inventory.yml MUST resolve its license
+# against exactly one of the three buckets below. Any license not listed
+# anywhere here should be treated as "unknown" until explicitly classified.
+#
+# - approved:         May be used freely. No copyleft / redistribution
+#                      obligations that conflict with on-premise, closed
+#                      deployment of VocaDox.
+# - review_required:  Weak-copyleft (file-level, e.g. MPL) or LGPL licenses.
+#                      Usable in most cases (esp. as unmodified dynamic
+#                      dependencies) but require a human sign-off recorded
+#                      in exceptions.yml or a note before merging.
+# - blocked:          Strong copyleft (GPL/AGPL), source-available-but-not-
+#                      open-source licenses (SSPL, RSAL, BSL), licenses with
+#                      commercial-use carve-outs (Commons Clause), proprietary
+#                      terms, or licenses we could not determine (UNKNOWN).
+
+approved:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - PostgreSQL
+  - OFL-1.1
+
+review_required:
+  - MPL-2.0
+  - LGPL-2.1
+  - LGPL-2.1-or-later
+  - LGPL-3.0
+  - LGPL-3.0-or-later
+
+blocked:
+  - GPL-2.0
+  - GPL-3.0
+  - AGPL-3.0
+  - SSPL-1.0
+  - RSAL
+  - BSL-1.1
+  - "Commons-Clause"
+  - proprietary
+  - UNKNOWN

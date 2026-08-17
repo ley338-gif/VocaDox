@@ -1,0 +1,33 @@
+# compliance/model-inventory.yml
+#
+# Inventory of AI/ML models bundled with or downloaded by VocaDox at
+# install/build time. Empty in Phase 0 by design (see note below).
+#
+# Schema for each entry under `models:`:
+#   - name:                      Model name/identifier as published by its source.
+#     version:                   Model version or release tag.
+#     source:                    Where the model is obtained from (e.g. Hugging
+#                                Face repo URL, vendor URL, internal registry).
+#     license:                   SPDX identifier or license name as published
+#                                by the model's source.
+#     commercial_use:            true/false/"conditional" — whether the license
+#                                permits commercial/production use.
+#     redistribution:            true/false/"conditional" — whether VocaDox may
+#                                redistribute the model weights/artifacts.
+#     usage_restrictions:        Free-text summary of any field-of-use,
+#                                acceptable-use, or attribution restrictions.
+#     sha256:                    Checksum of the model artifact actually
+#                                bundled/downloaded, for integrity verification.
+#     bundled:                   true/false — shipped inside a VocaDox artifact.
+#     downloaded_at_install:     true/false — fetched at install/first-run time
+#                                instead of being bundled.
+#     approval_status:           approved / review_required / blocked / unknown,
+#                                computed against compliance/license-policy.yml
+#                                (or a model-specific policy, if one is later
+#                                introduced).
+#
+# NOTE: No AI models are bundled or downloaded in Phase 0 of VocaDox.
+# Model integration (ASR/TTS/NLU or similar) begins in Phase 3/4 of the
+# roadmap; this file will be populated with real entries at that point.
+
+models: []

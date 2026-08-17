@@ -1,0 +1,21 @@
+# compliance/exceptions.yml
+#
+# Recorded exceptions to compliance/license-policy.yml — e.g. a
+# review_required or blocked dependency that was explicitly approved for
+# use despite its license bucket, with a documented reason and sign-off.
+#
+# Schema for each entry under `exceptions:`:
+#   - dependency_name:  Name of the dependency (matching dependency-inventory.yml
+#                        or model-inventory.yml) the exception applies to.
+#     reason:            Why the exception is needed / why the dependency is
+#                        used despite its license classification.
+#     approved_by:       Person (name/handle) who approved the exception.
+#     expiry_date:       Date the exception must be re-reviewed (ISO 8601),
+#                        or "none" if it is considered permanent.
+#     notes:             Any additional context, mitigations, or conditions
+#                        attached to the exception.
+#
+# No exceptions have been needed in Phase 0 — every dependency in
+# compliance/dependency-inventory.yml resolved to "approved".
+
+exceptions: []

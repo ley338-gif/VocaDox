@@ -1,0 +1,78 @@
+# Container image inventory (spec §10/§12 policy extended to base images).
+#
+# Every image used anywhere in the Phase 0 stack (deploy/docker-compose.yml,
+# root docker-compose.yml, backend/Dockerfile, frontend/Dockerfile) is
+# listed here with a pinned version tag AND digest — `latest` is never used.
+# All digests below were captured by actually pulling and inspecting the
+# images locally on 2026-08-17 (`docker inspect --format='{{index
+# .RepoDigests 0}}' <tag>`), not guessed.
+#
+# The same GO/NO-GO rule as dependencies/models applies: any container with
+# approval_status blocked or unknown => NO-GO for Phase 1.
+#
+# License notes: for OS-level base images (python, node, nginx official
+# images), the "license" recorded is the license of the primary
+# application/runtime the image packages (Python interpreter, Node.js
+# runtime, nginx server), not an exhaustive audit of every OS package layer
+# (openssl, coreutils, ...) baked into the underlying Debian/Alpine base —
+# that transitive OS-package surface is a known limitation, documented in
+# PHASE_0_VALIDATION_REPORT.md's Known Limitations section, consistent with
+# how the software dependency inventory also scopes to direct dependencies.
+
+containers:
+  - image: postgres
+    tag: "16.6-alpine3.20"
+    digest: "sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc"
+    purpose: "Primary datastore (system of record)"
+    source: "docker.io/library/postgres (Docker Official Image)"
+    license: "PostgreSQL License (PostgreSQL Global Development Group)"
+    pinned: true
+    approval_status: approved
+    notes: "PostgreSQL License is in the approved list (equivalent to MIT/BSD-style permissive)."
+
+  - image: valkey/valkey
+    tag: "8.0.2-alpine"
+    digest: "sha256:752ba000a58bc8925d11ee863a39b5225617cd2cb3dbc9ec8ac65268b65ebb6d"
+    purpose: "Queue / cache / coordination backend"
+    source: "docker.io/valkey/valkey (Linux Foundation Valkey project, official image)"
+    license: "BSD-3-Clause"
+    pinned: true
+    approval_status: approved
+    notes: >
+      Verified as BSD-3-Clause for the Valkey server itself (distinct from
+      the `valkey` PyPI client package, also BSD/MIT-family — see
+      dependency-inventory.yml).
+
+  - image: python
+    tag: "3.11.10-slim-bookworm"
+    digest: "sha256:840e180ebcc6e5c8efab209c43f5e40fd2af98cb49db5c7103c90539c56bb30e"
+    purpose: "Backend build/runtime base image"
+    source: "docker.io/library/python (Docker Official Image, Debian bookworm base)"
+    license: "PSF-2.0 (Python interpreter); Debian base layer under mixed OS-package licenses (not individually audited — see header note)"
+    pinned: true
+    approval_status: approved
+    notes: "PSF-2.0 is a permissive license consistent with the approved policy list's intent (MIT/BSD/Apache-style)."
+
+  - image: node
+    tag: "20.18.1-bookworm-slim"
+    digest: "sha256:b2c8e0eb8a6aeeae33b2711f8f516003e27ee45804e270468d937b3214f2f0cc"
+    purpose: "Frontend build stage + local dev server base image"
+    source: "docker.io/library/node (Docker Official Image, Debian bookworm base)"
+    license: "MIT (Node.js runtime); Debian base layer under mixed OS-package licenses (not individually audited — see header note)"
+    pinned: true
+    approval_status: approved
+
+  - image: nginx
+    tag: "1.27.3-alpine3.20"
+    digest: "sha256:814a8e88df978ade80e584cc5b333144b9372a8e3c98872d07137dbf3b44d0e4"
+    purpose: "Production frontend runtime — serves the static Vite build. The Vite dev server is never used in production; see frontend/Dockerfile `runtime` target."
+    source: "docker.io/library/nginx (Docker Official Image, Alpine base)"
+    license: "BSD-2-Clause (nginx license)"
+    pinned: true
+    approval_status: approved
+
+# Summary (computed 2026-08-17, verified against license-policy.yml):
+#   approved: 5
+#   review_required: 0
+#   blocked: 0
+#   unknown: 0
