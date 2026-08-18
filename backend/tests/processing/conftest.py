@@ -85,9 +85,29 @@ async def run_all_jobs(
         queue=queue,
         storage=storage,
     )
+    from app.processing.models import OutboxStatus, ProcessingOutbox
+    from sqlalchemy import select
+
     for _ in range(max_rounds):
+        # Job creation (API request or a worker's own success-handler
+        # chaining) writes a Transactional Outbox row rather than enqueuing
+        # onto FakeQueueBackend directly (Phase 3.1 — see
+        # app.processing.outbox). Each worker's own maintenance sweep would
+        # normally relay this, but that only happens as a side effect of
+        # `run_forever` below, which itself only runs if `pending` (queue
+        # depth) is nonzero — so check outstanding outbox rows too, or a
+        # freshly-created job that hasn't been relayed yet looks like "no
+        # work left" and the loop exits before the worker ever sees it.
+        async with sessionmaker() as session:
+            outstanding_outbox = (
+                await session.execute(
+                    select(ProcessingOutbox.id).where(
+                        ProcessingOutbox.status == OutboxStatus.PENDING.value
+                    )
+                )
+            ).scalars().first()
         pending = sum(len(v) for v in queue._queues.values())  # noqa: SLF001
-        if pending == 0:
+        if pending == 0 and outstanding_outbox is None:
             break
         await speech_worker.run_forever(max_iterations=1)
         await diarization_worker.run_forever(max_iterations=1)

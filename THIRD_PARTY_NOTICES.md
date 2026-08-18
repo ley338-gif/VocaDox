@@ -11,7 +11,9 @@ in `compliance/` — never invented or guessed:
   `pip-licenses`/`license-checker` output against the actual installed
   trees via `compliance/generate_transitive_inventory.py`
 - **Container images**: `compliance/container-inventory.yml`
-- **AI models**: `compliance/model-inventory.yml` (currently empty — none bundled)
+- **AI models**: `compliance/model-inventory.yml` (4 entries as of Phase
+  3.1 — none bundled in the product itself; each is admin-installed
+  separately, see `docs/admin/model-installation.md`)
 
 Run `python compliance/check_licenses.py` to re-verify all four
 inventories against `compliance/license-policy.yml` at any time. Last
@@ -123,10 +125,20 @@ image:
 
 ## AI models
 
-None bundled in Phase 0. See `docs/licenses/ai-models.md` and
-`compliance/model-inventory.yml`. Real model integrations (speech-to-text,
-diarization, LLM) are Phase 3/4 work; each will get its own license
-verification and inventory entry before it ships.
+None bundled directly in any VocaDox image or repository — every model
+below is downloaded by an admin, on request, into a persistent volume
+(see `docs/admin/model-installation.md`). As of Phase 3.1,
+`compliance/model-inventory.yml` records 4 approved entries:
+
+| Model | License | Gated? | Role |
+|---|---|---|---|
+| `Systran/faster-whisper-small` | MIT | No | Speech-to-text |
+| `pyannote/speaker-diarization-3.1` | MIT | Yes | Diarization (top-level pipeline) |
+| `pyannote/segmentation-3.0` | MIT | Yes | Diarization (segmentation sub-model) |
+| `pyannote/wespeaker-voxceleb-resnet34-LM` | CC-BY-4.0 | No | Diarization (speaker-embedding sub-model) |
+
+No LLM model is used anywhere in this codebase (Phase 4+ scope, not yet
+started).
 
 ---
 

@@ -93,11 +93,40 @@ transitive package rather than silently omitted.
   actually available (see PHASE_3_VALIDATION_REPORT.md — if no token was
   available in the validation sandbox, this is marked NOT VERIFIED
   honestly rather than claimed).
-- `compliance/model-inventory.yml` records both gated model repos with
-  `bundled_with_product: false` and `download_method: admin-initiated
-  (Hugging Face, requires accepted terms + token)`.
+- `compliance/model-inventory.yml` records all three model repos (see
+  "Phase 3.1 amendment" below) with `bundled_with_product: false` and
+  `download_method: admin-initiated (Hugging Face, requires accepted
+  terms + token)`.
 - Overlapping speech, ambiguous turns, and per-turn confidence are handled
   per `app/providers/diarization.py`'s `DiarizationResult` contract (see
   ADR-0022 for how the alignment stage turns this into honest
   CONFIDENT/AMBIGUOUS/OVERLAP/UNASSIGNED flags rather than forced
   certainty).
+
+## Phase 3.1 amendment: a THIRD dependent repo, and the gap between "documented" and "downloaded"
+
+This ADR's original text (above) named `pyannote/segmentation-3.0` as a
+pipeline dependency and even listed its license — but Phase 3's actual
+`app/cli/install_models.py` never downloaded it, and the pipeline
+composes a **second, undocumented** dependent repo,
+`pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0, not gated), which
+this ADR did not mention at all. Real diarization inference testing in
+Phase 3.1 (installing the model with a real Hugging Face token and
+running it against a real 2-speaker fixture — see
+`PHASE_3_1_VALIDATION_REPORT.md`) is what surfaced this: a fully-installed
+top-level pipeline still made a live, unauthorized network call for
+`segmentation-3.0` at request time, because nothing had ever actually
+fetched it. "Documenting a dependency in an ADR" and "the installer
+actually fetching it" turned out to be two different, independently
+fallible things — worth stating plainly rather than letting the earlier
+paragraph read as if it had already been handled.
+
+Fixed in Phase 3.1: `app/cli/install_models.py`'s `ModelProfile.
+dependent_repos` now downloads both `segmentation-3.0` and
+`wespeaker-voxceleb-resnet34-LM` automatically as part of installing
+`diarization-default`, into a shared Hugging Face cache directory that
+`PyannoteDiarizationProvider` points `pyannote.audio` at directly, with
+`HF_HUB_OFFLINE=1` forced for the whole worker process (see
+`app/workers/_offline_env.py`) so a still-missing dependent repo fails
+with a clear error instead of a silent/live network call. All three
+repos are now individually entered in `compliance/model-inventory.yml`.

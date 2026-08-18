@@ -57,7 +57,7 @@ models:
     approval_status: approved
 
   - name: pyannote/speaker-diarization-3.1
-    purpose: Speaker diarization, Phase 3 default diarization profile (internally composes pyannote/segmentation-3.0)
+    purpose: Speaker diarization, Phase 3 default diarization profile (top-level pipeline; composes the two dependent models below)
     provider: pyannote (Hervé Bredin / pyannoteAI)
     version: "84fd25912480287da0247647c3d2b4853cb3ee5"  # HF revision (commit), pinned — never a floating tag
     source: "https://huggingface.co/pyannote/speaker-diarization-3.1"
@@ -68,14 +68,109 @@ models:
       GATED on Hugging Face: an admin must log in, accept the model's
       terms, and supply a personal Hugging Face access token to download
       it (never bundled/redistributed by VocaDox itself as a result — see
-      ADR-0017/ADR-0018). The pipeline internally depends on
-      pyannote/segmentation-3.0 (also MIT, also gated) — same access
-      requirement.
-    sha256: null  # not yet computed for the locally-installed snapshot — see Known Limitations, PHASE_3_VALIDATION_REPORT.md
+      ADR-0017/ADR-0018).
+    sha256: null  # not yet computed for the locally-installed snapshot — see Known Limitations, PHASE_3_1_VALIDATION_REPORT.md
     bundled: false
     downloaded_at_install: true
-    download_method: "Admin-initiated: `python -m app.cli.install_models diarization-default --token <hf_token>` (app/cli/install_models.py). Requires VOCADOX_HUGGINGFACE_TOKEN or --token; never read by the running worker's request path, never logged."
+    download_method: "Admin-initiated: `docker compose run --rm model-manager install diarization-default` (app/cli/model_manager.py + app/cli/install_models.py). Requires VOCADOX_HUGGINGFACE_TOKEN or --token; never read by the running worker's request path, never logged."
     bundled_with_product: false
-    disk_size_mb: 20  # pipeline config + segmentation/embedding checkpoints combined, approximate
-    runtime_requirements: "pyannote.audio>=3.1,<3.4 (MIT, see dependency-inventory.yml); CPU or NVIDIA GPU"
+    disk_size_mb: 20  # top-level pipeline config + card only — the actual inference weights are the two dependent models below
+    runtime_requirements: "pyannote.audio>=4.0,<5.0 (MIT, see dependency-inventory.yml; NOTE — corrected in Phase 3.1: this entry previously said >=3.1,<3.4, which no longer matched pyproject.toml's actual pin after ADR-0017's real-testing-driven 3.x->4.x reversal during Phase 3); CPU or NVIDIA GPU"
+    approval_status: approved
+
+  # Phase 3.1 finding: real diarization inference testing (docker compose
+  # run --rm model-manager install diarization-default, then a real
+  # worker-diarization pipeline run) discovered that
+  # pyannote/speaker-diarization-3.1's config.yaml resolves TWO further
+  # Hugging Face repos BY NAME at pipeline-load time — neither was
+  # previously in this inventory, and only one (segmentation-3.0) was even
+  # mentioned in Phase 3's docs. Both are now downloaded automatically as
+  # part of installing the `diarization-default` profile (see
+  # app/cli/install_models.py's DependentRepo) into a shared, offline-only
+  # Hugging Face cache — see docs/admin/diarization-provider.md.
+  - name: pyannote/segmentation-3.0
+    purpose: Speaker-diarization sub-model (config.yaml's `segmentation:` component of pyannote/speaker-diarization-3.1)
+    provider: pyannote (Hervé Bredin / pyannoteAI)
+    version: "e66f3d3b9eb0873085418a7b813d3b369bf160bb"  # HF revision (commit), pinned
+    source: "https://huggingface.co/pyannote/segmentation-3.0"
+    license: MIT
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      GATED on Hugging Face — its own separate terms acceptance is
+      required even for a token that already has
+      speaker-diarization-3.1 access. The model card states it "will
+      always remain open-source" under MIT but the maintainers may
+      occasionally email accepted users about paid/premium offerings; no
+      field-of-use or redistribution restriction beyond standard MIT
+      attribution.
+    sha256: null
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated, automatically as part of `docker compose run --rm model-manager install diarization-default` (never a separate command an admin has to know about)."
+    bundled_with_product: false
+    disk_size_mb: 6
+    runtime_requirements: "pyannote.audio>=4.0,<5.0; loaded fully offline (HF_HUB_OFFLINE=1) from the shared HF cache — see app/providers/diarization.py's PyannoteDiarizationProvider"
+    approval_status: approved
+
+  - name: pyannote/wespeaker-voxceleb-resnet34-LM
+    purpose: Speaker-diarization sub-model (config.yaml's `embedding:` component of pyannote/speaker-diarization-3.1)
+    provider: WeSpeaker project, hosted under the pyannote Hugging Face org
+    version: "837717ddb9ff5507820346191109dc79c958d614"  # HF revision (commit), pinned
+    source: "https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM"
+    license: CC-BY-4.0
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      Not gated — no Hugging Face login/token required to download (a
+      token is still passed by VocaDox's installer since it is installing
+      alongside two gated repos in the same run, but this repo itself does
+      not require one). The model card states the VoxCeleb-trained
+      checkpoint follows CC-BY-4.0, i.e. attribution required, no other
+      field-of-use restriction; VocaDox attributes it here and in
+      THIRD_PARTY_NOTICES.md's "AI models" section.
+    sha256: null
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated, automatically as part of `docker compose run --rm model-manager install diarization-default` (never a separate command an admin has to know about)."
+    bundled_with_product: false
+    disk_size_mb: 26
+    runtime_requirements: "pyannote.audio>=4.0,<5.0; loaded fully offline (HF_HUB_OFFLINE=1) from the shared HF cache — see app/providers/diarization.py's PyannoteDiarizationProvider"
+    approval_status: approved
+
+  # Third dependent repo — not named in speaker-diarization-3.1's own
+  # config.yaml at all. Found by real diarization inference testing: a
+  # pyannote.audio 4.x library quirk (SpeakerDiarization.__init__
+  # unconditionally constructs a PLDA transform at pipeline-load time
+  # regardless of which `clustering:` algorithm the loaded pipeline
+  # actually configures — even for AgglomerativeClustering, which never
+  # uses it downstream) defaults that transform to a different, newer,
+  # gated pipeline VocaDox does not use or select (ADR-0017 selected
+  # speaker-diarization-3.1, not community-1). See ADR-0017's Phase 3.1
+  # amendment and app/cli/install_models.py's DependentRepo for the full
+  # account.
+  - name: pyannote/speaker-diarization-community-1 (plda/ subfolder only)
+    purpose: Unused-but-required PLDA transform pyannote.audio 4.x's SpeakerDiarization pipeline loads unconditionally at construction time
+    provider: pyannote (Hervé Bredin / pyannoteAI)
+    version: "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee"  # HF revision (commit), pinned
+    source: "https://huggingface.co/pyannote/speaker-diarization-community-1"
+    license: CC-BY-4.0
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      GATED on Hugging Face — its own separate terms acceptance is
+      required. VocaDox's installer restricts the download to this
+      repo's `plda/` subfolder only (via huggingface_hub's
+      `allow_patterns`) — the rest of this pipeline (its own,
+      much larger, segmentation/embedding weights) is never downloaded
+      and never used; VocaDox continues to use
+      pyannote/segmentation-3.0 and pyannote/wespeaker-voxceleb-
+      resnet34-LM for those roles, per ADR-0017's selection.
+    sha256: null
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated, automatically as part of `docker compose run --rm model-manager install diarization-default` (never a separate command an admin has to know about)."
+    bundled_with_product: false
+    disk_size_mb: 2  # plda/ subfolder only (plda.npz + xvec_transform.npz)
+    runtime_requirements: "pyannote.audio>=4.0,<5.0; loaded fully offline (HF_HUB_OFFLINE=1) from the shared HF cache — see app/providers/diarization.py's PyannoteDiarizationProvider. Constructed but never actually invoked by VocaDox's AgglomerativeClustering configuration — an upstream library inefficiency, not a VocaDox design choice."
     approval_status: approved

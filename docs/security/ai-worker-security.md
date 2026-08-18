@@ -1,5 +1,13 @@
 # AI worker security
 
+## Container vulnerability scan
+
+See `docs/security/ai-worker-vulnerability-triage.md` for the Phase 3.1
+individual, per-finding triage of this image's Trivy `HIGH` results (0
+CRITICAL, 18 HIGH, all in the base OS layer, all accepted with a
+documented reason — not accepted as one aggregate untriaged group, which
+is what Phase 3 had time-boxed to).
+
 ## Process isolation
 
 `worker-speech`/`worker-diarization` run as separate containers from the
