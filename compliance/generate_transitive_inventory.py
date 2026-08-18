@@ -110,6 +110,35 @@ FIRST_PARTY_NAMES = {"vocadox-backend", "vocadox-frontend"}
 PACKAGE_LICENSE_OVERRIDES: dict[tuple[str, str], str] = {
     ("pypi", "colorama"): "BSD-3-Clause",  # verified via PyPI JSON + project README, 2026-08-17
     ("pypi", "httpx"): "BSD-3-Clause",  # matches the direct-dependency entry in dependency-inventory.yml, verified via PyPI JSON, 2026-08-17
+    # Phase 3 [ai] extra (transitive deps of pyannote.audio): PyPI publishes
+    # no license classifier/expression for these pyannote-org packages at
+    # all (verified live against https://pypi.org/pypi/<name>/json,
+    # 2026-08-18 — info.license and info.license_expression both null,
+    # classifiers empty). Each project's actual GitHub LICENSE file was
+    # read directly instead of guessed from the pyannote.audio parent
+    # package's own MIT license.
+    ("pypi", "pyannote-core"): "MIT",  # raw.githubusercontent.com/pyannote/pyannote-core/develop/LICENSE
+    ("pypi", "pyannote-database"): "MIT",  # raw.githubusercontent.com/pyannote/pyannote-database/develop/LICENSE
+    ("pypi", "pyannote-metrics"): "MIT",  # raw.githubusercontent.com/pyannote/pyannote-metrics/master/LICENSE
+    ("pypi", "pyannote-pipeline"): "MIT",  # raw.githubusercontent.com/pyannote/pyannote-pipeline/develop/LICENSE
+    ("pypi", "antlr4-python3-runtime"): "BSD-3-Clause",  # pip-licenses reports bare "BSD"; verified
+    # 3-clause via raw.githubusercontent.com/antlr/antlr4/master/LICENSE.txt (has the
+    # no-endorsement-without-permission third clause), 2026-08-18.
+    # The following all reported bare "BSD" from pip-licenses (PyPI publishes only the
+    # generic "License :: OSI Approved :: BSD License" trove classifier, no clause-count
+    # detail) — each verified individually via PyPI's license/license_expression field or
+    # the project's actual LICENSE file on GitHub, 2026-08-18. Transitive deps of the
+    # Phase 3 [ai] extra (pyannote.audio / torch dependency tree).
+    ("pypi", "Jinja2"): "BSD-3-Clause",
+    ("pypi", "mpmath"): "BSD-3-Clause",  # PyPI license_expression = BSD-3-Clause
+    ("pypi", "omegaconf"): "BSD-3-Clause",
+    ("pypi", "pandas"): "BSD-3-Clause",  # PyPI license field states "BSD 3-Clause License"
+    ("pypi", "scipy"): "BSD-3-Clause",
+    ("pypi", "semver"): "BSD-3-Clause",
+    ("pypi", "soundfile"): "BSD-3-Clause",  # PyPI license field states "BSD 3-Clause License"
+    ("pypi", "sympy"): "BSD-3-Clause",
+    ("pypi", "threadpoolctl"): "BSD-3-Clause",  # PyPI license field states "BSD-3-Clause"
+    ("pypi", "torchaudio"): "BSD-2-Clause",  # verified via github.com/pytorch/audio LICENSE — 2-clause, unlike torch's own 3-clause
 }
 
 
@@ -133,10 +162,12 @@ def normalize_license(raw: str) -> str:
         "BSD License": "BSD",  # ambiguous 2 vs 3 clause; pip-licenses can't
         # tell them apart from classifiers alone for a few packages.
         "Apache Software License": "Apache-2.0",
+        "Apache License 2.0": "Apache-2.0",  # phase 3 [ai] extra: multidict reports this exact string
         "Apache 2.0": "Apache-2.0",
         "PYTHON SOFTWARE FOUNDATION LICENSE": "PSF-2.0",
         "Python Software Foundation License": "PSF-2.0",
         "Mozilla Public License 2.0 (MPL 2.0)": "MPL-2.0",
+        "3-Clause BSD License": "BSD-3-Clause",  # phase 3 [ai] extra: protobuf reports this exact string
     }
     return aliases.get(raw, raw)
 
@@ -280,6 +311,14 @@ def main() -> int:
     parser.add_argument("--pip-dev", type=Path, required=True)
     parser.add_argument("--npm-prod", type=Path, required=True)
     parser.add_argument("--npm-all", type=Path, required=True)
+    parser.add_argument(
+        "--pip-ai",
+        type=Path,
+        default=None,
+        help="pip-licenses JSON for `pip install -e backend/[ai]` — the AI worker image's "
+        "package set (Phase 3+, worker-speech/worker-diarization only, never the api/frontend "
+        "images). Tagged scope='worker'. Optional so this script stays runnable without it.",
+    )
     args = parser.parse_args()
 
     policy = load_yaml(POLICY_FILE)
@@ -302,7 +341,24 @@ def main() -> int:
     pip_entries = dedupe_prefer_runtime(pip_prod + pip_dev)
     npm_entries = dedupe_prefer_runtime(npm_prod + npm_all)
 
-    all_entries = sorted(pip_entries + npm_entries, key=lambda e: (e["ecosystem"], e["name"]))
+    worker_entries: list[dict[str, Any]] = []
+    if args.pip_ai is not None:
+        pip_ai = pip_licenses_to_entries(
+            load_json(args.pip_ai), scope="worker", direct_names=direct_names["pypi"]
+        )
+        # The [ai] extra install includes the base runtime deps too (it's
+        # an editable install of the whole package) — keep only packages
+        # not already captured by the prod/dev scan, tagged scope='worker'
+        # so it's clear they ship only in worker-speech/worker-diarization,
+        # never in the api/frontend images.
+        already_seen = {(e["ecosystem"], e["name"], e["version"]) for e in pip_entries}
+        worker_entries = [
+            e for e in pip_ai if (e["ecosystem"], e["name"], e["version"]) not in already_seen
+        ]
+
+    all_entries = sorted(
+        pip_entries + npm_entries + worker_entries, key=lambda e: (e["ecosystem"], e["name"])
+    )
 
     offenders = []
     for e in all_entries:
@@ -330,7 +386,11 @@ def main() -> int:
             "[dev] extra; frontend: `npm ls --production`) and therefore "
             "ships in the actual Docker runtime image / built bundle. "
             "'scope: dev' means it was only found in the full dev/build "
-            "tree (lint/test/build tooling) and is never shipped."
+            "tree (lint/test/build tooling) and is never shipped. "
+            "'scope: worker' (Phase 3+) means the package appears only in "
+            "`pip install -e backend/[ai]` — it ships in the worker-speech/"
+            "worker-diarization images only, never in the api/frontend "
+            "images (see backend/worker.Dockerfile)."
         ),
         "summary": counts,
         "dependencies": all_entries,

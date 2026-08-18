@@ -60,7 +60,7 @@ def get_media_normalizer() -> MediaNormalizer:
     """FFmpeg-based normalization is used whenever the `ffmpeg` binary is
     resolvable on PATH; otherwise falls back to the Phase 2 no-op
     normalizer (documented, not silent — see FfmpegMediaNormalizer's
-    docstring and docs/architecture/adr/0017-ffmpeg-normalization.md)."""
+    docstring and docs/architecture/adr/0019-ffmpeg-normalization.md)."""
     if FfmpegMediaNormalizer.ffmpeg_available():
         settings = get_settings()
         return FfmpegMediaNormalizer(

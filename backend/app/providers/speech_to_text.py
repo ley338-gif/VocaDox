@@ -10,7 +10,7 @@ keeping is captured only in `ProcessingRun.configuration_snapshot`
 
 `FasterWhisperSpeechProvider` (real, local, offline-capable once the
 model is installed — see docs/admin/model-installation.md and
-docs/architecture/adr/0014-speech-provider-selection.md for the full
+docs/architecture/adr/0016-speech-provider-selection.md for the full
 evaluation) is the Phase 3 production provider. `FakeSpeechProvider`
 remains available and is what CI/unit tests/GPU-less dev use exclusively
 — never the real provider (see .github/workflows/ci.yml).
@@ -161,7 +161,7 @@ class FasterWhisperConfig:
 
 class FasterWhisperSpeechProvider(SpeechToTextProvider):
     """Real local STT via faster-whisper (CTranslate2 Whisper). See
-    docs/architecture/adr/0014-speech-provider-selection.md for the full
+    docs/architecture/adr/0016-speech-provider-selection.md for the full
     evaluation and docs/admin/model-installation.md for how the model gets
     onto `config.model_dir` (never downloaded silently at request time in
     production)."""

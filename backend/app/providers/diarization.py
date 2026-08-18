@@ -8,7 +8,7 @@ represented honestly (multiple turns may cover the same time range) —
 never collapsed into a false single-speaker-at-a-time guarantee.
 
 `PyannoteDiarizationProvider` (real, local — see
-docs/architecture/adr/0015-diarization-provider-selection.md for the full
+docs/architecture/adr/0017-diarization-provider-selection.md for the full
 license/evaluation) is the Phase 3 production provider. The
 `pyannote/speaker-diarization-3.1` pipeline is MIT-licensed but *gated* on
 Hugging Face (requires accepting terms + an access token to download) —

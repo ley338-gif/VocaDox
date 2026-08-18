@@ -1,13 +1,27 @@
-# VocaDox Phase 0 development compose stack.
+# VocaDox development compose stack.
 #
-# No worker container yet (spec: workers ship alongside the async pipeline
-# in a later phase). The frontend service runs the Vite DEV server — this
-# is intentional for local development only; the production image
-# (frontend/Dockerfile `runtime` target) serves static assets via nginx and
-# never runs the dev server. See frontend/Dockerfile and README.md.
+# Phase 3 adds worker-speech/worker-diarization (see
+# docs/architecture/adr/0020-worker-topology.md): both build from the same
+# backend/worker.Dockerfile image but run with a different --role, so they
+# can later get independent GPU allocations without a Dockerfile change.
+# Neither the `backend` (api) nor `frontend` service ever gets GPU device
+# access — only the AI workers do (spec: "GPU isolation"); the api stays
+# fully functional (serving everything except newly-queued processing)
+# even if both workers are stopped. The frontend service runs the Vite DEV
+# server — this is intentional for local development only; the production
+# image (frontend/Dockerfile `runtime` target) serves static assets via
+# nginx and never runs the dev server. See frontend/Dockerfile and
+# README.md.
 #
 # All image tags below are pinned to a specific version (never `latest`);
 # see ../compliance/container-inventory.yml for the license/digest record.
+#
+# GPU: uncomment each worker's `deploy.resources.reservations.devices`
+# block to grant NVIDIA GPU access via the NVIDIA Container Toolkit (see
+# docs/operations/gpu-runtime.md). Left commented by default so
+# `docker compose up` works unmodified on a CPU-only host — workers then
+# fall back to CPU inference (see docs/admin/gpu-setup.md's honest CPU
+# real-time-factor numbers).
 
 services:
   postgres:
@@ -54,6 +68,9 @@ services:
       # the session cookie at all. A real deployment sits behind TLS and
       # must leave this at its secure-by-default `true`.
       VOCADOX_SESSION_COOKIE_SECURE: ${VOCADOX_SESSION_COOKIE_SECURE:-false}
+      # api never loads a real speech/diarization provider itself (it only
+      # enqueues jobs) — kept at the safe "fake" default here regardless;
+      # only the worker services below set these to the real providers.
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -68,6 +85,75 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
+
+  worker-speech:
+    build:
+      context: ../backend
+      dockerfile: worker.Dockerfile
+    command: ["--role", "speech"]
+    environment:
+      VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
+      VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
+      VOCADOX_LOG_FORMAT: ${VOCADOX_LOG_FORMAT:-json}
+      VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
+      VOCADOX_VALKEY_URL: ${VOCADOX_VALKEY_URL:-valkey://valkey:6379/0}
+      # "fake" by default so `docker compose up` never silently tries to
+      # load a multi-GB model that hasn't been explicitly installed (spec:
+      # "no silent internet access from workers in production" / "No model
+      # not installed -> show 'Not installed', never a fake 'Healthy'").
+      # Set to faster_whisper after running the model-install step (see
+      # docs/admin/model-installation.md).
+      VOCADOX_SPEECH_PROVIDER: ${VOCADOX_SPEECH_PROVIDER:-fake}
+      VOCADOX_SPEECH_DEVICE: ${VOCADOX_SPEECH_DEVICE:-auto}
+      VOCADOX_MODEL_VOLUME_ROOT: /app/data/models
+    volumes:
+      - vocadox_backend_data:/app/data
+      - vocadox_models_data:/app/data/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  worker-diarization:
+    build:
+      context: ../backend
+      dockerfile: worker.Dockerfile
+    command: ["--role", "diarization"]
+    environment:
+      VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
+      VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
+      VOCADOX_LOG_FORMAT: ${VOCADOX_LOG_FORMAT:-json}
+      VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
+      VOCADOX_VALKEY_URL: ${VOCADOX_VALKEY_URL:-valkey://valkey:6379/0}
+      VOCADOX_DIARIZATION_PROVIDER: ${VOCADOX_DIARIZATION_PROVIDER:-fake}
+      VOCADOX_DIARIZATION_DEVICE: ${VOCADOX_DIARIZATION_DEVICE:-auto}
+      VOCADOX_MODEL_VOLUME_ROOT: /app/data/models
+      # Only ever read by the admin-initiated `vocadox models install` CLI
+      # step, never by the running worker process itself at request time.
+      VOCADOX_HUGGINGFACE_TOKEN: ${VOCADOX_HUGGINGFACE_TOKEN:-}
+    volumes:
+      - vocadox_backend_data:/app/data
+      - vocadox_models_data:/app/data/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
   frontend:
     build:
@@ -87,3 +173,9 @@ volumes:
   vocadox_postgres_data:
   vocadox_valkey_data:
   vocadox_backend_data:
+  # Persistent model volume, deliberately separate from
+  # vocadox_backend_data (conversation media) — see
+  # docs/architecture/adr/0018-model-installation-strategy.md. Never
+  # re-downloaded on `docker compose restart`/`up` (models persist here
+  # across container recreation, only `down -v` clears them).
+  vocadox_models_data:

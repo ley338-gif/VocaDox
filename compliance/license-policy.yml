@@ -40,6 +40,18 @@ approved:
   - CC-BY-3.0          # Attribution-only Creative Commons — fine for closed-source use, just requires credit. (spdx-exceptions, dev-only)
   - CC-BY-4.0          # Attribution-only Creative Commons, same rationale. (caniuse-lite data tables, dev-only)
   - PSF-2.0            # Python Software Foundation License 2.0 — permissive, OSI-approved. Found on typing_extensions (runtime, transitive of pydantic) and defusedxml (dev-only, transitive of pip-audit).
+  # --- Added Phase 3, [ai] extra (worker-image-only) transitive scan (2026-08-18) ---
+  - BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0  # numpy's exact compound SPDX expression as reported by pip-licenses; every component is independently permissive.
+  - 0BSD                # Zero-clause BSD — public-domain-equivalent. (component of numpy's license expression)
+  - Zlib                # zlib/libpng license — permissive, no copyleft. (component of numpy's license expression)
+  - "Apache-2.0 WITH LLVM-exception"  # Apache-2.0 plus an LLVM-project exception that only broadens permissions. (component of torch's license expression)
+  # NOTE: "BSL-1.0" (Boost Software License 1.0, below) is NOT the same
+  # license as "BSL-1.1" (Business Source License 1.1) in the `blocked`
+  # bucket further down — despite the near-identical abbreviation, Boost's
+  # BSL-1.0 is a fully permissive OSI-approved license with no source-
+  # available/non-compete restriction. Verified individually (torch's
+  # license expression), never assumed from the abbreviation alone.
+  - BSL-1.0             # Boost Software License 1.0 — permissive. (component of torch's license expression; NOT Business Source License 1.1)
 
 review_required:
   - MPL-2.0

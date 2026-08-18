@@ -6,7 +6,7 @@ evaluated (never assume "FFmpeg = LGPL" — the effective license depends on
 which codecs are compiled in). That evaluation has now happened for Phase
 3 (speech/diarization providers require a specific PCM format — see
 `FfmpegMediaNormalizer`'s docstring and
-docs/architecture/adr/0017-ffmpeg-normalization.md) and selects an
+docs/architecture/adr/0019-ffmpeg-normalization.md) and selects an
 LGPL-configured FFmpeg build for anything VocaDox ships in a container
 image. `NoOpMediaNormalizer` remains available as the fallback when no
 `ffmpeg` binary is resolvable (documented degradation, never silent).
@@ -89,13 +89,13 @@ class FfmpegMediaNormalizer(MediaNormalizer):
     models are trained... to operate on audio sampled at 16kHz") and
     pyannote.audio's pipeline docs (resamples any input to 16kHz mono
     internally regardless of what it's given). See
-    docs/architecture/adr/0017-ffmpeg-normalization.md.
+    docs/architecture/adr/0019-ffmpeg-normalization.md.
 
     License note: the *binary* actually installed on PATH determines the
     effective license, not this code. Production container images MUST
     install an LGPL-configured FFmpeg build (`--disable-gpl
     --disable-nonfree`, no libx264/libmp3lame) — see
-    docs/architecture/adr/0017-ffmpeg-normalization.md and
+    docs/architecture/adr/0019-ffmpeg-normalization.md and
     compliance/container-inventory.yml for the exact build pinned in the
     worker image. A GPL-configured `ffmpeg` binary found on a developer's
     local PATH (as this repo's own CI/dev sandbox may have) is NEVER what

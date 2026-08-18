@@ -17,7 +17,7 @@ present once a reviewer corrects the segment. `review_status` tracks the
 per-segment review lifecycle. See app.transcription.corrections for the
 audit trail of who changed what, when, from what previous value.
 
-Word-level timing storage decision (see docs/architecture/adr/0016-word-timing-storage.md):
+Word-level timing storage decision (see docs/architecture/adr/0021-word-timing-storage.md):
 stored as a single validated JSON array per segment (`words`), not one row
 per word. Segment counts are small (seconds-to-minutes granularity);
 per-word tables would multiply row counts ~5-10x for no current query
