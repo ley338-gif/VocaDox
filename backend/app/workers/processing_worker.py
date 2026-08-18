@@ -1,0 +1,196 @@
+"""The Phase 3 worker process: dequeues a `ProcessingJob` id, executes the
+corresponding pipeline stage (see app.processing.orchestrator), applies
+the retry policy on failure, and chains the next stage on success. Never
+runs inside an HTTP request — this is what `python -m
+app.workers.runner` starts as its own process/container (see
+deploy/docker-compose.yml's `worker-speech`/`worker-diarization`
+services).
+
+Concurrency: `Settings.worker_concurrency` caps how many jobs one worker
+process executes concurrently (default 1 — safe for GPU-heavy work; see
+docs/admin/worker-configuration.md).
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.ai_providers import get_diarization_provider, get_media_normalizer, get_speech_provider
+from app.core.storage import get_storage_provider
+from app.platform.config import get_settings
+from app.platform.db.session import get_sessionmaker
+from app.platform.valkey.valkey_backend import get_valkey_backend
+from app.processing.models import JobType, ProcessingJob, ProcessingStatus
+from app.processing.orchestrator import (
+    execute_align,
+    execute_diarize,
+    execute_normalize,
+    execute_transcribe,
+    maybe_trigger_align,
+    trigger_post_normalize,
+)
+from app.processing.retry import classify_exception
+from app.processing.service import (
+    complete_job,
+    dequeue_next,
+    fail_job,
+    load_job,
+    reclaim_stale_jobs,
+    start_job,
+)
+
+logger = logging.getLogger("vocadox.worker")
+
+_STAGE_EXECUTORS = {
+    JobType.NORMALIZE: "normalize",
+    JobType.TRANSCRIBE: "transcribe",
+    JobType.DIARIZE: "diarize",
+    JobType.ALIGN: "align",
+}
+
+
+class ProcessingWorker:
+    def __init__(self, *, worker_id: str, job_types: list[JobType]) -> None:
+        self.worker_id = worker_id
+        self.job_types = job_types
+        self._settings = get_settings()
+        self._sessionmaker = get_sessionmaker()
+        self._queue = get_valkey_backend()
+        self._storage = get_storage_provider()
+        self._normalizer = get_media_normalizer()
+        self._speech_provider = get_speech_provider()
+        self._diarization_provider = get_diarization_provider()
+
+    async def run_forever(self, *, max_iterations: int | None = None) -> None:
+        iterations = 0
+        while max_iterations is None or iterations < max_iterations:
+            iterations += 1
+            await self._reclaim_sweep()
+            job_id = await dequeue_next(self._queue, self.job_types, timeout_seconds=5)
+            if job_id is None:
+                continue
+            await self._process_one(job_id)
+
+    async def _reclaim_sweep(self) -> None:
+        async with self._sessionmaker() as session:
+            await reclaim_stale_jobs(session, self._queue)
+            await session.commit()
+
+    async def _process_one(self, job_id: uuid.UUID) -> None:
+        async with self._sessionmaker() as session:
+            job = await load_job(session, job_id)
+            if job is None or job.status != ProcessingStatus.QUEUED.value:
+                return  # already claimed/cancelled/stale payload
+
+            await start_job(
+                session, job, worker_id=self.worker_id, lease_seconds=self._settings.job_lease_seconds
+            )
+            await session.commit()
+
+        async with self._sessionmaker() as session:
+            job = await load_job(session, job_id)
+            assert job is not None
+            try:
+                run_id = await self._dispatch(session, job)
+                await complete_job(session, job, processing_run_id=run_id)
+                await session.commit()
+            except Exception as exc:  # noqa: BLE001 - classify and record, never crash the loop
+                await session.rollback()
+                async with self._sessionmaker() as fail_session:
+                    job = await load_job(fail_session, job_id)
+                    assert job is not None
+                    failure_class = classify_exception(exc)
+                    logger.warning(
+                        "processing job failed",
+                        extra={
+                            "job_id": str(job.id),
+                            "job_type": job.job_type,
+                            "failure_class": failure_class.value,
+                        },
+                    )
+                    retried = await fail_job(
+                        fail_session,
+                        job,
+                        self._queue,
+                        error_code=failure_class.value.upper(),
+                        error_message_safe=f"{type(exc).__name__}: processing failed",
+                        failure_class=failure_class,
+                    )
+                    from app.audit.service import record_event
+
+                    await record_event(
+                        fail_session,
+                        event_type="processing.retried" if retried else "processing.failed",
+                        event_metadata={
+                            "job_id": str(job.id),
+                            "job_type": job.job_type,
+                            "failure_class": failure_class.value,
+                        },
+                    )
+                    if not retried:
+                        await self._mark_transcript_and_conversation_failed(fail_session, job)
+                    await fail_session.commit()
+                return
+
+        async with self._sessionmaker() as session:
+            job = await load_job(session, job_id)
+            assert job is not None
+            await self._on_success(session, job, run_id)
+            await session.commit()
+
+    async def _dispatch(self, session: AsyncSession, job: ProcessingJob) -> uuid.UUID:
+        job_type = JobType(job.job_type)
+        if job_type == JobType.NORMALIZE:
+            return await execute_normalize(session, self._storage, self._normalizer, job)
+        if job_type == JobType.TRANSCRIBE:
+            return await execute_transcribe(session, self._storage, self._speech_provider, job)
+        if job_type == JobType.DIARIZE:
+            return await execute_diarize(session, self._storage, self._diarization_provider, job)
+        if job_type == JobType.ALIGN:
+            return await execute_align(session, job)
+        raise ValueError(f"unknown job_type: {job.job_type}")
+
+    async def _on_success(self, session: AsyncSession, job: ProcessingJob, run_id: uuid.UUID) -> None:
+        job_type = JobType(job.job_type)
+        if job_type == JobType.NORMALIZE:
+            # run_id here is the NORMALIZATION ProcessingRun id; fetch its
+            # output_media_id back out to chain TRANSCRIBE/DIARIZE.
+            from app.processing.models import ProcessingRun
+
+            run = await session.get(ProcessingRun, run_id)
+            output_media_id = (run.configuration_snapshot or {}).get("output_media_id") if run else None
+            if output_media_id:
+                await trigger_post_normalize(
+                    session, self._queue, job, normalized_media_id=uuid.UUID(output_media_id)
+                )
+        elif job_type in (JobType.TRANSCRIBE, JobType.DIARIZE):
+            await maybe_trigger_align(session, self._queue, job)
+        # ALIGN success needs no further chaining — it's the terminal stage.
+
+    async def _mark_transcript_and_conversation_failed(self, session: AsyncSession, job: ProcessingJob) -> None:
+        from app.conversations.models import Conversation, ConversationStatus
+        from app.conversations.state_machine import is_valid_transition
+        from app.transcription.service import get_active_transcript, mark_transcript_failed
+
+        transcript = await get_active_transcript(session, source_media_id=job.source_media_id)
+        if transcript is not None:
+            await mark_transcript_failed(
+                session,
+                transcript,
+                error_code=job.error_code or "PROCESSING_FAILED",
+                error_message_safe=job.error_message_safe or "processing failed",
+            )
+        conversation = await session.get(Conversation, job.conversation_id)
+        if conversation is not None:
+            current = ConversationStatus(conversation.status)
+            if is_valid_transition(current, ConversationStatus.FAILED):
+                conversation.status = ConversationStatus.FAILED.value
+                await session.flush()
+
+
+async def run_worker(*, worker_id: str, job_types: list[JobType], max_iterations: int | None = None) -> None:
+    worker = ProcessingWorker(worker_id=worker_id, job_types=job_types)
+    await worker.run_forever(max_iterations=max_iterations)

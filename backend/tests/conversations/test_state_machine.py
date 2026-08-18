@@ -41,12 +41,17 @@ def test_deleted_is_terminal() -> None:
     assert not is_valid_transition(ConversationStatus.DELETED, ConversationStatus.RECORDING)
 
 
-def test_created_to_transcribing_does_not_exist() -> None:
-    # TRANSCRIBING isn't even a member of ConversationStatus in Phase 2 —
-    # this asserts the enum itself, guarding against it being added back
-    # accidentally before Phase 3 is approved.
-    assert not hasattr(ConversationStatus, "TRANSCRIBING")
-    assert not hasattr(ConversationStatus, "DIARIZING")
+def test_phase3_processing_states_now_exist_but_phase4_states_still_do_not() -> None:
+    # TRANSCRIBING/DIARIZING/ALIGNING became real in Phase 3 (see
+    # app.processing) — this now asserts the *opposite* of the old Phase 2
+    # guard for those three, while continuing to guard against Phase 4+
+    # states (EXTRACTING/COMPOSING/APPROVED) being added before their own
+    # phase is approved.
+    assert hasattr(ConversationStatus, "TRANSCRIBING")
+    assert hasattr(ConversationStatus, "DIARIZING")
+    assert hasattr(ConversationStatus, "ALIGNING")
+    assert not hasattr(ConversationStatus, "EXTRACTING")
+    assert not hasattr(ConversationStatus, "COMPOSING")
     assert not hasattr(ConversationStatus, "APPROVED")
 
 

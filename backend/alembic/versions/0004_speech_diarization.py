@@ -38,6 +38,7 @@ def upgrade() -> None:
         sa.Column("model_revision", sa.String(length=128), nullable=True),
         sa.Column("configuration_snapshot", sa.JSON(), nullable=True),
         sa.Column("application_version", sa.String(length=32), nullable=False),
+        sa.Column("raw_output", sa.JSON(), nullable=True),
         sa.Column("error_code", sa.String(length=64), nullable=True),
         sa.Column("error_message_safe", sa.String(length=1024), nullable=True),
         sa.Column(

@@ -49,15 +49,19 @@ class ConversationType(StrEnum):
 
 
 class ConversationStatus(StrEnum):
-    """Only states that genuinely exist as of Phase 2. TRANSCRIBING /
-    DIARIZING / EXTRACTING / APPROVED remain target-architecture-only (see
-    docs/architecture/domain-model.md) and must not be produced by any
-    Phase 2 code path."""
+    """States that genuinely exist as of Phase 3. TRANSCRIBING/DIARIZING/
+    ALIGNING became real in Phase 3 (real async processing stages — see
+    app.processing). EXTRACTING/COMPOSING/APPROVED remain
+    target-architecture-only (see docs/architecture/domain-model.md) and
+    must not be produced by any Phase 3 code path — those are Phase 4+."""
 
     CREATED = "created"
     RECORDING = "recording"
     UPLOADED = "uploaded"
     NORMALIZING = "normalizing"
+    TRANSCRIBING = "transcribing"
+    DIARIZING = "diarizing"
+    ALIGNING = "aligning"
     READY = "ready"
     FAILED = "failed"
     DELETED = "deleted"

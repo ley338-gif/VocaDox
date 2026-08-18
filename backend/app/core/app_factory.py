@@ -17,6 +17,7 @@ from app.platform.db import model_registry  # noqa: F401 - registers all domain 
 from app.platform.health import router as health_router
 from app.platform.logging import configure_logging
 from app.platform.middleware import RequestIdMiddleware
+from app.platform.version import APPLICATION_VERSION
 
 
 def create_app() -> FastAPI:
@@ -26,7 +27,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         description="On-premise evidence-based conversation documentation platform.",
-        version="0.0.1",
+        version=APPLICATION_VERSION,
     )
 
     app.add_middleware(RequestIdMiddleware)

@@ -100,6 +100,13 @@ class ProcessingRun(Base):
     configuration_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     application_version: Mapped[str] = mapped_column(String(32), nullable=False)
 
+    # Raw normalized provider output (TranscriptionResult/DiarizationResult
+    # as JSON), isolated here so it never leaks into TranscriptSegment
+    # directly — the ALIGN stage is the only reader, and it never re-runs
+    # a provider to get this data again. Justified, isolated storage of
+    # provider output per the module docstring's normalized-contract rule.
+    raw_output: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
     error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error_message_safe: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
