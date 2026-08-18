@@ -53,6 +53,33 @@ USAGE:
         --pip-dev compliance/_raw_pip_licenses.json \
         --npm-prod compliance/_raw_npm_licenses_prod.json \
         --npm-all compliance/_raw_npm_licenses_all.json
+
+IMPORTANT — regenerate on Linux, not Windows/macOS:
+CI's drift-check step (.github/workflows/ci.yml) regenerates this file on
+ubuntu-latest and fails the build on ANY diff from the committed copy. A
+number of resolved packages are platform-conditional and will NOT match
+if you generate the raw JSON inputs above on a different OS/arch:
+  - `uvloop` is Unix-only (absent entirely on Windows)
+  - `colorama` is Windows-only (a transitive dep of click/rich there)
+  - `@esbuild/*` and `@rollup/rollup-*` ship one native-binary package per
+    OS/arch (e.g. `win32-x64` locally vs `linux-x64` on CI's runners)
+To get byte-identical output, run the raw-JSON-producing commands above
+inside containers matching CI's images instead of directly on your host,
+e.g.:
+    docker run --rm -v "$PWD/backend:/work/backend" \
+        -v "$PWD/compliance:/work/compliance" -w /work python:3.11 bash -c '
+      python -m venv /tmp/prod_venv && /tmp/prod_venv/bin/pip install -e backend/ -q &&
+      /tmp/prod_venv/bin/pip install pip-licenses -q &&
+      /tmp/prod_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_prod_licenses.json &&
+      python -m venv /tmp/dev_venv && /tmp/dev_venv/bin/pip install -e "backend/[dev]" -q &&
+      /tmp/dev_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_licenses.json'
+    docker run --rm -v "$PWD/frontend:/work/frontend" \
+        -v "$PWD/compliance:/work/compliance" -w /work/frontend node:20 bash -c '
+      npm ci && npm install --no-save -D license-checker &&
+      npx license-checker --production --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_prod.json &&
+      npx license-checker --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_all.json'
+Then run this script (plain Python, platform-independent) against those
+Linux-resolved JSON files as usual.
 """
 
 from __future__ import annotations
@@ -61,7 +88,6 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -297,7 +323,6 @@ def main() -> int:
 
     output = {
         "_generated_by": "compliance/generate_transitive_inventory.py — do not hand-edit",
-        "_generated_at": datetime.now(timezone.utc).isoformat(),
         "_note": (
             "Full resolved dependency tree (direct + transitive) for both "
             "ecosystems. 'scope: runtime' means the package appears in a "
