@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import {
@@ -20,14 +20,15 @@ import {
   uploadMedia,
 } from "../api/conversations";
 import { useAuth } from "../auth/useAuth";
-import { AudioPlayer } from "../components/AudioPlayer";
+import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
+import { TranscriptPanel } from "../components/TranscriptPanel";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Select, TextInput } from "../design-system/FormControls";
 import styles from "./ConversationDetailPage.module.css";
 
-type Tab = "overview" | "audio" | "participants" | "notes" | "activity";
+type Tab = "overview" | "audio" | "transcript" | "participants" | "notes" | "activity";
 
 export function ConversationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +38,8 @@ export function ConversationDetailPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>(location.state?.startRecording ? "audio" : "overview");
   const [showRecorder, setShowRecorder] = useState(Boolean(location.state?.startRecording));
+  const audioPlayerRef = useRef<AudioPlayerHandle | null>(null);
+  const [activeMs, setActiveMs] = useState(0);
 
   const conversationId = id ?? "";
 
@@ -157,7 +160,7 @@ export function ConversationDetailPage() {
       </div>
 
       <div className={styles.tabs} role="tablist">
-        {(["overview", "audio", "participants", "notes", "activity"] as Tab[]).map((t) => (
+        {(["overview", "audio", "transcript", "participants", "notes", "activity"] as Tab[]).map((t) => (
           <button
             key={t}
             role="tab"
@@ -189,9 +192,11 @@ export function ConversationDetailPage() {
             <div>
               {sourceMedia ? (
                 <AudioPlayer
+                  ref={audioPlayerRef}
                   src={mediaContentUrl(conversationId, sourceMedia.id)}
                   sourceLabel={`${sourceMedia.source_type.replace("_", " ")} · ${sourceMedia.container ?? sourceMedia.content_type} · ${(sourceMedia.size_bytes / 1024 / 1024).toFixed(1)} MB`}
                   markers={markersQuery.data ?? []}
+                  onTimeUpdateMs={setActiveMs}
                 />
               ) : showRecorder ? (
                 csrfToken && (
@@ -236,6 +241,26 @@ export function ConversationDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {tab === "transcript" && (
+            <div>
+              {sourceMedia && (
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <AudioPlayer
+                    ref={audioPlayerRef}
+                    src={mediaContentUrl(conversationId, sourceMedia.id)}
+                    sourceLabel="Conversation audio"
+                    onTimeUpdateMs={setActiveMs}
+                  />
+                </div>
+              )}
+              <TranscriptPanel
+                conversationId={conversationId}
+                audioPlayerRef={audioPlayerRef}
+                activeMs={activeMs}
+              />
             </div>
           )}
 
