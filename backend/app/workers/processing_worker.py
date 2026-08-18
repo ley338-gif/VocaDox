@@ -42,6 +42,7 @@ from app.processing.orchestrator import (
     maybe_trigger_align,
     trigger_post_normalize,
 )
+from app.processing.outbox import relay_pending_outbox
 from app.processing.retry import classify_exception
 from app.processing.service import (
     complete_job,
@@ -104,7 +105,7 @@ class ProcessingWorker:
         while max_iterations is None or iterations < max_iterations:
             iterations += 1
             try:
-                await self._reclaim_sweep()
+                await self._maintenance_sweep()
                 job_id = await dequeue_next(self._queue, self.job_types, timeout_seconds=5)
             except Exception:  # noqa: BLE001 - infra hiccup, never crash the loop
                 logger.exception("worker poll iteration failed; retrying")
@@ -114,10 +115,31 @@ class ProcessingWorker:
                 continue
             await self._process_one(job_id)
 
-    async def _reclaim_sweep(self) -> None:
+    async def _maintenance_sweep(self) -> None:
+        """Runs every loop iteration (bounded by the ~5s dequeue poll
+        timeout below): reclaims stale-leased jobs, then relays any
+        PENDING Transactional Outbox rows to Valkey (Phase 3.1 — see
+        app.processing.outbox). Every worker process (both `worker-speech`
+        and `worker-diarization`) runs this independently and
+        redundantly — relay_pending_outbox is safe to call concurrently
+        from multiple processes (see its docstring), so this is
+        deliberately not centralized into a single relay process, which
+        would just be a new single point of failure."""
         async with self._sessionmaker() as session:
             await reclaim_stale_jobs(session, self._queue)
             await session.commit()
+        try:
+            async with self._sessionmaker() as session:
+                relayed = await relay_pending_outbox(session, self._queue)
+                await session.commit()
+                if relayed:
+                    logger.info("outbox relay: published %d pending message(s)", relayed)
+        except Exception:  # noqa: BLE001 - a relay hiccup (e.g. Valkey blip) must not
+            # crash the worker loop or block reclaim/dequeue from continuing;
+            # the un-committed transaction above already rolled any partially
+            # claimed rows back to PENDING, so nothing is lost — just retried
+            # next sweep (~5s later).
+            logger.exception("outbox relay sweep failed; will retry next iteration")
 
     async def _process_one(self, job_id: uuid.UUID) -> None:
         async with self._sessionmaker() as session:

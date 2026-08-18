@@ -58,6 +58,35 @@ class RunStatus(StrEnum):
     FAILED = "failed"
 
 
+class OutboxStatus(StrEnum):
+    """Phase 3.1: Transactional Outbox pattern (see app.processing.outbox).
+
+    A row here is written in the SAME database transaction/commit as the
+    ProcessingJob row it announces — never before, never in a separate
+    commit. This closes the Phase 3 dual-write race: previously,
+    `queue.enqueue()` was called against Valkey directly, independent of
+    the ProcessingJob row's own commit, so a crash between the two could
+    either publish a message for a job row that never committed (orphaned
+    message — the worker's "discarded a dequeued job_id with no matching
+    QUEUED row" symptom) or commit a job row whose enqueue call never
+    landed (a job stuck QUEUED forever, invisible on any queue). With the
+    outbox, the database is the single source of truth: if the job row
+    committed, its outbox row committed with it, and a periodic relay
+    (`app.processing.outbox.relay_pending_outbox`, run by every worker's
+    maintenance sweep) guarantees that row eventually reaches Valkey — at
+    least once, never zero times. At-least-once delivery can duplicate a
+    Valkey message (relay publishes, then the relay's own transaction
+    fails to commit before a crash) — this is safe because
+    `ProcessingWorker._process_one` already discards a dequeued job_id
+    whose row is not `QUEUED` (a second delivery of the same job_id finds
+    it already RUNNING/SUCCEEDED and is a no-op), so no processing stage
+    can execute twice.
+    """
+
+    PENDING = "pending"
+    PUBLISHED = "published"
+
+
 class FailureClass(StrEnum):
     """How a failed ProcessingJob should be treated for retry purposes.
     See app.processing.retry for the policy table keyed on this enum."""
@@ -174,3 +203,29 @@ class ProcessingJob(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class ProcessingOutbox(Base):
+    """Transactional Outbox row: "a message that must eventually reach
+    Valkey's queue_name". Written in the exact same commit as the
+    ProcessingJob row it announces (see OutboxStatus's docstring for the
+    race this closes). `payload` is always the job id as a string — kept
+    as a plain column (not re-deriving from job_id) so the relay never
+    needs to re-open the job row just to know what to publish.
+    """
+
+    __tablename__ = "processing_outbox"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("processing_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    queue_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=OutboxStatus.PENDING.value, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.platform.valkey.backends import QueueBackend
 from app.processing.models import FailureClass, JobType, ProcessingJob, ProcessingStatus
+from app.processing.outbox import write_outbox_entry
 from app.processing.queues import queue_name_for
 from app.processing.retry import is_retryable
 
@@ -78,7 +79,16 @@ async def create_and_enqueue_job(
     )
     session.add(job)
     await session.flush()
-    await queue.enqueue(queue_name_for(job_type), str(job.id))
+    # Transactional Outbox (Phase 3.1): write the "must be queued" fact in
+    # the SAME transaction as the job row itself, instead of calling
+    # `queue.enqueue()` directly here (Phase 3's dual-write race — see
+    # app.processing.models.OutboxStatus). Neither this row nor the job
+    # row is durable until the caller commits; a periodic relay
+    # (app.processing.outbox.relay_pending_outbox, run by every worker's
+    # maintenance sweep) is what actually reaches Valkey.
+    await write_outbox_entry(
+        session, job_id=job.id, queue_name=queue_name_for(job_type), payload=str(job.id)
+    )
     return job
 
 
@@ -183,7 +193,12 @@ async def fail_job(
         job.started_at = None
         job.worker_id = None
         await session.flush()
-        await queue.enqueue(queue_name_for(JobType(job.job_type)), str(job.id))
+        await write_outbox_entry(
+            session,
+            job_id=job.id,
+            queue_name=queue_name_for(JobType(job.job_type)),
+            payload=str(job.id),
+        )
         return True
 
     job.status = ProcessingStatus.FAILED.value
@@ -230,7 +245,13 @@ async def reclaim_stale_jobs(
             job.status = ProcessingStatus.QUEUED.value
             job.started_at = None
             job.worker_id = None
-            await queue.enqueue(queue_name_for(JobType(job.job_type)), str(job.id))
+            await session.flush()
+            await write_outbox_entry(
+                session,
+                job_id=job.id,
+                queue_name=queue_name_for(JobType(job.job_type)),
+                payload=str(job.id),
+            )
         else:
             job.status = ProcessingStatus.FAILED.value
             job.completed_at = now
