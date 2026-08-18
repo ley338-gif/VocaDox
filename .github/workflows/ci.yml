@@ -162,7 +162,7 @@ jobs:
           fi
 
   docker-build:
-    name: Docker build (backend + frontend)
+    name: Docker build (backend + frontend + AI worker)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -172,6 +172,13 @@ jobs:
 
       - name: Build frontend production image
         run: docker build --target runtime -t vocadox-frontend:ci ./frontend
+
+      # Phase 3: the AI worker image (faster-whisper + pyannote.audio +
+      # the pinned LGPL FFmpeg build) — CPU-only torch wheels, so this
+      # build needs no GPU and stays usable in ordinary CI (spec:
+      # "mandatory CI... must not depend on GPU").
+      - name: Build AI worker image
+        run: docker build -f backend/worker.Dockerfile -t vocadox-worker:ci ./backend
 
       - name: Validate compose config
         run: docker compose -f deploy/docker-compose.yml config --quiet
@@ -209,6 +216,18 @@ jobs:
           pip install -e ".[dev]"
           pip-licenses --format=json --with-urls > ../compliance/_raw_pip_licenses.json
 
+      # Phase 3 [ai] extra: the worker-speech/worker-diarization image's
+      # package set (faster-whisper, pyannote.audio, torch, ...) — CPU-only
+      # torch wheels, never installed in the api/frontend images. Scanned
+      # separately (scope: worker in the output) so it's clear these
+      # packages ship only in the AI worker images.
+      - name: Resolve AI worker Python dependency tree
+        run: |
+          python -m venv /tmp/ai_venv
+          /tmp/ai_venv/bin/pip install -e "backend/[ai]" --extra-index-url https://download.pytorch.org/whl/cpu
+          /tmp/ai_venv/bin/pip install pip-licenses
+          /tmp/ai_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_ai_licenses.json
+
       # Node trees (production-only and full dev+prod):
       - name: Resolve Node dependency trees
         working-directory: frontend
@@ -223,6 +242,7 @@ jobs:
           python compliance/generate_transitive_inventory.py \
             --pip-prod compliance/_raw_pip_prod_licenses.json \
             --pip-dev compliance/_raw_pip_licenses.json \
+            --pip-ai compliance/_raw_pip_ai_licenses.json \
             --npm-prod compliance/_raw_npm_licenses_prod.json \
             --npm-all compliance/_raw_npm_licenses_all.json
 
@@ -238,7 +258,7 @@ jobs:
         run: python compliance/check_licenses.py
 
   container-vulnerability-scan:
-    name: Container vulnerability scan (Trivy — backend/frontend runtime + frontend build/dev images)
+    name: Container vulnerability scan (Trivy — backend/frontend/AI-worker runtime + frontend build/dev images)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -251,6 +271,12 @@ jobs:
 
       - name: Build frontend build/dev image (not shipped, but scanned anyway — see ADR-0008)
         run: docker build --target dev -t vocadox-frontend-dev:ci ./frontend
+
+      # Phase 3: the AI worker image is shipped (worker-speech/
+      # worker-diarization) — spec: "Trivy on all shipped images (including
+      # AI worker images)".
+      - name: Build AI worker image (shipped)
+        run: docker build -f backend/worker.Dockerfile -t vocadox-worker:ci ./backend
 
       # Trivy itself: Apache-2.0, license-checked (see
       # compliance/container-inventory.yml), pinned image, never installed
@@ -273,6 +299,12 @@ jobs:
             aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
             image --exit-code 1 --severity CRITICAL vocadox-frontend-dev:ci
 
+      - name: Scan AI worker image — fail on any unresolved CRITICAL
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --exit-code 1 --severity CRITICAL vocadox-worker:ci
+
       - name: Report HIGH/MEDIUM/LOW findings (non-blocking, for visibility)
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
@@ -284,3 +316,6 @@ jobs:
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
             image --severity HIGH,MEDIUM,LOW vocadox-frontend-dev:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --severity HIGH,MEDIUM,LOW vocadox-worker:ci
