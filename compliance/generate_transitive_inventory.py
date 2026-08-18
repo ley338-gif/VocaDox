@@ -125,6 +125,12 @@ def split_spdx_expression(expr: str) -> tuple[str, list[str]]:
         return "AND", [t.strip() for t in inner.split(" AND ")]
     if " OR " in inner:
         return "OR", [t.strip() for t in inner.split(" OR ")]
+    if "; " in inner:
+        # pip-licenses joins multiple PyPI trove classifiers this way (e.g.
+        # "Apache Software License; MIT License" for a dual-licensed
+        # package like uvloop). Each classifier names an *alternative* the
+        # licensee may pick, i.e. the same semantics as SPDX 'OR'.
+        return "OR", [t.strip() for t in inner.split("; ")]
     return "SINGLE", [inner]
 
 

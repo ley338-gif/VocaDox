@@ -32,6 +32,12 @@ dev = [
     # for their own license entries.
     "pip-licenses>=5.5,<6.0",
     "pip-audit>=2.10,<3.0",
+    # GitHub Actions' hosted Python includes an older preinstalled
+    # setuptools (independent of [build-system].requires, which only
+    # governs the isolated build env) that pip-audit flags — see
+    # PYSEC-2026-3447/GHSA-h35f-9h28-mq5c. Pin it as a real dependency too
+    # so `pip install -e .[dev]` actually upgrades what's on PATH.
+    "setuptools>=83.0",
 ]
 
 [build-system]

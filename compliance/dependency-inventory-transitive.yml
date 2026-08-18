@@ -1,11 +1,11 @@
 _generated_by: "compliance/generate_transitive_inventory.py \u2014 do not hand-edit"
-_generated_at: '2026-08-18T01:54:04.775208+00:00'
+_generated_at: '2026-08-18T02:31:33.266274+00:00'
 _note: 'Full resolved dependency tree (direct + transitive) for both ecosystems. ''scope: runtime'' means
   the package appears in a production-only install (backend: `pip install .` with no [dev] extra; frontend:
   `npm ls --production`) and therefore ships in the actual Docker runtime image / built bundle. ''scope:
   dev'' means it was only found in the full dev/build tree (lint/test/build tooling) and is never shipped.'
 summary:
-  approved: 419
+  approved: 424
   review_required: 2
   blocked: 0
   unknown: 0
@@ -2765,12 +2765,26 @@ dependencies:
   direct: false
   license: MPL-2.0
   approval_status: review_required
+- name: pip
+  ecosystem: pypi
+  version: 26.2.1
+  scope: dev
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: pip-api
   ecosystem: pypi
   version: 0.0.34
   scope: dev
   direct: false
   license: Apache-2.0
+  approval_status: approved
+- name: pip-licenses
+  ecosystem: pypi
+  version: 5.5.5
+  scope: dev
+  direct: true
+  license: MIT
   approval_status: approved
 - name: pip-requirements-parser
   ecosystem: pypi
@@ -2799,6 +2813,13 @@ dependencies:
   scope: dev
   direct: false
   license: MIT
+  approval_status: approved
+- name: prettytable
+  ecosystem: pypi
+  version: 3.18.0
+  scope: dev
+  direct: false
+  license: BSD-3-Clause
   approval_status: approved
 - name: py-serializable
   ecosystem: pypi
@@ -2884,6 +2905,13 @@ dependencies:
   direct: true
   license: MIT
   approval_status: approved
+- name: setuptools
+  ecosystem: pypi
+  version: 84.0.0
+  scope: dev
+  direct: true
+  license: MIT
+  approval_status: approved
 - name: sortedcontainers
   ecosystem: pypi
   version: 2.4.0
@@ -2951,6 +2979,13 @@ dependencies:
   ecosystem: pypi
   version: 1.2.0
   scope: runtime
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: wcwidth
+  ecosystem: pypi
+  version: 0.8.2
+  scope: dev
   direct: false
   license: MIT
   approval_status: approved
