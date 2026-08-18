@@ -80,4 +80,5 @@ async def assign_speaker_endpoint(
         db, event_type=event_type, user_id=user.id, event_metadata={"speaker_id": str(speaker.id)}
     )
     await db.commit()
+    await db.refresh(speaker)
     return DetectedSpeakerResponse.model_validate(speaker)

@@ -219,6 +219,7 @@ async def cancel_processing_job_endpoint(
             "interrupted in this phase)",
         )
     await db.commit()
+    await db.refresh(job)
     return ProcessingJobResponse.model_validate(job)
 
 
@@ -304,6 +305,7 @@ async def correct_segment_endpoint(
         await set_review_status(db, segment, status=SegmentReviewStatus(body.review_status))
 
     await db.commit()
+    await db.refresh(segment)
     return TranscriptSegmentResponse.model_validate(segment)
 
 

@@ -57,16 +57,32 @@ _STAGE_EXECUTORS = {
 
 
 class ProcessingWorker:
-    def __init__(self, *, worker_id: str, job_types: list[JobType]) -> None:
+    """All dependencies are injectable (defaulting to the real
+    process-wide singletons) so tests can run the worker loop against an
+    in-memory queue/DB/fake providers without any real Valkey/Postgres/GPU
+    — see tests/processing/conftest.py's FakeQueueBackend."""
+
+    def __init__(
+        self,
+        *,
+        worker_id: str,
+        job_types: list[JobType],
+        sessionmaker=None,  # noqa: ANN001
+        queue=None,  # noqa: ANN001
+        storage=None,  # noqa: ANN001
+        normalizer=None,  # noqa: ANN001
+        speech_provider=None,  # noqa: ANN001
+        diarization_provider=None,  # noqa: ANN001
+    ) -> None:
         self.worker_id = worker_id
         self.job_types = job_types
         self._settings = get_settings()
-        self._sessionmaker = get_sessionmaker()
-        self._queue = get_valkey_backend()
-        self._storage = get_storage_provider()
-        self._normalizer = get_media_normalizer()
-        self._speech_provider = get_speech_provider()
-        self._diarization_provider = get_diarization_provider()
+        self._sessionmaker = sessionmaker or get_sessionmaker()
+        self._queue = queue or get_valkey_backend()
+        self._storage = storage or get_storage_provider()
+        self._normalizer = normalizer or get_media_normalizer()
+        self._speech_provider = speech_provider or get_speech_provider()
+        self._diarization_provider = diarization_provider or get_diarization_provider()
 
     async def run_forever(self, *, max_iterations: int | None = None) -> None:
         iterations = 0
