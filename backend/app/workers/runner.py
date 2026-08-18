@@ -11,9 +11,21 @@ import logging
 import socket
 import uuid
 
+from app.platform.db import model_registry  # noqa: F401 - registers all domain models; see below
 from app.platform.logging import configure_logging
 from app.processing.queues import DIARIZATION_WORKER_JOB_TYPES, SPEECH_WORKER_JOB_TYPES
 from app.workers.processing_worker import run_worker
+
+# The import above is not decorative: unlike app.core.app_factory (which
+# imports model_registry before the API ever serves a request), nothing
+# else on the worker's code path touched every domain's models module
+# before SQLAlchemy resolves a cross-domain relationship/FK lazily.
+# Found by real testing (fresh `docker compose up` + real worker
+# containers, not just pytest's SQLite-metadata setup, which happens to
+# import model_registry itself in every test conftest.py) —
+# `NoReferencedTableError: ... could not find table 'organizations'`
+# the first time a worker touched a Conversation-adjacent query, because
+# app.organizations.models had never been imported in that process.
 
 logger = logging.getLogger("vocadox.worker.runner")
 

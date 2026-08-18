@@ -16,6 +16,7 @@ setting. See docs/admin/worker-configuration.md.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 
@@ -93,11 +94,22 @@ class ProcessingWorker:
         self._diarization_provider = diarization_provider or get_diarization_provider()
 
     async def run_forever(self, *, max_iterations: int | None = None) -> None:
+        """A transient infrastructure error (DB not migrated yet, a
+        connection blip) here must never kill the whole worker process —
+        found by real testing: a worker container started slightly before
+        `alembic upgrade head` had run against a fresh database crashed
+        outright on its first reclaim sweep, requiring a manual restart.
+        Log and back off instead; the next iteration retries."""
         iterations = 0
         while max_iterations is None or iterations < max_iterations:
             iterations += 1
-            await self._reclaim_sweep()
-            job_id = await dequeue_next(self._queue, self.job_types, timeout_seconds=5)
+            try:
+                await self._reclaim_sweep()
+                job_id = await dequeue_next(self._queue, self.job_types, timeout_seconds=5)
+            except Exception:  # noqa: BLE001 - infra hiccup, never crash the loop
+                logger.exception("worker poll iteration failed; retrying")
+                await asyncio.sleep(5)
+                continue
             if job_id is None:
                 continue
             await self._process_one(job_id)
