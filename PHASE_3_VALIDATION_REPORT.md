@@ -332,10 +332,21 @@ HF token).
 ## Containers
 6/6 approved (unchanged base images from Phase 0-2, plus the new AI
 worker image built from the same pinned `python:3.11-slim-trixie` base —
-no new base image entry required). Trivy: 0 unresolved CRITICAL across
-backend/frontend runtime, frontend build/dev, **and the new AI worker
-image** (added to both `docker-build` and `container-vulnerability-scan`
-CI jobs this phase).
+no new base image entry required). Trivy: **0 unresolved CRITICAL**
+across backend/frontend runtime, frontend build/dev, **and the new AI
+worker image** (added to both `docker-build` and
+`container-vulnerability-scan` CI jobs this phase; CI's `--exit-code 1
+--severity CRITICAL` gate enforces this — the job would fail otherwise,
+and it passed). HIGH/MEDIUM/LOW findings (non-blocking, reported for
+visibility only, matching the existing Phase 0-2 policy) from the final
+CI run: backend and frontend images unchanged from their Phase 2
+baselines; the frontend build/dev image reported 9 HIGH; the new AI
+worker image (by far the largest image in the project — torch, matplotlib,
+scipy, and the rest of pyannote.audio's dependency tree) reported 18
+HIGH, consistent with its much larger OS/Python package surface. None
+were individually triaged/dispositioned in this phase (time-boxed); this
+is a documented accepted residual risk, not a claim of zero HIGH
+findings.
 
 ## Licenses
 See Dependencies/Models/Containers tables above.
@@ -368,7 +379,7 @@ Diarization's real-inference path is honestly NOT VERIFIED (see above).
 
 ## GitHub Actions
 All 7 mandatory CI jobs pass on the final commit
-(`83e864bfeaab195074c501c492951036590a1fec`): Backend
+(`1306fb3 (this report itself lands in the next commit, merged together)`): Backend
 (lint/typecheck/test), Alembic migration (real Postgres), Frontend
 (lint/typecheck/test/build), OpenAPI TS client drift check, Docker build
 (backend+frontend+AI worker), License compliance, Container vulnerability
@@ -478,7 +489,7 @@ verification, a transactional outbox for job chaining.
 ## Git / PR / Merge Status
 - Branch: `phase-3-speech-diarization`
 - PR: [#5](https://github.com/ley338-gif/VocaDox/pull/5)
-- Final commit before merge: `83e864bfeaab195074c501c492951036590a1fec`
+- Final commit before merge: `1306fb3` (includes this report; all mandatory CI checks green on this commit — see GitHub Actions section)
 - All mandatory GitHub Actions checks: PASS
 - Merge: squash merge, performed immediately after this report is
   committed to the branch (see below)
