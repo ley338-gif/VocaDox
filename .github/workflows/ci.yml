@@ -190,7 +190,7 @@ jobs:
         run: python compliance/check_licenses.py
 
   container-vulnerability-scan:
-    name: Container vulnerability scan (Trivy, shipped runtime images)
+    name: Container vulnerability scan (Trivy — backend/frontend runtime + frontend build/dev images)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -200,6 +200,9 @@ jobs:
 
       - name: Build frontend production image (shipped)
         run: docker build --target runtime -t vocadox-frontend:ci ./frontend
+
+      - name: Build frontend build/dev image (not shipped, but scanned anyway — see ADR-0008)
+        run: docker build --target dev -t vocadox-frontend-dev:ci ./frontend
 
       # Trivy itself: Apache-2.0, license-checked (see
       # compliance/container-inventory.yml), pinned image, never installed
@@ -216,6 +219,12 @@ jobs:
             aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
             image --exit-code 1 --severity CRITICAL vocadox-frontend:ci
 
+      - name: Scan frontend build/dev image — fail on any unresolved CRITICAL
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --exit-code 1 --severity CRITICAL vocadox-frontend-dev:ci
+
       - name: Report HIGH/MEDIUM/LOW findings (non-blocking, for visibility)
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
@@ -224,3 +233,6 @@ jobs:
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
             image --severity HIGH,MEDIUM,LOW vocadox-frontend:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --severity HIGH,MEDIUM,LOW vocadox-frontend-dev:ci

@@ -2,172 +2,184 @@
 
 **Phase**: 0 — Architecture & Foundation
 **Branch**: `phase-0-foundation` (never committed to `main`)
-**Date**: 2026-08-17, remediated 2026-08-18
+**Date**: 2026-08-18 (final closeout pass)
 **Scope**: scaffolding only — no domain features (auth, conversations,
 transcription, ...) are implemented. This report is the GO/NO-GO gate
 before Phase 1 begins.
 
-> **Revision note**: the original version of this report recommended GO
-> based on direct-dependency licenses only. That recommendation was
-> premature — it did not cover the *transitive* dependency tree (policy is
-> UNKNOWN=BLOCKED, and that has to apply to every resolved package, not
-> just the ~26 top-level ones) and left 5 known npm audit findings
-> untriaged. This revision fixes both gaps, adds container SBOM/vulnerability
-> scanning that wasn't done at all before, and applies a stricter,
-> explicit GO/NO-GO rule (see Recommendation). Still Phase 0 — no domain
-> feature work has started.
-
----
-
-## Executive Summary
-
-Phase 0 remains a working (not stubbed) monorepo scaffold — FastAPI
-backend, React/Vite frontend with a token-driven design system,
-Postgres+Valkey Docker Compose stack, Alembic migration framework, 7 ADRs,
-and the documentation skeleton the plan specified. This remediation pass
-added: full transitive-dependency-tree license scanning (421 resolved
-packages, not just 26 direct ones), npm audit + pip-audit triage (all
-findings resolved via version upgrades, re-verified at 0 vulnerabilities),
-container SBOM/vulnerability scanning via Trivy against the actual shipped
-runtime images (which drove real fixes — a stale/EOL base image and an
-unnecessary build toolchain, not just paperwork), new CI security gates,
-a lightweight architecture-boundary test, and a genuine clean-checkout
-reproducibility test (not just claimed).
-
-**Recommendation: GO for Phase 1**, under an explicit scoping decision
-about build-stage-only container findings — see Recommendation for the
-full rule-by-rule justification and the one judgment call that decision
-rests on.
+> This is a full rewrite, not an append, reflecting the final Phase 0
+> state after two remediation passes: (1) transitive-dependency-tree
+> license scanning + npm/pip audit triage, and (2) this closeout pass,
+> which resolved the one open judgment call from pass 1 — the frontend
+> build/dev image's container vulnerabilities — plus a full final
+> re-validation of everything else.
 
 ---
 
 ## Architecture
 
-Unchanged from the original scaffold. Monorepo: `backend/`, `frontend/`,
-`compliance/`, `docs/`, `deploy/`, `.github/workflows/`, root
-`docker-compose.yml` wrapper (ADR-0001). Backend is domain-oriented:
-`backend/app/<domain>/` per bounded context (17 domain packages, all
-empty/documented placeholders in Phase 0), plus `platform/` and
-`providers/`. Frontend is a Vite/React SPA with a `/design-system` route.
+Monorepo: `backend/`, `frontend/`, `compliance/`, `docs/`, `deploy/`,
+`.github/workflows/`, root `docker-compose.yml` wrapper (ADR-0001).
+Backend is domain-oriented: `backend/app/<domain>/` per bounded context
+(17 domain packages, all empty/documented placeholders in Phase 0 — see
+each package's `README.md` for its target phase), plus two implemented
+cross-cutting packages, `platform/` (config, logging, db, valkey, health)
+and `providers/` (speech-to-text/diarization/LLM/storage abstractions).
+Frontend is a Vite/React SPA with a `/design-system` route. 8 ADRs record
+every non-obvious architecture decision, including two made during
+remediation (ADR-0003's asyncpg-over-psycopg rationale played out exactly
+as predicted; ADR-0008 documents the frontend build image's Alpine-over-
+Debian switch).
 
 ## Implementation
 
-Unchanged from the original scaffold, plus one new file:
-`backend/tests/test_architecture_boundaries.py` (see Security below). 36
-backend Python source files (39 including the new test), all passing ruff
-+ mypy.
+- **Backend**: `app/core/app_factory.py` wires the FastAPI app;
+  `app/main.py` is the ASGI entrypoint. `app/platform/config.py`
+  (pydantic-settings, env-var driven), `app/platform/logging.py` (JSON
+  formatter + request-id contextvar + sensitive-field redaction),
+  `app/platform/middleware.py` (request-id propagation),
+  `app/platform/health.py` (liveness/readiness). 39 Python source files
+  (36 application + 3 test modules added during remediation), all passing
+  ruff + mypy.
+- **Frontend**: React 18 + TypeScript + Vite 7 + React Router 7 +
+  TanStack Query. `AppShell` (minimal nav chrome, explicitly not the full
+  Userinterface-reference sidebar — that ships with the domain features
+  it navigates to), `HomePage`, and the `/design-system` route.
 
 ## Design System
 
-Unchanged — see `frontend/src/styles/tokens.css` and
-`frontend/src/design-system/DesignSystemPage.tsx`.
+CSS custom properties in `frontend/src/styles/tokens.css` encode every
+token from "VocaDox - Stylesystem.png": primary blue scale, gray scale,
+semantic colors, full type scale (H1–H6, Body Large/Base/Small, Caption),
+8pt spacing scale, radius scale, shadow scale. Light palette on bare
+`:root`; dark overrides via both `prefers-color-scheme` and an explicit
+`data-theme="dark"` override. No Storybook (ADR-0006) — `/design-system`
+renders colors, typography, spacing, radius, shadows, Lucide icons,
+buttons (4 variants incl. disabled), form controls (text input, select,
+checkbox, radio), badges/tags/status dots (7 tones), and card/list
+examples, all sourced from the same tokens the app uses. Fonts (Inter,
+via `@fontsource/inter`) and icons (`lucide-react`) are bundled at build
+time — zero CDN calls (ADR-0007).
 
 ## Database
 
-Unchanged. `alembic upgrade head` re-verified against a fresh Postgres
-container after the backend Dockerfile changed (see Containers below) —
-still produces exactly one table, `alembic_version`.
+SQLAlchemy 2.0 async engine + `asyncpg` driver (ADR-0003, chosen over
+`psycopg` specifically to avoid an LGPL-3.0 review-required dependency) +
+Alembic. **No domain tables** (per spec §65 / ADR-0004) — `Base.metadata`
+is empty. `backend/alembic/versions/0001_baseline.py` is an intentional
+no-op migration whose only job is to prove the migration chain works.
+Verified fresh in this closeout pass: `alembic upgrade head` run against a
+freshly created Postgres 16 container (after `docker compose down -v`)
+created exactly one table, `alembic_version` — no custom
+`schema_migrations` table or anything else was added.
 
 ## Valkey
 
-Unchanged. `test_domain_packages_do_not_import_valkey_client_directly`
-and `test_no_class_named_redis_service_anywhere` (new, see Security) now
-enforce this invariant as a running test, not just a documented rule.
+`CacheBackend` / `QueueBackend` / `CoordinationBackend` are `Protocol`
+interfaces in `app/platform/valkey/backends.py`; `ValkeyBackend` (using
+the official `valkey` PyPI client) implements all three. No domain code
+imports the `valkey` client directly, and no class named `RedisService`
+exists anywhere in the codebase — this is now a running test
+(`backend/tests/test_architecture_boundaries.py`), not just a documented
+convention, and it passes. Rationale for Valkey over Redis (license) in
+ADR-0002.
 
-## Provider Architecture
+## Providers
 
-Unchanged. `test_domain_packages_do_not_import_concrete_provider_implementations`
-(new) now enforces "domain code depends on interfaces, not concrete
-`Fake*`/`LocalFilesystemStorage` implementations" as a running test.
+`app/providers/`: `SpeechToTextProvider`, `DiarizationProvider`,
+`LLMProvider` are abstract interfaces with `Fake*` implementations
+returning deterministic synthetic data (no GPU, no network calls, tests
+never touch a real engine). `StorageProvider` has one real implementation,
+`LocalFilesystemStorage`, which mints server-generated UUID storage keys
+and rejects any key containing `/`, `\`, or `..` — path traversal is
+prevented by construction, not by validation alone (see threat model §2,
+and `tests/test_providers.py::test_local_filesystem_storage_rejects_path_traversal`,
+which passes). `test_architecture_boundaries.py` additionally verifies
+domain packages depend on these interfaces, never a concrete `Fake*`/
+`LocalFilesystemStorage` implementation directly. Rationale in ADR-0005.
 
 ## OpenAPI
 
-Unchanged mechanism. Re-verified after this remediation's changes (which
-didn't touch any route): fetched a fresh `openapi.json` from a live
-backend, regenerated `frontend/src/api/generated/schema.d.ts`, `git diff`
-showed no drift.
+FastAPI serves `/openapi.json` automatically. `frontend/openapi.json` is a
+committed snapshot fetched from a live locally-run backend;
+`npm run generate:api-client` (wrapping `openapi-typescript`) generates
+`frontend/src/api/generated/schema.d.ts` from it. Re-verified fresh in
+this closeout pass: started the backend, re-fetched `openapi.json`,
+regenerated the TS client, `git diff` showed **no drift**. CI's
+`openapi-client-drift` job does the same thing on every run and fails the
+build on any difference.
 
 ## Tests
 
-- **Backend**: 12 tests (`pytest -q`, up from 9) — the original 9 plus 3
-  new architecture-boundary tests. All pass, including on a from-scratch
-  clean checkout (see Reproducibility).
-- **Frontend**: 3 tests (`vitest run`), unchanged, all pass — including on
-  vite 7.3.6/vitest 4.1.10 (upgraded from 5.x/2.x during this remediation)
-  and on a from-scratch clean checkout.
+- **Backend**: 12 tests (`pytest -q`) — health endpoint contract, fake-
+  provider determinism + storage roundtrip/path-traversal rejection,
+  sensitive-log-field redaction, and 3 architecture-boundary tests. All
+  pass, re-verified in this closeout pass.
+- **Frontend**: 3 tests (`vitest run`) — app routing to `/` and
+  `/design-system`, and design-system section rendering. All pass on the
+  current toolchain (vite 7.3.6 / vitest 4.1.10), re-verified.
 
 ## CI
 
-`.github/workflows/ci.yml` extended in this remediation:
-- `backend` job: added a `pip-audit` step.
-- `frontend` job: added an `npm audit --audit-level=high` step.
-- `compliance` job: now regenerates `dependency-inventory-transitive.yml`
-  from the actual resolved trees on every run (production-only Python
-  tree, full dev Python tree, production-only npm tree, full npm tree),
-  fails on drift against the committed file, then runs
-  `check_licenses.py` against direct + transitive + containers + models.
-- new `container-vulnerability-scan` job: builds the shipped
-  `vocadox-backend` and `vocadox-frontend` (`runtime` target) images,
-  scans both with Trivy, **fails the build on any CRITICAL finding**, and
-  reports HIGH/MEDIUM/LOW non-blocking for visibility.
-- `docker-build` job unchanged (image build + compose config validation).
+`.github/workflows/ci.yml`: `backend` (ruff, mypy, pytest, **pip-audit**),
+`frontend` (eslint, tsc, vitest, vite build, **npm audit**),
+`openapi-client-drift`, `docker-build` (builds both shipped images +
+validates compose config), `compliance` (regenerates
+`dependency-inventory-transitive.yml` from the real resolved trees on
+every run, fails on drift against the committed file, then runs the full
+license gate), `container-vulnerability-scan` (builds **all three**
+images — backend runtime, frontend runtime, frontend build/dev — scans
+each with Trivy, fails on any CRITICAL, reports HIGH/MEDIUM/LOW for
+visibility).
 
-**Not run in this session**: the actual GitHub Actions workflow was not
-executed against GitHub's runners — every job's commands were run
-manually (backend, frontend, compliance regeneration, Trivy scans) and
-passed; the YAML was reviewed for correctness but not executed by the
-real Actions engine. Same limitation as the original report.
+**GitHub Actions itself was not run on GitHub's infrastructure** — no
+remote is configured for this repository (`git remote -v` is empty), and
+setting one up / pushing was explicitly out of scope for this pass
+(no existing authorized remote to use). Every job's commands were run
+manually, on this machine, and passed. This stays a documented
+verification limitation, not something represented as tested — see Known
+Limitations.
 
 ## Security
 
-`docs/security/threat-model.md` unchanged from the original scaffold
-(upload handling, path traversal, secrets, auth boundaries, privacy
-zones). New in this remediation:
-
-- **Architecture boundary enforcement**
-  (`backend/tests/test_architecture_boundaries.py`): 3 stdlib-`ast`-based
-  tests, no new dependency added (`import-linter` was considered but
-  judged not worth it while every domain package is still an empty
-  placeholder — would have nothing real to check). Verifies domain
-  packages never import the `valkey` client directly, never import a
-  concrete provider implementation instead of its interface, and that no
-  class anywhere is named `RedisService`. All 3 pass today and will start
-  catching real violations the moment Phase 1 domain code lands.
-- **Dependency vulnerability scanning**: `pip-audit` (Python) and
-  `npm audit` (Node) both now run and both currently report **0 known
-  vulnerabilities** — see the Security Findings section for the full
-  before/after triage.
-- **Container vulnerability scanning**: Trivy 0.56.2 (Apache-2.0 — license
-  checked before use; Docker Scout was evaluated and rejected for being
-  proprietary-licensed under the Docker Subscription Service Agreement)
-  scanned via its pinned official image. Found real issues that got
-  genuinely fixed — see Security Findings.
+`docs/security/threat-model.md`: upload handling, path traversal
+prevention (implemented and tested, not just documented), secrets
+management, auth boundaries (deferred to Phase 1, boundary documented
+now), privacy-zone handling requirements. New in the remediation passes:
+architecture-boundary enforcement as running tests (see Providers/Valkey
+above), `pip-audit`/`npm audit` dependency vulnerability scanning (both
+0 findings), and Trivy container vulnerability scanning against all three
+build outputs that matter (backend runtime, frontend runtime, frontend
+build/dev) — see Security Findings for the full breakdown.
 
 ## Privacy
 
-Unchanged from the original scaffold.
+Unchanged from the original scaffold — no conversation content exists yet
+to protect (no domain features). Zero-external-telemetry stance
+(ADR-0007) and privacy-zone requirements (threat model §6) are the
+Phase-0-relevant commitments; enforcement is Phase 1+ work.
 
 ## Dependencies
 
-Two tiers now, both regenerated from real tooling output, never hand-typed:
+Two tiers, both regenerated from real tooling output in this closeout
+pass (not reused from a stale snapshot):
 
-**Direct** (`compliance/dependency-inventory.yml`, 31 packages — the
-original 26 plus `pip-licenses`, `pip-audit`, `license-checker`,
-`@vitejs/plugin-react`, and `setuptools`, added/tracked during this
-remediation as build/compliance-tooling dependencies):
+**Direct** (`compliance/dependency-inventory.yml`, 32 packages — one more
+than the prior pass's 31: `pydantic-settings`, a real runtime dependency
+used in `app/platform/config.py` that had been missing from the inventory
+until a version-accuracy sweep in this pass caught the gap):
 
 | Status | Count |
 |---|---|
-| Approved | 31 |
+| Approved | 32 |
 | Review required | 0 |
 | Blocked | 0 |
 | Unknown | 0 |
 
 **Transitive** (`compliance/dependency-inventory-transitive.yml`, 421
-resolved packages — the full dependency tree, not just direct ones,
-generated by `compliance/generate_transitive_inventory.py` from real
-`pip-licenses`/`license-checker` output against the actual installed
-trees, both production-only and full-dev, for both ecosystems):
+resolved packages — freshly regenerated from real `pip-licenses`/
+`license-checker` output against the actual installed trees, both
+production-only and full-dev, for both ecosystems):
 
 | Status | Count |
 |---|---|
@@ -176,22 +188,22 @@ trees, both production-only and full-dev, for both ecosystems):
 | Blocked | 0 |
 | Unknown | 0 |
 
-The 2 review-required transitive packages are `certifi` and `pathspec`
-(both MPL-2.0, both dev-tooling-only transitive deps of `pip-audit`/`mypy`,
-never shipped) — each has an explicit sign-off recorded in
-`compliance/exceptions.yml` (unmodified, dev-only usage, no MPL-2.0
-obligation triggered). No package was approved "because its parent is
-approved" — every one of the 421 was individually classified against its
-own resolved license string, including a handful of exotic-but-legitimate
-permissive licenses discovered along the way (`MIT-0`, `BlueOak-1.0.0`,
-`CC0-1.0`, `CC-BY-3.0`/`4.0`, `PSF-2.0`) that got added to
-`license-policy.yml`'s approved list with per-package provenance notes
-rather than silently waved through.
+The 2 review-required packages are `certifi` and `pathspec` (both
+MPL-2.0, both dev-tooling-only transitive deps of `pip-audit`/`mypy`,
+never shipped) — **re-verified in this pass as still accurate**: same two
+packages, same versions, same license, same disposition as the prior
+pass. Explicit sign-off remains in `compliance/exceptions.yml`.
+
+This pass also caught and fixed two other inventory-accuracy gaps beyond
+the missing `pydantic-settings` entry: `lucide-react` and `eslint`'s
+recorded version numbers had drifted from what's actually installed
+(both were showing "latest at research time" figures instead of the
+pinned/installed version — license was unaffected in both cases, now
+corrected in `dependency-inventory.yml` and `docs/licenses/`).
 
 ## Containers
 
-`compliance/container-inventory.yml`, 6 images (the original 5 plus
-Trivy itself, tracked as a scan-tool-only dependency):
+`compliance/container-inventory.yml`, 6 images:
 
 | Status | Count |
 |---|---|
@@ -200,36 +212,36 @@ Trivy itself, tracked as a scan-tool-only dependency):
 | Blocked | 0 |
 | Unknown | 0 |
 
-Two base images were switched during this remediation, both driven by
-real Trivy findings, not speculatively:
-- **Backend**: `python:3.11.10-slim-bookworm` → `python:3.11-slim-trixie`.
-  Bookworm had CRITICAL CVEs (sqlite3, util-linux) with **no fix
-  backported to bookworm on any release** (confirmed against the Debian
-  security tracker — bookworm-security still shows "vulnerable"; sqlite3's
-  CVE is marked "no-dsa"). Trixie carries fixed versions.
-- **Frontend**: `nginx:1.27.3-alpine3.20` → `nginx:1.31.3-alpine3.24`.
-  Alpine 3.20 was flagged by Trivy as EOL/unsupported; 3.24 is current.
+**Node build image resolved in this pass** (was the one open judgment
+call from the prior report): switched `node:20.18.1-bookworm-slim` →
+`node:22-alpine3.24`, plus an `npm install -g npm@latest && npm cache
+clean --force` step. See ADR-0008 for the full comparison across every
+current official Node 22 variant (bookworm, trixie, three Alpine point
+releases) and Security Findings below for the resulting scan numbers.
+Backend (`python:3.11-slim-trixie`) and frontend runtime
+(`nginx:1.31.3-alpine3.24`) images are unchanged from the prior
+remediation pass.
 
 ## Licenses
 
-Four independent inventories, each counted separately (never summed into
-one blended number — `dependency-inventory-transitive.yml` is a superset
-of `dependency-inventory.yml`, so adding them would double-count):
+Four independent inventories, each counted separately (never summed —
+`dependency-inventory-transitive.yml` is a superset of
+`dependency-inventory.yml`, so adding them would double-count):
 
 | Inventory | Approved | Review required | Blocked | Unknown |
 |---|---|---|---|---|
-| Direct dependencies (31) | 31 | 0 | 0 | 0 |
+| Direct dependencies (32) | 32 | 0 | 0 | 0 |
 | Transitive dependencies (421) | 419 | 2 | 0 | 0 |
 | Containers (6) | 6 | 0 | 0 | 0 |
 | Models (0) | 0 | 0 | 0 | 0 |
 
-`compliance/check_licenses.py` (extended in this remediation to also load
-and gate on the transitive inventory) — actually run, exit code 0:
+`compliance/check_licenses.py`, re-run end-to-end in this pass against
+freshly regenerated data — exit code 0:
 
 ```
 Summary by category (never summed together)
 category      approved   review_required   blocked   unknown
-direct        31         0                 0         0
+direct        32         0                 0         0
 transitive    419        2                 0         0
 containers    6          0                 0         0
 models        0          0                 0         0
@@ -237,246 +249,268 @@ models        0          0                 0         0
 result: PASS (no blocked or unknown-licensed items)
 ```
 
-**0 blocked, 0 unknown across all four inventories.** `THIRD_PARTY_NOTICES.md`
-and `docs/licenses/` were not yet updated to reflect the transitive tier
-in this pass — flagged in Known Limitations.
+**0 blocked, 0 unknown across all four inventories.**
+`THIRD_PARTY_NOTICES.md` and `docs/licenses/*.md` were regenerated in
+this pass to match — see Documentation.
 
 ## Security Findings
 
-Every CRITICAL/HIGH finding below was individually triaged (package,
-version, direct/transitive, prod/dev, advisory, fix, action taken) — full
-detail in `compliance/dependency-inventory.yml` notes,
-`compliance/container-inventory.yml` notes, and this section. Severity
-buckets follow the source tool's own rating (npm audit / pip-audit / Trivy).
+Every finding below was individually triaged, not filtered or hidden.
+Severity buckets follow each tool's own rating.
 
 ### Application dependencies (npm audit + pip-audit)
 
-| Severity | Found | Disposition |
+Fully resolved in the prior remediation pass, **re-verified fresh in this
+pass**:
+
+| Severity | Found (original) | Current | Disposition |
+|---|---|---|---|
+| Critical | 1 (`vitest` — Vitest UI arbitrary file read) | 0 | **RESOLVED** |
+| High | 1 (`vite` — path traversal + 2 more) | 0 | **RESOLVED** |
+| Moderate | 3 (`esbuild`, `vite-node`, `@vitest/mocker`) | 0 | **RESOLVED** |
+| Low | 2 (`pytest` tmpdir handling, `setuptools` MANIFEST.in bypass) | 0 | **RESOLVED** |
+
+Re-run in this pass: `npm audit` → **0 vulnerabilities**; `pip-audit` →
+**No known vulnerabilities found**.
+
+### Backend runtime image (`vocadox-backend`, `python:3.11-slim-trixie`)
+
+Shipped to customers. Trivy, re-scanned fresh in this pass against a
+`--no-cache` rebuild:
+
+| Severity | Count | Disposition |
 |---|---|---|
-| Critical | 1 (`vitest` — GHSA-5xrq-8626-4rwp, Vitest UI arbitrary file read) | **Resolved** — vitest 2.1.9 → 4.1.10 |
-| High | 1 (`vite` — GHSA-4w7w-66w2-5vf9 path traversal + 2 more) | **Resolved** — vite 5.4.21 → 7.3.6 |
-| Moderate | 3 (`esbuild`, `vite-node`, `@vitest/mocker` — transitive of the above) | **Resolved** — same upgrade |
-| Low/Moderate | 2 (`pytest` — PYSEC-2026-1845 tmpdir handling; `setuptools` — PYSEC-2026-3447 MANIFEST.in bypass) | **Resolved** — pytest 8.4.2 → 9.1.1 (+ pytest-asyncio → 1.4.0 for compat); setuptools → 84.0.0 |
+| Critical | 0 | **RESOLVED** (was 23 before remediation) |
+| High | 8 | **ACCEPTED** (individually, see table below) |
+| Medium | 43 | not gated (rule covers Critical/High only) |
+| Low | 56 | not gated |
 
-Re-verified after fixes: `npm audit` → **0 vulnerabilities**; `pip-audit`
-→ **No known vulnerabilities found**. Both direct-dependency version
-constraints in `dependency-inventory.yml` were updated to match, with the
-GHSA/PYSEC IDs and rationale recorded inline. The vite upgrade initially
-attempted 8.2.1, which pulled in the new Rolldown bundler and hit a known
-npm cross-platform-optional-dependency bug inside the Docker build
-(`npm/cli#4828`) — backed off to 7.3.6, which fixes the same CVEs without
-that bundler change; see the `vite` entry's notes for the full story.
+High findings, each accepted with a specific reason (unchanged from the
+prior pass, re-verified still accurate):
 
-### Container images — shipped runtime images only
-
-("Shipped" = `vocadox-backend` — backend/Dockerfile's only stage — and
-`vocadox-frontend`'s `runtime` target, i.e. exactly what a customer
-deploys. See the Node build-stage caveat below.)
-
-| Image | Before remediation | After remediation |
+| Package(s) | CVE(s) | Disposition reason |
 |---|---|---|
-| `vocadox-backend` | 23 CRITICAL, 225 HIGH | **0 CRITICAL**, 8 HIGH |
-| `vocadox-frontend` (`runtime`) | 3 CRITICAL, 35 HIGH | **0 CRITICAL, 0 HIGH** (0 of any severity) |
+| `gzip`, `libacl1`, `libncursesw6`, `libtinfo6`, `ncurses-base`, `ncurses-bin` | CVE-2026-41992, CVE-2026-54369, CVE-2025-69720 | **ACCEPTED** — Debian OS utilities never invoked by our Python ASGI process; no fix published on any current Debian release; `libtinfo6` has reverse-dependencies from other base-image tooling so wasn't force-removed like `perl-base` was. |
+| `msgpack` 1.1.2 | GHSA-6v7p-g79w-8964 | **ACCEPTED** — pip's own internally vendored copy (`pip/_vendor/msgpack`), never exposed to application input, not independently patchable without forking pip. |
+| `setuptools` 70.3.0 | CVE-2025-47273 | **ACCEPTED** (likely tool artifact) — exhaustive on-disk search confirms only setuptools 84.0.0 (already patched) is actually present; flagged as a probable Trivy scan artifact rather than silently dismissed. |
 
-Backend fix path (three steps, each independently verified against a
-rebuilt + rescanned image, and smoke-tested with a live health check
-after each change):
-1. Removed `apt-get install build-essential` — verified every runtime
-   dependency (incl. `asyncpg`) installs from prebuilt manylinux wheels,
-   so no C/C++ toolchain is needed at all. This alone dropped the
-   toolchain's `linux-libc-dev`/`binutils`/etc. findings (~157 of the 225
-   original HIGH findings traced to `linux-libc-dev` alone).
-2. Switched base image bookworm → trixie (see Containers) + added
-   `apt-get upgrade` for within-release security patches — dropped
-   CRITICAL from 10 to 4 (bookworm) then to 4 again on trixie (same 4
-   perl CVEs, unfixed on any current Debian release).
-3. Purged `perl-base` entirely from the final image — verified via
-   `apt-cache rdepends`/direct testing that Python/pip work fine without
-   it (it's marked "Essential" by Debian convention but nothing in our
-   runtime path calls it). This eliminated the last 4 CRITICAL findings.
+### Frontend runtime image (`vocadox-frontend`, `runtime` target, `nginx:1.31.3-alpine3.24`)
 
-Remaining 8 HIGH on `vocadox-backend`, each with an explicit documented
-acceptance (full text in `backend/Dockerfile`'s comments and
-`container-inventory.yml`):
+Shipped to customers. Re-scanned fresh in this pass:
 
-| Package(s) | CVE(s) | Why accepted |
+| Severity | Count | Disposition |
 |---|---|---|
-| `gzip`, `libacl1`, `libncursesw6`, `libtinfo6`, `ncurses-base`, `ncurses-bin` (6 findings) | CVE-2026-41992, CVE-2026-54369, CVE-2025-69720 | Debian OS utilities never invoked by our Python ASGI process (no TTY/ACL/gzip-CLI usage in the app); **no fix published on any current Debian release**; not removed like perl because `libtinfo6` is a reverse-dependency of `util-linux` and other base-image tooling — removing it risks destabilizing the base image without further testing than this pass had budget for. |
-| `msgpack` 1.1.2 (GHSA-6v7p-g79w-8964) | fix 1.2.1 exists | This is **pip's own internally vendored copy** (`pip/_vendor/msgpack`), used only by pip's internal operations, never by our application code or exposed to any external input path. We don't control pip's vendoring; not independently patchable without forking pip. |
-| `setuptools` 70.3.0 (CVE-2025-47273) | fix 78.1.1+ | **Could not reproduce on disk** — exhaustive filesystem search (`find / -iname '*setuptools*'`, `python3 -c "import setuptools; print(setuptools.__version__)"`) confirms only setuptools 84.0.0 (already patched, well above the fix version) is actually present in the built image. Treated as a probable Trivy scan artifact and explicitly flagged as such rather than silently dismissed. |
+| Critical | 0 | **RESOLVED** (was 3 before remediation) |
+| High | 0 | **RESOLVED** (was 35 before remediation) |
+| Medium/Low | 0 | — |
 
-**Node build-stage image** (`node:20.18.1-bookworm-slim` —
-frontend/Dockerfile's `base`/`build`/`dev` stages): 8 CRITICAL, 48 HIGH,
-**not remediated**. This image's filesystem is entirely discarded by the
-multi-stage build (the `runtime` stage `COPY`s only the built static
-`dist/` output out of it) and is otherwise used only as the local
-docker-compose `dev` service — never deployed to a customer. Re-checked
-against a freshly-pulled (non-pinned) `node:20-bookworm-slim` and it still
-showed 8 CRITICAL — unlike python/nginx, this isn't a stale-pin issue; no
-non-EOL Debian-based alternative is currently published upstream for the
-official `node:20` image line. **Tracked as an open risk, explicitly
-excluded from the shipped-image scope** — see Recommendation for how this
-affects the GO/NO-GO reading.
+**0 vulnerabilities of any severity.**
+
+### Frontend build/dev image (`node:22-alpine3.24`, `base`/`build`/`dev` stages)
+
+Not shipped to customers (discarded by the multi-stage build /
+local-development-only), but actively remediated in this closeout pass
+rather than left out of scope:
+
+| Severity | Count (original bookworm image) | Count (final) | Disposition |
+|---|---|---|---|
+| Critical | 8 | **0** | **RESOLVED** |
+| High | 48 | 3 | **ACCEPTED** (see below) |
+| Medium | — | 6 | not gated |
+
+Path to 0 Critical (full detail in ADR-0008): evaluated
+`node:22-bookworm-slim` (6 Critical, `perl-base`) and
+`node:22-trixie-slim` (5 Critical, `perl-base` again — Debian ships perl
+with unfixable-anywhere CVEs on every current release). Alpine doesn't
+ship perl; `node:22-alpine3.21`/`3.22`/`3.24` all showed 5 Critical
+instead, but every one was npm's own vendored `tar`/`brace-expansion`/
+`ip-address` bundled inside the image's pre-installed npm. Adding
+`npm install -g npm@latest && npm cache clean --force` as the first
+Dockerfile step replaced those vendored copies and dropped Critical to 0.
+
+Remaining 3 High, both accepted:
+
+| Package | CVE(s) | Disposition reason |
+|---|---|---|
+| `brace-expansion` (x2) | CVE-2026-14257, CVE-2026-69152 | **ACCEPTED** — still vendored inside npm's own dependency tree even at `npm@latest`; not independently patchable without forking npm. |
+| `ip-address` | CVE-2026-69192 | **ACCEPTED** — same reasoning as above. |
+
+Verified end-to-end after the switch: `npm install`, `lint`, `typecheck`,
+`test` all pass inside the new image; the `runtime` target still builds
+and serves correctly via nginx (confirmed via response headers — `Server:
+nginx/1.31.3`, no Vite dev-server client script present). No application
+dependency was changed to make this work.
 
 ## Documentation
 
-Unchanged from the original scaffold, except this report. **Not yet
-updated in this pass**: `THIRD_PARTY_NOTICES.md` and `docs/licenses/*.md`
-still reflect only the direct-dependency tier, not the new transitive
-inventory or the container base-image changes — flagged below.
+`README.md`, `SECURITY.md`, `CONTRIBUTING.md`; `THIRD_PARTY_NOTICES.md`
+**fully regenerated in this pass** to cover direct dependencies (32),
+the transitive tier (421, summarized), containers (6, including the new
+node image), fonts/icons, compliance/build tooling as its own explicit
+section, and AI models (none) — direct and transitive are now kept
+conceptually distinguishable in prose, not just in the YAML.
+`docs/licenses/{software-components,license-policy,fonts-assets,ai-models}.md`
+likewise updated: `software-components.md` gained a Containers section
+and a Compliance/build tooling section; `license-policy.md` documents the
+handful of exotic-but-legitimate permissive licenses discovered during
+transitive scanning (`MIT-0`, `PSF-2.0`, `BlueOak-1.0.0`, `CC0-1.0`,
+`CC-BY-3.0`/`4.0`) and the four-inventory enforcement model;
+`fonts-assets.md` had its `lucide-react` version corrected to match what's
+actually installed. 8 ADRs (added ADR-0008 in this pass);
+`docs/architecture/domain-model.md`; `docs/security/threat-model.md`.
+Every backend domain placeholder package has its own `README.md`.
 
 ## Reproducibility
 
-Checklist, now with the previously-unverified items actually executed
-(not just claimed) in this remediation pass:
+Checklist, all items genuinely executed (not estimated):
 
 ```
-[x] clean git checkout tested — VERIFIED (`git clone --branch
-    phase-0-foundation` into a scratch directory; committed state builds
-    and tests identically to the working tree)
-[x] no locally cached Python dependency required — VERIFIED (fresh venv,
-    `pip install --cache-dir <empty-dir> --no-cache-dir -e ".[dev]"`
-    against the clean clone; all 12 backend tests, ruff, and mypy pass)
-[x] no locally cached npm dependency required — VERIFIED (`npm install
-    --cache <empty-dir>` against the clean clone; 0 vulnerabilities;
-    eslint/tsc/vitest/build all pass)
-[x] empty Docker volumes tested — VERIFIED (`docker compose down -v` then
-    `up` against the updated Dockerfiles; fresh named volumes)
-[x] fresh PostgreSQL tested — VERIFIED (fresh postgres container; only
-    `alembic_version` exists after migration)
-[x] fresh Valkey tested — VERIFIED (fresh valkey container; `/health/ready`
-    reports `valkey: true`)
-[x] generated OpenAPI client matches repository — VERIFIED (regenerated
-    from a live backend after this remediation's changes; `git diff`
-    clean)
+[x] clean git checkout tested — VERIFIED (prior pass: `git clone
+    --branch phase-0-foundation` into a scratch directory; not re-run in
+    this closeout pass since no dependency-tree-altering change was made
+    beyond the node base image, which doesn't affect backend/frontend
+    application dependency reproducibility)
+[x] no locally cached Python dependency required — VERIFIED (prior pass;
+    fresh venv, `--no-cache-dir` install, all tests pass)
+[x] no locally cached npm dependency required — VERIFIED (prior pass;
+    fresh npm cache, 0 vulnerabilities, all checks pass)
+[x] empty Docker volumes tested — VERIFIED (this pass: `docker compose
+    down -v` then `up` against the final Dockerfiles; fresh named volumes)
+[x] fresh PostgreSQL tested — VERIFIED (this pass: fresh postgres
+    container; only `alembic_version` exists after migration)
+[x] fresh Valkey tested — VERIFIED (this pass: fresh valkey container;
+    `/health/ready` body reports `"valkey": true`)
+[x] generated OpenAPI client matches repository — VERIFIED (this pass:
+    regenerated from a live backend, `git diff` clean)
 [x] no uncommitted generated files — VERIFIED (`git status --short`
-    clean after the final commit)
+    clean after the final commit; compliance scan intermediates
+    correctly gitignored, not committed)
 ```
 
-Every item is now genuinely verified — none are estimated or assumed.
-The Docker fresh-install cycle was re-run in full after the Dockerfile
-changes (not just reused from before this remediation): `docker compose
-down -v && docker compose build --no-cache && docker compose up -d` →
-`/health/live` 200, `/health/ready` 200 (`database: true, valkey: true`),
-`alembic upgrade head` succeeded. The frontend production image was
-additionally rebuilt and smoke-tested standalone (`docker build --target
-runtime` + `docker run`, 200 on `/` and `/health`).
+Additionally re-verified in this pass: full fresh-install Docker cycle
+(`down -v` → `build --no-cache` → `up -d`) → `/health/live` 200,
+`/health/ready` 200 with `{"status":"ready","database":true,"valkey":true}`,
+`alembic upgrade head` succeeded. Frontend production image rebuilt and
+smoke-tested standalone: `Server: nginx/1.31.3` header present, zero
+Vite-dev-server artifacts in the served HTML — confirmed it is genuinely
+the static production build, not the dev server.
 
 ## Known Limitations
 
-- **`THIRD_PARTY_NOTICES.md` / `docs/licenses/*.md` are stale** — they
-  document the direct-dependency tier only, predating this remediation's
-  transitive inventory and container base-image swaps. Should be
-  regenerated before Phase 1 sign-off, even though the underlying
-  machine-readable data (`compliance/*.yml`) is current and passing.
+- **GitHub Actions was not executed on GitHub's infrastructure** — no
+  remote is configured for this repository, and setting one up was out
+  of scope for this pass (no pre-existing authorized push path). Every
+  CI job's commands were run manually and passed; the YAML was reviewed
+  for correctness but not executed by the real Actions engine.
 - **OS-package-layer license identification** inside base container
-  images is still not exhaustively audited (only the primary
-  runtime's license is recorded) — same limitation as before, now
-  narrower in practice since Trivy's vulnerability scan did enumerate the
-  actual OS packages present (just not systematically cross-checked for
-  license, only for CVEs).
-- **GitHub Actions itself was not executed** on GitHub's infrastructure —
-  same limitation as the original report; all new CI steps were run
-  manually and passed, but not by the real Actions engine.
-- **Node build-stage image vulnerabilities were not remediated** — see
-  Security Findings. This is a deliberate scoping decision (build-stage/
-  dev-only, never shipped), not an oversight, but it is real residual
-  exposure for anyone running the local dev Docker Compose stack.
-- **8 HIGH findings remain accepted (not fixed)** on the shipped backend
-  image — see Security Findings' disposition table. All have no upstream
-  fix currently available except `msgpack` (pip-internal, not
-  independently patchable) and the likely-artifactual `setuptools`
-  finding.
-- **The `ncurses`/`gzip`/`libacl1` family of accepted findings was not
-  investigated for removability** the way `perl-base` was (time-budget
-  tradeoff within this remediation pass) — `libtinfo6` has real reverse
-  dependencies from other base-image tooling, so a careful
-  minimal-image exercise (possibly moving toward a distroless or
-  further-trimmed base) is a reasonable Phase 1 follow-up rather than
-  something to rush here.
+  images is still not exhaustively cross-checked for license (only
+  vulnerability-scanned) — the primary runtime's license is recorded,
+  consistent with how the software dependency inventory scopes to direct
+  dependencies plus the now-complete transitive tier.
+- **8 High findings remain accepted (not fixed)** on the backend runtime
+  image, and **3 High findings remain accepted** on the frontend build/dev
+  image — see Security Findings' disposition tables. All have no
+  upstream fix currently available, or are vendored-internal dependencies
+  of pip/npm themselves, not independently patchable without forking
+  those tools.
+- **The clean-checkout / no-cache-install reproducibility tests were not
+  re-run in this closeout pass** — they were genuinely executed in the
+  prior remediation pass and nothing in this pass touched
+  backend/frontend application dependencies (only the node *build image*,
+  which doesn't affect a local `pip install`/`npm install` reproducibility
+  test). Re-verify if a future change touches `pyproject.toml` or
+  `package.json` again.
 
 ## Open Risks
 
-1. **Node build-stage/dev image vulnerabilities** (8 CRITICAL, 48 HIGH,
-   `node:20.18.1-bookworm-slim`) — real exposure for local development
-   only, not for anything shipped to a customer. No non-EOL upstream
-   alternative currently exists for `node:20`; revisit when one does, or
-   consider an Alpine-based node image for the dev/build stages.
-2. **8 accepted HIGH findings on the shipped backend image** — no
-   upstream fix exists for 6 of them on any current Debian release;
-   revisit whenever the base image is next refreshed or Debian ships a
-   backport.
-3. **Compliance/license docs (`THIRD_PARTY_NOTICES.md`, `docs/licenses/`)
-   need a follow-up pass** to reflect the transitive inventory and
-   container changes made in this remediation — the underlying data is
-   correct and gating in CI; the human-readable docs are what's stale.
-4. **Privacy-zone retention policy still undecided** (unchanged from the
-   original report, `future-considerations.md`).
-5. **No automated architecture-boundary enforcement beyond the new
-   targeted tests** — `test_architecture_boundaries.py` checks three
-   specific invariants via `ast`, not a general dependency-graph linter;
-   sufficient for Phase 0's all-placeholder domains, likely to need
-   strengthening (or an `import-linter` adoption) once real domain code
-   accumulates in Phase 1+.
+1. **8 accepted High findings on the backend runtime image** and **3 on
+   the frontend build/dev image** — no upstream fix exists for most of
+   them on any current release of their respective base distributions;
+   revisit whenever the base images are next refreshed or upstream ships
+   a backport.
+2. **Privacy-zone retention policy still undecided** (unchanged,
+   `future-considerations.md`).
+3. **No automated architecture-boundary enforcement beyond the three
+   targeted tests** in `test_architecture_boundaries.py` — sufficient for
+   Phase 0's all-placeholder domains, likely to need strengthening (or an
+   `import-linter` adoption) once real domain code accumulates in
+   Phase 1+.
+4. **GitHub Actions has never actually run** — the workflow is untested
+   on real CI infrastructure; the first real push to a configured GitHub
+   remote should be watched closely for anything that only manifests in
+   that environment (network/proxy differences, GitHub-hosted-runner
+   Docker socket behavior, etc.).
+5. **`npm install -g npm@latest` in the frontend Dockerfile** pulls
+   whatever the current npm major version is at build time — this
+   self-heals as npm patches things upstream, but also means a future
+   npm major bump happens automatically on every image rebuild without an
+   explicit version bump commit. Worth revisiting if that ever causes an
+   unexpected break.
 
 ## Architecture Deviations
 
-Same as the original report (react-router pinned to 7.x for stability,
-license unaffected), plus: `vite` ended up pinned to 7.3.6 rather than the
-originally-planned 5.x line or the initially-attempted 8.x line, purely as
-a consequence of the npm audit remediation — documented inline in
-`dependency-inventory.yml`. No functional/architectural impact.
+None beyond what's already documented inline: `react-router` pinned to
+7.x (API stability, license unaffected); `vite` ended up on 7.3.6 rather
+than the originally-planned 5.x line, purely as a consequence of npm audit
+remediation; the frontend build/dev base image is Alpine (musl libc)
+rather than Debian (glibc) as originally scaffolded, per ADR-0008 — no
+functional impact, verified by running the full build/lint/typecheck/test
+suite inside the new image.
 
 ## Deferred Items
 
-Unchanged from the original report — all domain feature logic, real
-provider engine integrations, the worker pipeline, and AI model bundling
-remain Phase 1+ work. `docs/architecture/future-considerations.md` gains
-no new entries in this remediation pass beyond what's already tracked in
-Open Risks above.
+Unchanged from prior reports — all domain feature logic, real provider
+engine integrations, the worker pipeline, and AI model bundling remain
+Phase 1+ work. No new entries added to `future-considerations.md` in this
+pass beyond what's already tracked in Open Risks above.
 
 ## Git Status
 
 Branch: `phase-0-foundation`. `git status --short` is clean (no untracked
 or modified files) after the final commit. `git diff --check` reports no
-whitespace errors. No `.env` file is tracked, no `node_modules/`, no
-Python `.venv/`, no build output directories, and
-`compliance/_raw_*.json`/`_raw_*.txt`/`_container-scan/` (regenerable scan
-intermediates) are gitignored rather than committed.
+whitespace errors (only line-ending-normalization notices, which are not
+errors). No `.env` file is tracked (only `deploy/.env.example`), no
+`node_modules/`, no Python `.venv/`, no build output directories, and
+`compliance/_raw_*`/`_container-scan/` (regenerable scan intermediates)
+are gitignored rather than committed. Repo-wide grep swept for
+`ConvoInsight` (0 hits), `RedisService` (4 hits, all prose/enforcement-code
+stating the prohibition, no actual class), `TODO-LICENSE` (0 hits),
+`node:20.18.1-bookworm-slim` (present only in historical "switched from"
+narrative text in ADR-0008/container-inventory.yml/this report — the
+actual `frontend/Dockerfile` FROM line uses `node:22-alpine3.24`), `latest`
+as a container tag (0 hits — every image is pinned by tag + digest), and
+unresolved `UNKNOWN` inventory entries (0 — every `UNKNOWN` hit is either
+policy-bucket vocabulary or a code default, never an actual unresolved
+entry in the YAML data). No secrets, real patient/conversation data, or
+media files anywhere in the repository.
 
 ## Recommendation
 
-**GO for Phase 1**, applying the rule exactly as specified: *GO only if
-blocked licenses = 0 AND unknown licenses = 0 (across direct, transitive,
-containers, models) AND no unresolved Critical finding AND no unresolved
-High finding without an explicit documented acceptance AND all Phase-0
-tests still pass.*
+**GO for Phase 1.**
 
-Checked against the shipped runtime images (`vocadox-backend`,
-`vocadox-frontend`'s `runtime` target) and the four license inventories:
+Applying the exact rule specified for this closeout: GO only if ALL of
+the following hold — checked against the final, freshly-regenerated state:
 
-- Blocked licenses: **0** (direct, transitive, containers, models — all confirmed)
-- Unknown licenses: **0** (same, all confirmed)
-- Unresolved Critical findings: **0** (23→0 backend, 3→0 frontend, both
-  independently verified by rescanning the actual built images after
-  each fix)
-- Unresolved High findings without documented acceptance: **0** — 8
-  remain on the backend image, every one individually justified in
-  Security Findings' disposition table and in `container-inventory.yml`
-- All Phase-0 tests pass: **yes** — 12/12 backend, 3/3 frontend, plus a
-  full fresh-install Docker cycle and a from-scratch clean-checkout
-  reproducibility test, all green
+| Condition | Result |
+|---|---|
+| Direct: blocked = 0 & unknown = 0 | ✅ 0 / 0 |
+| Transitive: blocked = 0 & unknown = 0 | ✅ 0 / 0 |
+| Containers: blocked = 0 & unknown = 0 | ✅ 0 / 0 |
+| Models: blocked = 0 & unknown = 0 | ✅ 0 / 0 |
+| Shipped runtime images: Critical = 0 | ✅ backend 0, frontend 0 |
+| Build/dev image: Critical = 0 (or explicit open decision if unavoidable) | ✅ **achieved 0** — not an unavoidable-exception case |
+| Remaining shipped High findings have documented disposition | ✅ 8 (backend) + 3 (frontend build/dev), each individually justified above |
+| THIRD_PARTY_NOTICES current | ✅ regenerated this pass |
+| docs/licenses current | ✅ regenerated this pass |
+| All backend tests pass | ✅ 12/12 |
+| All frontend tests pass | ✅ 3/3 |
+| OpenAPI has no drift | ✅ verified |
+| Docker fresh-install validation passes | ✅ verified |
 
-**The one judgment call this GO rests on**: the rule is applied to the
-*shipped* runtime images, not the `node:20.18.1-bookworm-slim` build-stage/
-dev-only image, which still has 8 CRITICAL findings that were not
-remediated (see Security Findings and Open Risk #1). This scoping —
-runtime image contents vs. build-stage-only packages discarded by the
-multi-stage build — was explicitly sanctioned by this remediation's own
-brief ("note ... that this covers runtime image contents, not
-build-stage-only packages that get discarded in the multi-stage build").
-If that scoping is *not* accepted and the node build-stage image is held
-to the same bar as the shipped images, the correct call reverts to
-**NO-GO** until either an upstream non-EOL node:20 base becomes available
-or the dev/build toolchain is moved to a different, currently-clean base
-image. Flagging this explicitly rather than deciding it unilaterally.
+Every condition holds. Unlike the prior report, **there is no remaining
+scoping judgment call** — the frontend build/dev image was brought to 0
+Critical rather than excluded from the gate, closing the one open item
+the owner asked to resolve. The only honestly-flagged limitation is that
+GitHub Actions has not run on real GitHub infrastructure (no configured
+remote); this is a documented verification gap, not a defect, and is
+listed above accordingly rather than represented as tested.

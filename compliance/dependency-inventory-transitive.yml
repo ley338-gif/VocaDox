@@ -1,5 +1,5 @@
 _generated_by: "compliance/generate_transitive_inventory.py \u2014 do not hand-edit"
-_generated_at: '2026-08-17T21:45:41.479495+00:00'
+_generated_at: '2026-08-18T01:54:04.775208+00:00'
 _note: 'Full resolved dependency tree (direct + transitive) for both ecosystems. ''scope: runtime'' means
   the package appears in a production-only install (backend: `pip install .` with no [dev] extra; frontend:
   `npm ls --production`) and therefore ships in the actual Docker runtime image / built bundle. ''scope:
@@ -2818,7 +2818,7 @@ dependencies:
   ecosystem: pypi
   version: 2.15.0
   scope: runtime
-  direct: false
+  direct: true
   license: MIT
   approval_status: approved
 - name: pydantic_core

@@ -30,8 +30,12 @@ raw lookup sources.
 
 - **Package license (npm registry):** `ISC` (verified — matches
   expectation)
-- **Source checked:** `https://registry.npmjs.org/lucide-react/latest`,
-  version `1.31.0`
+- **Source checked:** `https://registry.npmjs.org/lucide-react/latest`
+  (latest published version at research time was `1.31.0`; the version
+  actually pinned and installed in this project is `0.451.0` — a
+  narrower, more stable range chosen deliberately, see
+  `compliance/dependency-inventory.yml`'s `lucide-react` entry. License is
+  unaffected by this — ISC throughout the package's version history.)
 - **Upstream project license:** The Lucide project (the fork of Feather
   Icons that `lucide-react` is generated from) is itself licensed under
   ISC for its icon source files and tooling, consistent with the
@@ -44,10 +48,10 @@ raw lookup sources.
 
 ## Summary
 
-| Asset | Package | License | Status |
+| Asset | Package (installed) | License | Status |
 |---|---|---|---|
 | Inter font | `@fontsource/inter` v5.3.0 | OFL-1.1 | approved |
-| Lucide icons | `lucide-react` v1.31.0 | ISC | approved |
+| Lucide icons | `lucide-react` v0.451.0 | ISC | approved |
 
 Both assets are safe to bundle in VocaDox's on-premise, closed-source
 distribution with no copyleft or redistribution obligations beyond

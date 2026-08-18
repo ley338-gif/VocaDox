@@ -9,3 +9,4 @@ MADR-style (Status / Context / Decision / Consequences), numbered sequentially. 
 - [0005](0005-provider-abstraction-fakes.md) — Provider abstraction + fake-provider strategy
 - [0006](0006-no-storybook-design-system.md) — No-Storybook design-system approach
 - [0007](0007-zero-external-telemetry.md) — Zero-external-telemetry / on-prem-only stance
+- [0008](0008-node-build-image-alpine.md) — Node build/dev image: Alpine over Debian, plus npm self-update

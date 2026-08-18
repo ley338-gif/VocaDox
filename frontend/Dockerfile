@@ -1,6 +1,26 @@
 # Pinned base images (see compliance/container-inventory.yml for license/digest record).
-FROM node:20.18.1-bookworm-slim@sha256:b2c8e0eb8a6aeeae33b2711f8f516003e27ee45804e270468d937b3214f2f0cc AS base
+#
+# node:22-alpine3.24 (not the originally scaffolded node:20.18.1-bookworm-slim):
+# a Trivy scan during Phase 0 final closeout found 8 CRITICAL / 48 HIGH on
+# the bookworm image (mostly perl-base — same irreducible-on-Debian issue
+# as the backend's original base image, plus npm's own vendored
+# tar/brace-expansion/etc.). Evaluated node:22-bookworm-slim (6 CRITICAL,
+# still has perl-base), node:22-trixie-slim (5 CRITICAL, perl-base again —
+# Debian ships perl on every release), and node:22-alpine3.21/3.22/3.24
+# (5 CRITICAL each, purely npm's own vendored deps — Alpine doesn't ship
+# perl at all). alpine3.24 + upgrading npm's own bundled copy of itself
+# (see below) gets this to 0 CRITICAL, 3 HIGH — see ADR-0008 and
+# container-inventory.yml for the full comparison and final disposition.
+FROM node:22-alpine3.24@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS base
 WORKDIR /app
+
+# npm ships its own vendored copies of tar/brace-expansion/ip-address/etc.
+# inside the Node image (used by npm itself, not our app) — the versions
+# bundled with the base image's npm were the source of every CRITICAL
+# Trivy finding on this image. Updating npm to latest replaces those
+# vendored copies with patched ones; verified this drops CRITICAL to 0.
+RUN npm install -g npm@latest && npm cache clean --force
+
 COPY package.json package-lock.json* ./
 RUN npm install
 

@@ -53,6 +53,18 @@ dependencies:
       either. Confirmed MIT via the project's canonical LICENSE file at
       https://raw.githubusercontent.com/pydantic/pydantic/main/LICENSE.
 
+  - name: pydantic-settings
+    ecosystem: pypi
+    version_constraint: ">=2.4,<3.0 (installed: 2.15.0)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/pydantic-settings/json
+    approval_status: approved
+    notes: >
+      Direct runtime dependency (used in app/platform/config.py) that was
+      missing from this inventory until Phase 0's final closeout pass
+      caught the gap during a version-accuracy sweep — added here rather
+      than left untracked. info.license_expression = MIT (PyPI JSON).
+
   - name: sqlalchemy
     ecosystem: pypi
     version_constraint: ">=2.0,<2.1"
@@ -305,11 +317,11 @@ dependencies:
 
   - name: eslint
     ecosystem: npm
-    version_constraint: "^10.8.1"
+    version_constraint: "^9.12.0 (installed: 9.39.5)"
     license: MIT
     license_source_url: https://registry.npmjs.org/eslint/latest
     approval_status: approved
-    notes: "license = MIT (npm registry, version 10.8.1). Dev-only dependency."
+    notes: "license = MIT (npm registry; verified against the latest published version, 10.8.1, at research time). Pinned to the 9.x line actually installed for stability; MIT throughout eslint's history. Dev-only dependency."
 
   - name: vitest
     ecosystem: npm
@@ -345,15 +357,16 @@ dependencies:
 
   - name: lucide-react
     ecosystem: npm
-    version_constraint: "^1.31.0"
+    version_constraint: "^0.451.0 (installed: 0.451.0)"
     license: ISC
     license_source_url: https://registry.npmjs.org/lucide-react/latest
     approval_status: approved
     notes: >
-      Verified as requested: license = ISC (npm registry, version
-      1.31.0), matching the expected ISC. See also
-      docs/licenses/fonts-assets.md for the Lucide icon-set project
-      license.
+      Verified as requested: license = ISC (npm registry; verified against
+      the latest published version, 1.31.0, at research time — matches the
+      expected ISC). Pinned to the 0.x line actually installed for API
+      stability; license unaffected. See also docs/licenses/fonts-assets.md
+      for the Lucide icon-set project license.
 
   - name: "@fontsource/inter"
     ecosystem: npm

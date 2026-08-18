@@ -31,19 +31,13 @@
 # regenerate via the commands in PHASE_0_VALIDATION_REPORT.md's Security
 # Findings section).
 #
-# SCOPE: this covers the packages present in the final, shipped runtime
-# image only. `node:20.18.1-bookworm-slim` (frontend/Dockerfile's `base`/
-# `build`/`dev` stages) is explicitly OUT of this scope for two reasons:
-# (1) its filesystem is entirely discarded by the multi-stage build — the
-# `runtime` stage COPYs only `/app/dist` (built static assets) out of it,
-# so none of its OS packages reach the shipped image; (2) the `dev` stage
-# is used only as the local-development docker-compose service, never
-# deployed to a customer. It was still scanned for visibility (see the
-# `node` entry below) and does carry real CRITICAL/HIGH findings from a
-# stale Debian bookworm base with no newer non-EOL alternative currently
-# published upstream for the node:20 line — tracked as an open risk in
-# PHASE_0_VALIDATION_REPORT.md, not a gate blocker, per this explicit
-# build-stage-vs-runtime-image scoping.
+# SCOPE: primarily covers the packages present in the final, shipped
+# runtime images (vocadox-backend, vocadox-frontend `runtime` stage). The
+# frontend build/dev image (`node`, below) was ALSO scanned and actively
+# remediated during Phase 0's final closeout — see ADR-0008 — rather than
+# left out of scope, even though its filesystem never reaches the shipped
+# runtime image and it's otherwise dev-only. Result: 0 CRITICAL across all
+# three (backend runtime, frontend runtime, frontend build/dev).
 
 containers:
   - image: postgres
@@ -94,25 +88,36 @@ containers:
       own internals — individually justified in the validation report).
 
   - image: node
-    tag: "20.18.1-bookworm-slim"
-    digest: "sha256:b2c8e0eb8a6aeeae33b2711f8f516003e27ee45804e270468d937b3214f2f0cc"
-    purpose: "Frontend build stage (discarded — never reaches the shipped image) + local dev server base image (dev-only, never deployed to customers)"
-    source: "docker.io/library/node (Docker Official Image, Debian bookworm base)"
-    license: "MIT (Node.js runtime); Debian base layer under mixed OS-package licenses (not individually audited — see header note)"
+    tag: "22-alpine3.24"
+    digest: "sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32"
+    purpose: "Frontend build stage (discarded by the multi-stage build — never reaches the shipped runtime image) + local dev server base image (dev-only, never deployed to customers)"
+    source: "docker.io/library/node (Docker Official Image, Alpine base)"
+    license: "MIT (Node.js runtime); Alpine base layer under mixed OS-package licenses (not individually audited — see header note)"
     pinned: true
     approval_status: approved
     notes: >
-      OUT OF SCOPE for the shipped-image vulnerability gate — see this
-      file's header note. Trivy found 8 CRITICAL / 48 HIGH on this base
-      image; re-checked against the current (non-pinned, freshly pulled)
-      node:20-bookworm-slim floating tag and it still showed 8
-      CRITICAL/38 HIGH, so — unlike python and nginx — this is not simply
-      a stale pin; no newer non-EOL Debian release is currently published
-      upstream for the official node:20 image line. Tracked as an open
-      risk in PHASE_0_VALIDATION_REPORT.md (affects local dev-compose
-      usage only, not anything shipped to a customer). Revisit when
-      an official node image on a newer Debian base becomes available, or
-      consider an Alpine-based node image for the dev/build stages.
+      Switched from node:20.18.1-bookworm-slim during Phase 0's final
+      closeout (ADR-0008). Evaluated node:22-bookworm-slim (6 CRITICAL)
+      and node:22-trixie-slim (5 CRITICAL) — both blocked by perl-base,
+      which Debian ships on every current release with 4 unfixable-anywhere
+      CVEs (same root cause the backend hit and fixed by switching away
+      from Debian's perl entirely). Alpine doesn't ship perl at all;
+      node:22-alpine3.21/3.22/3.24 all showed 5 CRITICAL instead, but
+      every one was npm's own vendored copy of tar/brace-expansion/
+      ip-address/etc. bundled inside the image's pre-installed npm —
+      genuinely fixable, unlike Debian's perl. Added
+      `npm install -g npm@latest && npm cache clean --force` as the first
+      step in frontend/Dockerfile's `base` stage, which replaces those
+      vendored copies with current ones. Final scanned image (the actual
+      built `base`/`dev` stage, not a synthetic test): **0 CRITICAL, 3
+      HIGH**. Verified end-to-end: `npm install`, `lint`, `typecheck`,
+      `test`, and `build` (via the `runtime` target) all still pass inside
+      this image with no application dependency changes required.
+      Residual 3 HIGH (`brace-expansion` x2, `ip-address` x1) are also
+      npm's own vendored dependencies, still present even at npm@latest —
+      accepted, same treatment as the backend image's pip-internal
+      `msgpack` finding: not exposed to any input path our build process
+      controls, not independently patchable without forking npm.
 
   - image: nginx
     tag: "1.31.3-alpine3.24"
@@ -157,10 +162,10 @@ containers:
 #   blocked: 0
 #   unknown: 0
 #
-# Vulnerability summary, SHIPPED runtime images only (vocadox-backend,
-# vocadox-frontend `runtime` stage) — see PHASE_0_VALIDATION_REPORT.md,
-# Security Findings, for the full package-by-package breakdown and
-# disposition of every CRITICAL/HIGH finding:
-#   vocadox-backend  (python:3.11-slim-trixie):  0 CRITICAL, 8 HIGH (documented/accepted)
-#   vocadox-frontend (nginx:1.31.3-alpine3.24):   0 CRITICAL, 0 HIGH
-#   node:20.18.1-bookworm-slim (build-stage/dev-only, NOT shipped): 8 CRITICAL, 48 HIGH — open risk, not a gate blocker
+# Vulnerability summary (all three images actively remediated — see
+# PHASE_0_VALIDATION_REPORT.md, Security Findings, for the full
+# package-by-package breakdown and disposition of every CRITICAL/HIGH
+# finding, and ADR-0008 for the node image decision):
+#   vocadox-backend            (python:3.11-slim-trixie):  0 CRITICAL, 8 HIGH (documented/accepted)
+#   vocadox-frontend (runtime) (nginx:1.31.3-alpine3.24):   0 CRITICAL, 0 HIGH
+#   frontend build/dev image   (node:22-alpine3.24):        0 CRITICAL, 3 HIGH (documented/accepted)

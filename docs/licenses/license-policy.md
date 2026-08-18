@@ -23,6 +23,15 @@ for font assets (see `docs/licenses/fonts-assets.md`); it carries a
 narrow "don't sell the font by itself" restriction that doesn't apply to
 using it as a bundled application asset.
 
+**Added during the full transitive-dependency-tree scan** (Phase 0
+remediation): `MIT-0`, `PSF-2.0`, `BlueOak-1.0.0`, `CC0-1.0`, `CC-BY-3.0`,
+`CC-BY-4.0`. Each was found on a specific *transitive* (never direct)
+dependency, individually identified — not guessed — and added with a
+per-package provenance note in `compliance/license-policy.yml`. All are
+permissive or public-domain-equivalent with no copyleft/redistribution
+obligation that conflicts with closed, on-premise deployment; none appear
+in a production runtime dependency tree (all are dev/build-tooling-only).
+
 ## Review required
 
 `MPL-2.0`, `LGPL-2.1`, `LGPL-2.1-or-later`, `LGPL-3.0`,
@@ -70,8 +79,17 @@ recorded exception:
 ## Enforcement
 
 `compliance/check_licenses.py` loads `compliance/license-policy.yml`
-together with `compliance/dependency-inventory.yml` and
-`compliance/model-inventory.yml`, classifies every entry, prints a
-summary, and exits with a non-zero status if anything resolves to
-`blocked` or `unknown`. It is intended to be run in CI as a gate on every
-change to the dependency or model inventories.
+together with **four** inventories — `compliance/dependency-inventory.yml`
+(direct dependencies), `compliance/dependency-inventory-transitive.yml`
+(the full resolved dependency tree — every transitive package too, not
+just direct ones, regenerated from real tooling output by
+`compliance/generate_transitive_inventory.py`), `compliance/container-inventory.yml`,
+and `compliance/model-inventory.yml` — classifies every entry in each,
+prints a summary broken out by inventory (never summed together, since
+the transitive inventory is a superset of the direct one), and exits with
+a non-zero status if anything in *any* of them resolves to `blocked` or
+`unknown`. It is intended to be run in CI as a gate on every change to any
+of the four inventories — see `.github/workflows/ci.yml`'s `compliance`
+job, which also regenerates the transitive inventory from the real
+lockfiles before gating, so a stale/committed snapshot can't mask a real
+drift.
