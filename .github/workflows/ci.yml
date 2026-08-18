@@ -35,6 +35,54 @@ jobs:
       - name: pip-audit (Python dependency vulnerabilities)
         run: pip-audit
 
+  migration:
+    name: Alembic migration (real Postgres)
+    runs-on: ubuntu-latest
+    # Phase 1 adds the first real domain tables (0002_identity_rbac). The
+    # `backend` job above deliberately keeps using SQLite/fakes for
+    # pytest (see tests/identity/conftest.py) so it needs no external
+    # services — but the migration itself must still be proven against a
+    # real Postgres, not just SQLite's more forgiving DDL. This job is
+    # that proof, separate from `backend` so a Postgres-specific failure
+    # here is never confused with an application-logic test failure.
+    services:
+      postgres:
+        image: postgres:16.6-alpine3.20@sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc
+        env:
+          POSTGRES_USER: vocadox
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: vocadox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vocadox"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      VOCADOX_DATABASE_URL: postgresql+asyncpg://vocadox:changeme@localhost:5432/vocadox
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: alembic upgrade head (from empty database)
+        run: alembic upgrade head
+
+      - name: alembic downgrade to base (proves downgrade() is not silently broken)
+        run: alembic downgrade base
+
+      - name: alembic upgrade head again (proves the up/down/up cycle is clean)
+        run: alembic upgrade head
+
   frontend:
     name: Frontend (lint / typecheck / test / build)
     runs-on: ubuntu-latest
