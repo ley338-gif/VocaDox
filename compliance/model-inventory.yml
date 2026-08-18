@@ -1,7 +1,12 @@
 # compliance/model-inventory.yml
 #
 # Inventory of AI/ML models bundled with or downloaded by VocaDox at
-# install/build time. Empty in Phase 0 by design (see note below).
+# install/build time. Activated for real in Phase 3 (speech-to-text +
+# diarization) — see docs/architecture/adr/0016-speech-provider-selection.md,
+# 0017-diarization-provider-selection.md, and 0018-model-installation-strategy.md
+# for the full evaluation. Every entry below had its runtime LIBRARY license
+# (compliance/dependency-inventory.yml) and its MODEL-WEIGHT license verified
+# SEPARATELY — never assumed identical.
 #
 # Schema for each entry under `models:`:
 #   - name:                      Model name/identifier as published by its source.
@@ -25,9 +30,52 @@
 #                                computed against compliance/license-policy.yml
 #                                (or a model-specific policy, if one is later
 #                                introduced).
-#
-# NOTE: No AI models are bundled or downloaded in Phase 0 of VocaDox.
-# Model integration (ASR/TTS/NLU or similar) begins in Phase 3/4 of the
-# roadmap; this file will be populated with real entries at that point.
 
-models: []
+models:
+  - name: faster-whisper-small (Systran conversion of openai/whisper-small)
+    purpose: Speech-to-text (transcription), Phase 3 default speech profile
+    provider: Systran (CTranslate2 conversion of OpenAI's Whisper weights)
+    version: "536b0662742c02347bc0e980a01041f333bce12"  # HF revision (commit), pinned — never a floating tag
+    source: "https://huggingface.co/Systran/faster-whisper-small"
+    license: MIT
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      None beyond standard MIT attribution. Not gated — no Hugging Face
+      login/token required to download. The model card documents the exact
+      conversion command from openai/whisper-small
+      (`ct2-transformers-converter --model openai/whisper-small ...`),
+      confirming the effective terms trace back to OpenAI's own MIT-licensed
+      Whisper weights rather than being assumed from the library's license.
+    sha256: null  # not yet computed for the locally-installed snapshot — see Known Limitations, PHASE_3_VALIDATION_REPORT.md
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated: `python -m app.cli.install_models speech-default` (app/cli/install_models.py), via huggingface_hub.snapshot_download pinned to the revision above. Never downloaded silently by the running worker."
+    bundled_with_product: false
+    disk_size_mb: 484
+    runtime_requirements: "faster-whisper>=1.0,<2.0 (MIT, see dependency-inventory.yml); CPU (int8) or NVIDIA GPU (float16, ~1-2GB VRAM)"
+    approval_status: approved
+
+  - name: pyannote/speaker-diarization-3.1
+    purpose: Speaker diarization, Phase 3 default diarization profile (internally composes pyannote/segmentation-3.0)
+    provider: pyannote (Hervé Bredin / pyannoteAI)
+    version: "84fd25912480287da0247647c3d2b4853cb3ee5"  # HF revision (commit), pinned — never a floating tag
+    source: "https://huggingface.co/pyannote/speaker-diarization-3.1"
+    license: MIT
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      GATED on Hugging Face: an admin must log in, accept the model's
+      terms, and supply a personal Hugging Face access token to download
+      it (never bundled/redistributed by VocaDox itself as a result — see
+      ADR-0017/ADR-0018). The pipeline internally depends on
+      pyannote/segmentation-3.0 (also MIT, also gated) — same access
+      requirement.
+    sha256: null  # not yet computed for the locally-installed snapshot — see Known Limitations, PHASE_3_VALIDATION_REPORT.md
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated: `python -m app.cli.install_models diarization-default --token <hf_token>` (app/cli/install_models.py). Requires VOCADOX_HUGGINGFACE_TOKEN or --token; never read by the running worker's request path, never logged."
+    bundled_with_product: false
+    disk_size_mb: 20  # pipeline config + segmentation/embedding checkpoints combined, approximate
+    runtime_requirements: "pyannote.audio>=3.1,<3.4 (MIT, see dependency-inventory.yml); CPU or NVIDIA GPU"
+    approval_status: approved

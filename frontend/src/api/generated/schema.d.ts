@@ -361,6 +361,223 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/process/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Process Transcript Endpoint
+         * @description Explicit user action to start processing — never triggered
+         *     automatically on upload (spec, "Triggering processing").
+         */
+        post: operations["process_transcript_endpoint_api_v1_conversations__conversation_id__process_transcript_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/processing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Processing Status Endpoint */
+        get: operations["get_processing_status_endpoint_api_v1_conversations__conversation_id__processing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/processing/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Processing Endpoint
+         * @description Re-queue the most recent terminally-FAILED job for this conversation
+         *     as a brand new job (spec: explicit retries, not hidden endless retry).
+         */
+        post: operations["retry_processing_endpoint_api_v1_conversations__conversation_id__processing_retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/processing/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Processing Job Endpoint */
+        post: operations["cancel_processing_job_endpoint_api_v1_conversations__conversation_id__processing__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/transcript": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Transcript Endpoint */
+        get: operations["get_transcript_endpoint_api_v1_conversations__conversation_id__transcript_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/transcript/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Transcript Segments Endpoint */
+        get: operations["list_transcript_segments_endpoint_api_v1_conversations__conversation_id__transcript_segments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/transcript/segments/{segment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Correct Segment Endpoint */
+        patch: operations["correct_segment_endpoint_api_v1_conversations__conversation_id__transcript_segments__segment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/transcript/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Transcript Endpoint
+         * @description Plain text / JSON export, no generated summaries (spec: "Transcript
+         *     export"). Respects the same authorization as every other transcript
+         *     read.
+         */
+        get: operations["export_transcript_endpoint_api_v1_conversations__conversation_id__transcript_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/speakers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Speakers Endpoint */
+        get: operations["list_speakers_endpoint_api_v1_conversations__conversation_id__speakers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/speakers/{speaker_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Assign Speaker Endpoint */
+        patch: operations["assign_speaker_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/providers/speech": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Speech Provider Status Endpoint */
+        get: operations["speech_provider_status_endpoint_api_v1_admin_providers_speech_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/providers/diarization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diarization Provider Status Endpoint */
+        get: operations["diarization_provider_status_endpoint_api_v1_admin_providers_diarization_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -498,6 +715,52 @@ export interface components {
             email: string | null;
             /** Permissions */
             permissions: string[];
+        };
+        /** DetectedSpeakerResponse */
+        DetectedSpeakerResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Internal Label */
+            internal_label: string;
+            /** Display Label */
+            display_label: string | null;
+            /** Participant Id */
+            participant_id: string | null;
+            /** Assigned By User Id */
+            assigned_by_user_id: string | null;
+            /** Assigned At */
+            assigned_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** DiarizationProviderStatusResponse */
+        DiarizationProviderStatusResponse: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Model Revision */
+            model_revision: string | null;
+            /** Installed */
+            installed: boolean;
+            /** Detail */
+            detail: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -750,6 +1013,65 @@ export interface components {
          * @enum {string}
          */
         PrivacyMode: "standard" | "restricted";
+        /** ProcessRequest */
+        ProcessRequest: {
+            /**
+             * Diarize
+             * @default true
+             */
+            diarize: boolean;
+            /** Language Hint */
+            language_hint?: string | null;
+            /** Min Speakers */
+            min_speakers?: number | null;
+            /** Max Speakers */
+            max_speakers?: number | null;
+            /**
+             * Reprocess
+             * @default false
+             */
+            reprocess: boolean;
+        };
+        /** ProcessingJobResponse */
+        ProcessingJobResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Job Type */
+            job_type: string;
+            /** Status */
+            status: string;
+            /** Progress */
+            progress: number;
+            /** Attempt */
+            attempt: number;
+            /** Max Attempts */
+            max_attempts: number;
+            /** Failure Class */
+            failure_class: string | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message Safe */
+            error_message_safe: string | null;
+            /**
+             * Queued At
+             * Format: date-time
+             */
+            queued_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+        };
+        /** ProcessingStatusResponse */
+        ProcessingStatusResponse: {
+            /** Conversation Status */
+            conversation_status: string;
+            /** Jobs */
+            jobs: components["schemas"]["ProcessingJobResponse"][];
+        };
         /** ReadinessResponse */
         ReadinessResponse: {
             /** Status */
@@ -758,6 +1080,132 @@ export interface components {
             database: boolean;
             /** Valkey */
             valkey: boolean;
+        };
+        /** SegmentCorrectionRequest */
+        SegmentCorrectionRequest: {
+            /** Corrected Text */
+            corrected_text?: string | null;
+            review_status?: components["schemas"]["SegmentReviewStatus"] | null;
+        };
+        /**
+         * SegmentReviewStatus
+         * @enum {string}
+         */
+        SegmentReviewStatus: "unreviewed" | "confirmed" | "corrected" | "flagged";
+        /** SpeakerAssignmentRequest */
+        SpeakerAssignmentRequest: {
+            /** Participant Id */
+            participant_id?: string | null;
+            /** Display Label */
+            display_label?: string | null;
+        };
+        /** SpeechProviderStatusResponse */
+        SpeechProviderStatusResponse: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Model Revision */
+            model_revision: string | null;
+            /** Installed */
+            installed: boolean;
+            /** Device */
+            device: string;
+            /** Cuda Available */
+            cuda_available: boolean;
+            /** Detail */
+            detail: string | null;
+        };
+        /** TranscriptResponse */
+        TranscriptResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Source Media Id
+             * Format: uuid
+             */
+            source_media_id: string;
+            /** Language */
+            language: string | null;
+            /** Status */
+            status: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Model Revision */
+            model_revision: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message Safe */
+            error_message_safe: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** TranscriptSegmentResponse */
+        TranscriptSegmentResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Transcript Id
+             * Format: uuid
+             */
+            transcript_id: string;
+            /** Speaker Id */
+            speaker_id: string | null;
+            /** Sequence */
+            sequence: number;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms: number;
+            /** Original Text */
+            original_text: string;
+            /** Corrected Text */
+            corrected_text: string | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Words */
+            words: components["schemas"]["WordSchema"][] | null;
+            /** Review Status */
+            review_status: string;
+            /** Alignment Quality */
+            alignment_quality: string;
+            /** Review Flag */
+            review_flag: boolean;
+            /** Review Flag Reason */
+            review_flag_reason: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -771,6 +1219,17 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WordSchema */
+        WordSchema: {
+            /** Text */
+            text: string;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms: number;
+            /** Confidence */
+            confidence: number;
         };
     };
     responses: never;
@@ -1681,6 +2140,375 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationResponse"][];
+                };
+            };
+        };
+    };
+    process_transcript_endpoint_api_v1_conversations__conversation_id__process_transcript_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_processing_status_endpoint_api_v1_conversations__conversation_id__processing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_processing_endpoint_api_v1_conversations__conversation_id__processing_retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingJobResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_processing_job_endpoint_api_v1_conversations__conversation_id__processing__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingJobResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_transcript_endpoint_api_v1_conversations__conversation_id__transcript_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_transcript_segments_endpoint_api_v1_conversations__conversation_id__transcript_segments_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptSegmentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_segment_endpoint_api_v1_conversations__conversation_id__transcript_segments__segment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptSegmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_transcript_endpoint_api_v1_conversations__conversation_id__transcript_export_get: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_speakers_endpoint_api_v1_conversations__conversation_id__speakers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectedSpeakerResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_speaker_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                speaker_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeakerAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectedSpeakerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    speech_provider_status_endpoint_api_v1_admin_providers_speech_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeechProviderStatusResponse"];
+                };
+            };
+        };
+    };
+    diarization_provider_status_endpoint_api_v1_admin_providers_diarization_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiarizationProviderStatusResponse"];
                 };
             };
         };

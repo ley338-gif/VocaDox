@@ -1,5 +1,5 @@
 import { Pause, Play } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import type { Marker } from "../api/conversations";
 import { Button } from "../design-system/Button";
@@ -12,15 +12,25 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-export function AudioPlayer({
-  src,
-  sourceLabel,
-  markers = [],
-}: {
-  src: string;
-  sourceLabel: string;
-  markers?: Marker[];
-}) {
+/** Imperative seek handle — used by the Transcript tab so clicking a
+ * transcript segment seeks the same underlying <audio> element (spec:
+ * "Audio/transcript synchronization"). */
+export interface AudioPlayerHandle {
+  seekToMs: (ms: number) => void;
+  play: () => void;
+}
+
+export const AudioPlayer = forwardRef<
+  AudioPlayerHandle,
+  {
+    src: string;
+    sourceLabel: string;
+    markers?: Marker[];
+    /** Fired on every timeupdate, in milliseconds — used to highlight the
+     * currently-playing transcript segment. */
+    onTimeUpdateMs?: (ms: number) => void;
+  }
+>(function AudioPlayer({ src, sourceLabel, markers = [], onTimeUpdateMs }, ref) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -29,7 +39,10 @@ export function AudioPlayer({
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      onTimeUpdateMs?.(audio.currentTime * 1000);
+    };
     const onLoadedMetadata = () => setDuration(audio.duration || 0);
     const onEnded = () => setPlaying(false);
     audio.addEventListener("timeupdate", onTimeUpdate);
@@ -40,7 +53,7 @@ export function AudioPlayer({
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
     };
-  }, [src]);
+  }, [src, onTimeUpdateMs]);
 
   function togglePlay() {
     const audio = audioRef.current;
@@ -59,6 +72,21 @@ export function AudioPlayer({
     audio.currentTime = seconds;
     setCurrentTime(seconds);
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      seekToMs: (ms: number) => seekTo(ms / 1000),
+      play: () => {
+        const audio = audioRef.current;
+        if (audio) {
+          void audio.play();
+          setPlaying(true);
+        }
+      },
+    }),
+    []
+  );
 
   return (
     <div className={styles.player}>
@@ -101,4 +129,4 @@ export function AudioPlayer({
       <span className={styles.sourceLine}>{sourceLabel}</span>
     </div>
   );
-}
+});

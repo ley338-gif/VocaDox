@@ -1,11 +1,14 @@
 _generated_by: "compliance/generate_transitive_inventory.py \u2014 do not hand-edit"
-_note: 'Full resolved dependency tree (direct + transitive) for both ecosystems. ''scope: runtime'' means
-  the package appears in a production-only install (backend: `pip install .` with no [dev] extra; frontend:
-  `npm ls --production`) and therefore ships in the actual Docker runtime image / built bundle. ''scope:
-  dev'' means it was only found in the full dev/build tree (lint/test/build tooling) and is never shipped.'
+_note: "Full resolved dependency tree (direct + transitive) for both ecosystems. 'scope: runtime' means\
+  \ the package appears in a production-only install (backend: `pip install .` with no [dev] extra; frontend:\
+  \ `npm ls --production`) and therefore ships in the actual Docker runtime image / built bundle. 'scope:\
+  \ dev' means it was only found in the full dev/build tree (lint/test/build tooling) and is never shipped.\
+  \ 'scope: worker' (Phase 3+) means the package appears only in `pip install -e backend/[ai]` \u2014\
+  \ it ships in the worker-speech/worker-diarization images only, never in the api/frontend images (see\
+  \ backend/worker.Dockerfile)."
 summary:
-  approved: 424
-  review_required: 2
+  approved: 494
+  review_required: 3
   blocked: 0
   unknown: 0
 dependencies:
@@ -2508,6 +2511,15 @@ dependencies:
   direct: false
   license: Apache-2.0
   approval_status: approved
+- name: Jinja2
+  ecosystem: pypi
+  version: 3.1.6
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: Mako
   ecosystem: pypi
   version: 1.4.1
@@ -2542,6 +2554,27 @@ dependencies:
   scope: runtime
   direct: true
   license: MIT
+  approval_status: approved
+- name: aiohappyeyeballs
+  ecosystem: pypi
+  version: 2.7.1
+  scope: worker
+  direct: false
+  license: PSF-2.0
+  approval_status: approved
+- name: aiohttp
+  ecosystem: pypi
+  version: 3.14.3
+  scope: worker
+  direct: false
+  license: Apache-2.0 AND MIT
+  approval_status: approved
+- name: aiosignal
+  ecosystem: pypi
+  version: 1.4.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
   approval_status: approved
 - name: aiosqlite
   ecosystem: pypi
@@ -2592,12 +2625,33 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: asteroid-filterbanks
+  ecosystem: pypi
+  version: 0.4.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: asyncpg
   ecosystem: pypi
   version: 0.31.0
   scope: runtime
   direct: true
   license: Apache-2.0
+  approval_status: approved
+- name: attrs
+  ecosystem: pypi
+  version: 26.1.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: av
+  ecosystem: pypi
+  version: 18.1.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
   approval_status: approved
 - name: boolean.py
   ecosystem: pypi
@@ -2634,6 +2688,38 @@ dependencies:
   direct: false
   license: BSD-3-Clause
   approval_status: approved
+- name: colorlog
+  ecosystem: pypi
+  version: 6.12.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: contourpy
+  ecosystem: pypi
+  version: 1.3.3
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: ctranslate2
+  ecosystem: pypi
+  version: 4.8.1
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: cycler
+  ecosystem: pypi
+  version: 0.12.1
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: cyclonedx-python-lib
   ecosystem: pypi
   version: 11.12.0
@@ -2648,10 +2734,24 @@ dependencies:
   direct: false
   license: PSF-2.0
   approval_status: approved
+- name: einops
+  ecosystem: pypi
+  version: 0.8.2
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: fastapi
   ecosystem: pypi
   version: 0.141.1
   scope: runtime
+  direct: true
+  license: MIT
+  approval_status: approved
+- name: faster-whisper
+  ecosystem: pypi
+  version: 1.2.1
+  scope: worker
   direct: true
   license: MIT
   approval_status: approved
@@ -2662,6 +2762,41 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: flatbuffers
+  ecosystem: pypi
+  version: 25.12.19
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: fonttools
+  ecosystem: pypi
+  version: 4.63.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: frozenlist
+  ecosystem: pypi
+  version: 1.8.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: fsspec
+  ecosystem: pypi
+  version: 2026.7.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+- name: googleapis-common-protos
+  ecosystem: pypi
+  version: 1.75.1
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
 - name: greenlet
   ecosystem: pypi
   version: 3.5.5
@@ -2669,12 +2804,26 @@ dependencies:
   direct: false
   license: MIT AND PSF-2.0
   approval_status: approved
+- name: grpcio
+  ecosystem: pypi
+  version: 1.83.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
 - name: h11
   ecosystem: pypi
   version: 0.16.0
   scope: runtime
   direct: false
   license: MIT
+  approval_status: approved
+- name: hf-xet
+  ecosystem: pypi
+  version: 1.6.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
   approval_status: approved
 - name: httpcore
   ecosystem: pypi
@@ -2699,6 +2848,13 @@ dependencies:
   approval_status: approved
   note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
     this script).
+- name: huggingface_hub
+  ecosystem: pypi
+  version: 1.28.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
 - name: idna
   ecosystem: pypi
   version: '3.19'
@@ -2713,6 +2869,29 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: joblib
+  ecosystem: pypi
+  version: 1.5.3
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+- name: julius
+  ecosystem: pypi
+  version: 0.2.8
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: kiwisolver
+  ecosystem: pypi
+  version: 1.5.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: librt
   ecosystem: pypi
   version: 0.15.0
@@ -2727,12 +2906,33 @@ dependencies:
   direct: false
   license: Apache-2.0
   approval_status: approved
+- name: lightning
+  ecosystem: pypi
+  version: 2.6.5
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: lightning-utilities
+  ecosystem: pypi
+  version: 0.15.3
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
 - name: markdown-it-py
   ecosystem: pypi
   version: 4.2.0
   scope: dev
   direct: false
   license: MIT
+  approval_status: approved
+- name: matplotlib
+  ecosystem: pypi
+  version: 3.11.1
+  scope: worker
+  direct: false
+  license: PSF-2.0
   approval_status: approved
 - name: mdurl
   ecosystem: pypi
@@ -2741,10 +2941,26 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: mpmath
+  ecosystem: pypi
+  version: 1.3.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: msgpack
   ecosystem: pypi
   version: 1.2.1
   scope: dev
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: multidict
+  ecosystem: pypi
+  version: 6.7.1
+  scope: worker
   direct: false
   license: Apache-2.0
   approval_status: approved
@@ -2762,6 +2978,97 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: narwhals
+  ecosystem: pypi
+  version: 2.24.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: networkx
+  ecosystem: pypi
+  version: 3.6.1
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+- name: numpy
+  ecosystem: pypi
+  version: 2.4.6
+  scope: worker
+  direct: false
+  license: BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0
+  approval_status: approved
+- name: onnxruntime
+  ecosystem: pypi
+  version: 1.29.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: opentelemetry-api
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp-proto-common
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp-proto-grpc
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp-proto-http
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-proto
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-sdk
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-semantic-conventions
+  ecosystem: pypi
+  version: 0.65b0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: optuna
+  ecosystem: pypi
+  version: 4.9.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: packageurl-python
   ecosystem: pypi
   version: 0.17.6
@@ -2776,6 +3083,15 @@ dependencies:
   direct: false
   license: Apache-2.0 OR BSD-2-Clause
   approval_status: approved
+- name: pandas
+  ecosystem: pypi
+  version: 3.0.5
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: pathspec
   ecosystem: pypi
   version: 1.1.1
@@ -2783,6 +3099,13 @@ dependencies:
   direct: false
   license: MPL-2.0
   approval_status: review_required
+- name: pillow
+  ecosystem: pypi
+  version: 12.3.0
+  scope: worker
+  direct: false
+  license: MIT-CMU
+  approval_status: approved
 - name: pip-api
   ecosystem: pypi
   version: 0.0.34
@@ -2818,6 +3141,27 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: primePy
+  ecosystem: pypi
+  version: '1.3'
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: propcache
+  ecosystem: pypi
+  version: 0.5.2
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: protobuf
+  ecosystem: pypi
+  version: 7.35.1
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
 - name: py-serializable
   ecosystem: pypi
   version: 2.1.0
@@ -2825,6 +3169,60 @@ dependencies:
   direct: false
   license: Apache-2.0
   approval_status: approved
+- name: pyannote-audio
+  ecosystem: pypi
+  version: 4.0.7
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: pyannote-core
+  ecosystem: pypi
+  version: 6.0.1
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: pyannote-database
+  ecosystem: pypi
+  version: 6.1.1
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: pyannote-metrics
+  ecosystem: pypi
+  version: '4.1'
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: pyannote-pipeline
+  ecosystem: pypi
+  version: 4.0.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: pyannoteai-sdk
+  ecosystem: pypi
+  version: 0.4.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: pycparser
   ecosystem: pypi
   version: '3.0'
@@ -2874,6 +3272,13 @@ dependencies:
   direct: true
   license: Apache-2.0
   approval_status: approved
+- name: python-dateutil
+  ecosystem: pypi
+  version: 2.9.0.post0
+  scope: worker
+  direct: false
+  license: Apache Software License; BSD License
+  approval_status: approved
 - name: python-dotenv
   ecosystem: pypi
   version: 1.2.3
@@ -2887,6 +3292,20 @@ dependencies:
   scope: runtime
   direct: true
   license: Apache-2.0
+  approval_status: approved
+- name: pytorch-lightning
+  ecosystem: pypi
+  version: 2.6.5
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: pytorch-metric-learning
+  ecosystem: pypi
+  version: 2.9.0
+  scope: worker
+  direct: false
+  license: MIT
   approval_status: approved
 - name: requests
   ecosystem: pypi
@@ -2909,6 +3328,36 @@ dependencies:
   direct: true
   license: MIT
   approval_status: approved
+- name: safetensors
+  ecosystem: pypi
+  version: 0.8.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: scikit-learn
+  ecosystem: pypi
+  version: 1.9.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+- name: scipy
+  ecosystem: pypi
+  version: 1.17.1
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: six
+  ecosystem: pypi
+  version: 1.17.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: sortedcontainers
   ecosystem: pypi
   version: 2.4.0
@@ -2922,6 +3371,31 @@ dependencies:
   scope: runtime
   direct: false
   license: BSD-3-Clause
+  approval_status: approved
+- name: sympy
+  ecosystem: pypi
+  version: 1.14.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: threadpoolctl
+  ecosystem: pypi
+  version: 3.6.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: tokenizers
+  ecosystem: pypi
+  version: 0.23.1
+  scope: worker
+  direct: false
+  license: Apache-2.0
   approval_status: approved
 - name: tomli
   ecosystem: pypi
@@ -2937,6 +3411,60 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: torch
+  ecosystem: pypi
+  version: 2.13.0+cpu
+  scope: worker
+  direct: false
+  license: Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0
+    AND MIT
+  approval_status: approved
+- name: torch-audiomentations
+  ecosystem: pypi
+  version: 0.12.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: torch_pitch_shift
+  ecosystem: pypi
+  version: 1.2.5
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+- name: torchaudio
+  ecosystem: pypi
+  version: 2.11.0+cpu
+  scope: worker
+  direct: false
+  license: BSD-2-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: torchcodec
+  ecosystem: pypi
+  version: 0.16.0+cpu
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: torchmetrics
+  ecosystem: pypi
+  version: 1.9.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: tqdm
+  ecosystem: pypi
+  version: 4.70.0
+  scope: worker
+  direct: false
+  license: MPL-2.0 AND MIT
+  approval_status: review_required
 - name: typing-inspection
   ecosystem: pypi
   version: 0.4.4
@@ -2992,4 +3520,11 @@ dependencies:
   scope: runtime
   direct: false
   license: BSD-3-Clause
+  approval_status: approved
+- name: yarl
+  ecosystem: pypi
+  version: 1.24.5
+  scope: worker
+  direct: false
+  license: Apache-2.0
   approval_status: approved

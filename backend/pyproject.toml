@@ -31,6 +31,35 @@ dependencies = [
 # "Known limitation: metadata extraction" for the honest scope of this.
 
 [project.optional-dependencies]
+# Phase 3 real speech/diarization providers — installed ONLY in the
+# worker-speech/worker-diarization container images (see
+# deploy/docker-compose.yml, deploy/worker.Dockerfile), never in the api/
+# frontend images and never required by the mandatory (fake-provider) test
+# suite. See docs/architecture/adr/0014-speech-provider-selection.md and
+# 0015-diarization-provider-selection.md for the full license evaluation;
+# compliance/dependency-inventory.yml records each direct package's
+# license. Deliberately NOT part of `dependencies` above so `pip install
+# -e backend/` (the CI/api image install) never pulls multi-GB ML
+# packages.
+ai = [
+    # MIT (verified: https://pypi.org/pypi/faster-whisper/json) — CTranslate2-
+    # based Whisper inference.
+    "faster-whisper>=1.0,<2.0",
+    # pyannote.audio 3.1+ is required by the pyannote/speaker-diarization-3.1
+    # pipeline card. Originally pinned to the lighter 3.x line, but real
+    # local testing (building backend/worker.Dockerfile and importing the
+    # package) hit a genuine, documented upstream incompatibility: 3.x's
+    # `pyannote/audio/core/io.py` calls `torchaudio.AudioMetaData`, which
+    # newer torchaudio releases removed entirely (see
+    # https://github.com/pyannote/pyannote-audio/issues/1952) — pyannote.audio
+    # 3.x cannot actually be imported against a modern torchaudio resolved
+    # by pip today. 4.x fixed this by moving to torchcodec instead of the
+    # removed torchaudio API, so 4.x is what's pinned, despite its heavier
+    # dependency footprint (see ADR-0017 for the full account of this
+    # empirical finding, including the pin change). MIT (verified:
+    # https://raw.githubusercontent.com/pyannote/pyannote-audio/develop/LICENSE).
+    "pyannote.audio>=4.0,<5.0",
+]
 dev = [
     "ruff>=0.6,<1.0",
     "mypy>=1.11,<2.0",

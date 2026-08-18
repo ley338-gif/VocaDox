@@ -1,0 +1,144 @@
+.empty {
+  text-align: center;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: var(--font-body-sm-size);
+}
+
+.progress {
+  padding: var(--space-4);
+}
+
+.stageList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4) 0;
+}
+
+.stageList li {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.stageActive {
+  background: var(--surface-accent, #eef2ff);
+  color: var(--text-default);
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.exportLinks {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.exportLinks a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-body-sm-size);
+}
+
+.speakerList {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.speakerChip {
+  min-width: 160px;
+}
+
+.segmentList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.segment {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.segmentActive {
+  background: var(--surface-accent, #eef2ff);
+  border-color: var(--border-accent, #6366f1);
+}
+
+.timestamp {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-link, #4f46e5);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  height: fit-content;
+}
+
+.segmentBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.segmentMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-warning, #b45309);
+  font-size: var(--font-body-sm-size);
+}
+
+.editable {
+  cursor: text;
+}
+
+.editable:hover {
+  background: var(--surface-hover, #f9fafb);
+}
+
+.editRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.originalText {
+  color: var(--text-muted);
+  font-size: var(--font-body-sm-size);
+  font-style: italic;
+  margin-top: var(--space-1);
+}

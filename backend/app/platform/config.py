@@ -100,6 +100,55 @@ class Settings(BaseSettings):
         "operators should set this deliberately for production deployments.",
     )
 
+    # -- Speech / diarization processing (Phase 3) ---------------------------
+    speech_provider: str = Field(
+        default="fake",
+        description="'fake' (tests/dev, always available) or 'faster_whisper' (real, requires "
+        "an installed model — see docs/admin/model-installation.md). Never defaults to a real "
+        "provider so a fresh checkout without an installed model degrades safely.",
+    )
+    diarization_provider: str = Field(
+        default="fake",
+        description="'fake' (tests/dev) or 'pyannote' (real, requires an installed, "
+        "license-accepted pyannote pipeline).",
+    )
+    model_volume_root: str = Field(
+        default="./data/models",
+        description="Persistent root for installed AI models (separate from conversation "
+        "media — see docs/admin/model-installation.md). Never re-downloaded on restart.",
+    )
+    speech_model_dir_name: str = Field(default="speech-default")
+    diarization_model_dir_name: str = Field(default="diarization-default")
+    speech_device: str = Field(default="auto", description="'auto' | 'cuda' | 'cpu'")
+    diarization_device: str = Field(default="auto", description="'auto' | 'cuda' | 'cpu'")
+    huggingface_token: str | None = Field(
+        default=None,
+        description="Used only by the offline `vocadox models install` CLI to download a "
+        "gated model (e.g. pyannote's pipeline) once, at admin-initiated install time. Never "
+        "read by the API or worker request path, never logged, never exposed via any endpoint.",
+    )
+    normalization_target_sample_rate_hz: int = Field(default=16000)
+    normalization_subprocess_timeout_seconds: int = Field(default=600)
+    normalization_max_duration_seconds: int = Field(
+        default=4 * 60 * 60, description="Hard cap on source media duration accepted for "
+        "normalization (4 hours default)."
+    )
+    worker_concurrency: int = Field(
+        default=1,
+        description="Max concurrent GPU-heavy jobs per worker process. Safe default is 1 — "
+        "see docs/admin/worker-configuration.md.",
+    )
+    job_lease_seconds: int = Field(
+        default=300,
+        description="How long a RUNNING job's lease is valid before another worker may "
+        "reclaim it as abandoned (worker-crash recovery).",
+    )
+    max_active_processing_jobs_per_conversation: int = Field(
+        default=3,
+        description="Queue-fairness cap: a user cannot enqueue unlimited concurrent "
+        "processing jobs for the same conversation.",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

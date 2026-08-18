@@ -406,3 +406,44 @@ dependencies:
       packaging; the underlying Inter font itself is also licensed under
       the SIL Open Font License 1.1 by its author. See
       docs/licenses/fonts-assets.md.
+
+  # ---------------------------------------------------------------------
+  # Phase 3: real speech/diarization providers — worker-speech/
+  # worker-diarization images ONLY (backend `[ai]` optional-dependency
+  # extra, never installed in the api/frontend images or the mandatory
+  # CI test suite). See docs/architecture/adr/0016-speech-provider-selection.md
+  # and 0017-diarization-provider-selection.md for the full evaluation
+  # (runtime library license verified separately from model-weight
+  # license in each case).
+  # ---------------------------------------------------------------------
+  - name: faster-whisper
+    ecosystem: pypi
+    version_constraint: ">=1.0,<2.0"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/faster-whisper/json
+    approval_status: approved
+    notes: >
+      info.license = "MIT License" (PyPI JSON, 2026-08-18); classifiers
+      confirm "License :: OSI Approved :: MIT License". Worker-image-only
+      (backend `[ai]` extra) — never in the api/frontend images.
+
+  - name: pyannote.audio
+    ecosystem: pypi
+    version_constraint: ">=4.0,<5.0"
+    license: MIT
+    license_source_url: https://raw.githubusercontent.com/pyannote/pyannote-audio/develop/LICENSE
+    approval_status: approved
+    notes: >
+      PyPI publishes no license/license_expression field for this package;
+      verified instead via the project's actual LICENSE file on GitHub
+      (MIT, copyright CNRS 2020), 2026-08-18. Originally pinned to the
+      lighter 3.x line; revised to 4.x after real testing found 3.x cannot
+      actually be imported against a modern torchaudio (removed
+      `torchaudio.AudioMetaData` API — see
+      docs/architecture/adr/0017-diarization-provider-selection.md,
+      "Version pin revised after real testing"). Worker-image-only
+      (backend `[ai]` extra) — never in the api/frontend images. Every one
+      of its own transitive dependencies (torch, lightning, opentelemetry,
+      torchcodec, scipy, pandas, ...)
+      is recorded in dependency-inventory-transitive.yml with
+      scope: worker.

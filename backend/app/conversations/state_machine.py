@@ -33,15 +33,46 @@ _ALLOWED_TRANSITIONS: dict[ConversationStatus, set[ConversationStatus]] = {
         ConversationStatus.DELETED,
     },
     ConversationStatus.NORMALIZING: {
+        ConversationStatus.TRANSCRIBING,
+        ConversationStatus.READY,
+        ConversationStatus.FAILED,
+        ConversationStatus.DELETED,
+    },
+    # Phase 3: real async processing stages. TRANSCRIBING and DIARIZING are
+    # not required to be sequential (diarization runs against the same
+    # normalized audio independently of transcription) — both may follow
+    # NORMALIZING, and either may lead into ALIGNING once both underlying
+    # ProcessingRuns exist (see app.processing.orchestrator).
+    ConversationStatus.TRANSCRIBING: {
+        ConversationStatus.DIARIZING,
+        ConversationStatus.ALIGNING,
+        ConversationStatus.READY,
+        ConversationStatus.FAILED,
+        ConversationStatus.DELETED,
+    },
+    ConversationStatus.DIARIZING: {
+        ConversationStatus.ALIGNING,
+        ConversationStatus.READY,
+        ConversationStatus.FAILED,
+        ConversationStatus.DELETED,
+    },
+    ConversationStatus.ALIGNING: {
         ConversationStatus.READY,
         ConversationStatus.FAILED,
         ConversationStatus.DELETED,
     },
     ConversationStatus.READY: {
+        # A user-triggered reprocess ("reprocess with current profile", spec)
+        # re-enters the pipeline from a READY conversation without losing
+        # processing history (previous Transcript rows/ProcessingRuns are
+        # never deleted — see app.processing.orchestrator.start_transcription).
+        ConversationStatus.TRANSCRIBING,
         ConversationStatus.DELETED,
     },
     ConversationStatus.FAILED: {
         ConversationStatus.UPLOADED,  # retry a fresh upload after a failure
+        ConversationStatus.NORMALIZING,
+        ConversationStatus.TRANSCRIBING,
         ConversationStatus.DELETED,
     },
     ConversationStatus.DELETED: set(),

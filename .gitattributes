@@ -1,0 +1,8 @@
+# Binary test fixtures — never subject to CRLF/LF line-ending conversion
+# (git's own content-based binary detection already handles this
+# correctly without this file, verified by inspecting the actual commit —
+# this makes the intent explicit rather than relying on that heuristic).
+*.wav binary
+*.mp3 binary
+*.m4a binary
+*.webm binary
