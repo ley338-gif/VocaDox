@@ -7,7 +7,7 @@ _note: "Full resolved dependency tree (direct + transitive) for both ecosystems.
   \ it ships in the worker-speech/worker-diarization images only, never in the api/frontend images (see\
   \ backend/worker.Dockerfile)."
 summary:
-  approved: 485
+  approved: 494
   review_required: 3
   blocked: 0
   unknown: 0
@@ -2511,13 +2511,6 @@ dependencies:
   direct: false
   license: Apache-2.0
   approval_status: approved
-- name: HyperPyYAML
-  ecosystem: pypi
-  version: 1.2.3
-  scope: worker
-  direct: false
-  license: Apache-2.0
-  approval_status: approved
 - name: Jinja2
   ecosystem: pypi
   version: 3.1.6
@@ -2611,15 +2604,6 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
-- name: antlr4-python3-runtime
-  ecosystem: pypi
-  version: 4.9.3
-  scope: worker
-  direct: false
-  license: BSD-3-Clause
-  approval_status: approved
-  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
-    this script).
 - name: anyio
   ecosystem: pypi
   version: 4.14.2
@@ -2711,6 +2695,15 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: contourpy
+  ecosystem: pypi
+  version: 1.3.3
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: ctranslate2
   ecosystem: pypi
   version: 4.8.1
@@ -2718,6 +2711,15 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: cycler
+  ecosystem: pypi
+  version: 0.12.1
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: cyclonedx-python-lib
   ecosystem: pypi
   version: 11.12.0
@@ -2750,7 +2752,7 @@ dependencies:
   ecosystem: pypi
   version: 1.2.1
   scope: worker
-  direct: false
+  direct: true
   license: MIT
   approval_status: approved
 - name: filelock
@@ -2767,6 +2769,13 @@ dependencies:
   direct: false
   license: Apache-2.0
   approval_status: approved
+- name: fonttools
+  ecosystem: pypi
+  version: 4.63.0
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: frozenlist
   ecosystem: pypi
   version: 1.8.0
@@ -2781,12 +2790,26 @@ dependencies:
   direct: false
   license: BSD-3-Clause
   approval_status: approved
+- name: googleapis-common-protos
+  ecosystem: pypi
+  version: 1.75.1
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
 - name: greenlet
   ecosystem: pypi
   version: 3.5.5
   scope: runtime
   direct: false
   license: MIT AND PSF-2.0
+  approval_status: approved
+- name: grpcio
+  ecosystem: pypi
+  version: 1.83.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
   approval_status: approved
 - name: h11
   ecosystem: pypi
@@ -2860,6 +2883,15 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: kiwisolver
+  ecosystem: pypi
+  version: 1.5.0
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: librt
   ecosystem: pypi
   version: 0.15.0
@@ -2894,6 +2926,13 @@ dependencies:
   scope: dev
   direct: false
   license: MIT
+  approval_status: approved
+- name: matplotlib
+  ecosystem: pypi
+  version: 3.11.1
+  scope: worker
+  direct: false
+  license: PSF-2.0
   approval_status: approved
 - name: mdurl
   ecosystem: pypi
@@ -2960,21 +2999,68 @@ dependencies:
   direct: false
   license: BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0
   approval_status: approved
-- name: omegaconf
-  ecosystem: pypi
-  version: 2.3.1
-  scope: worker
-  direct: false
-  license: BSD-3-Clause
-  approval_status: approved
-  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
-    this script).
 - name: onnxruntime
   ecosystem: pypi
   version: 1.29.0
   scope: worker
   direct: false
   license: MIT
+  approval_status: approved
+- name: opentelemetry-api
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp-proto-common
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp-proto-grpc
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-exporter-otlp-proto-http
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-proto
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-sdk
+  ecosystem: pypi
+  version: 1.44.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: opentelemetry-semantic-conventions
+  ecosystem: pypi
+  version: 0.65b0
+  scope: worker
+  direct: false
+  license: Apache-2.0
   approval_status: approved
 - name: optuna
   ecosystem: pypi
@@ -3013,6 +3099,13 @@ dependencies:
   direct: false
   license: MPL-2.0
   approval_status: review_required
+- name: pillow
+  ecosystem: pypi
+  version: 12.3.0
+  scope: worker
+  direct: false
+  license: MIT-CMU
+  approval_status: approved
 - name: pip-api
   ecosystem: pypi
   version: 0.0.34
@@ -3076,6 +3169,15 @@ dependencies:
   direct: false
   license: Apache-2.0
   approval_status: approved
+- name: pyannote-audio
+  ecosystem: pypi
+  version: 4.0.7
+  scope: worker
+  direct: false
+  license: MIT
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: pyannote-core
   ecosystem: pypi
   version: 6.0.1
@@ -3112,13 +3214,15 @@ dependencies:
   approval_status: approved
   note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
     this script).
-- name: pyannote.audio
+- name: pyannoteai-sdk
   ecosystem: pypi
-  version: 3.3.2
+  version: 0.4.0
   scope: worker
   direct: false
   license: MIT
   approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: pycparser
   ecosystem: pypi
   version: '3.0'
@@ -3217,26 +3321,19 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
-- name: ruamel.yaml
-  ecosystem: pypi
-  version: 0.18.17
-  scope: worker
-  direct: false
-  license: MIT
-  approval_status: approved
-- name: ruamel.yaml.clib
-  ecosystem: pypi
-  version: 0.2.15
-  scope: worker
-  direct: false
-  license: MIT
-  approval_status: approved
 - name: ruff
   ecosystem: pypi
   version: 0.16.3
   scope: dev
   direct: true
   license: MIT
+  approval_status: approved
+- name: safetensors
+  ecosystem: pypi
+  version: 0.8.0
+  scope: worker
+  direct: false
+  license: Apache-2.0
   approval_status: approved
 - name: scikit-learn
   ecosystem: pypi
@@ -3254,22 +3351,6 @@ dependencies:
   approval_status: approved
   note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
     this script).
-- name: semver
-  ecosystem: pypi
-  version: 3.0.4
-  scope: worker
-  direct: false
-  license: BSD-3-Clause
-  approval_status: approved
-  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
-    this script).
-- name: sentencepiece
-  ecosystem: pypi
-  version: 0.2.2
-  scope: worker
-  direct: false
-  license: Apache-2.0
-  approval_status: approved
 - name: six
   ecosystem: pypi
   version: 1.17.0
@@ -3281,22 +3362,6 @@ dependencies:
   ecosystem: pypi
   version: 2.4.0
   scope: dev
-  direct: false
-  license: Apache-2.0
-  approval_status: approved
-- name: soundfile
-  ecosystem: pypi
-  version: 0.14.0
-  scope: worker
-  direct: false
-  license: BSD-3-Clause
-  approval_status: approved
-  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
-    this script).
-- name: speechbrain
-  ecosystem: pypi
-  version: 1.1.0
-  scope: worker
   direct: false
   license: Apache-2.0
   approval_status: approved
@@ -3316,13 +3381,6 @@ dependencies:
   approval_status: approved
   note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
     this script).
-- name: tensorboardX
-  ecosystem: pypi
-  version: 2.6.5
-  scope: worker
-  direct: false
-  license: MIT
-  approval_status: approved
 - name: threadpoolctl
   ecosystem: pypi
   version: 3.6.0
@@ -3381,6 +3439,15 @@ dependencies:
   scope: worker
   direct: false
   license: BSD-2-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
+- name: torchcodec
+  ecosystem: pypi
+  version: 0.16.0+cpu
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
   approval_status: approved
   note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
     this script).

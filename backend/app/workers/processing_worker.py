@@ -6,9 +6,12 @@ app.workers.runner` starts as its own process/container (see
 deploy/docker-compose.yml's `worker-speech`/`worker-diarization`
 services).
 
-Concurrency: `Settings.worker_concurrency` caps how many jobs one worker
-process executes concurrently (default 1 — safe for GPU-heavy work; see
-docs/admin/worker-configuration.md).
+Concurrency: this loop processes exactly one job at a time per process
+(safe default for GPU-heavy work — no risk of two jobs fighting over the
+same VRAM). `Settings.worker_concurrency` documents the intended future
+cap for a concurrent-execution implementation but is not yet read here —
+scale out today via additional worker containers/replicas, not this
+setting. See docs/admin/worker-configuration.md.
 """
 
 from __future__ import annotations

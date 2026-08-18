@@ -139,6 +139,22 @@ PACKAGE_LICENSE_OVERRIDES: dict[tuple[str, str], str] = {
     ("pypi", "sympy"): "BSD-3-Clause",
     ("pypi", "threadpoolctl"): "BSD-3-Clause",  # PyPI license field states "BSD-3-Clause"
     ("pypi", "torchaudio"): "BSD-2-Clause",  # verified via github.com/pytorch/audio LICENSE — 2-clause, unlike torch's own 3-clause
+    # pyannote.audio 4.x's own transitive tree (matplotlib + torchcodec +
+    # pyannoteai-sdk), verified 2026-08-18 after the 3.x -> 4.x pin change
+    # (see ADR-0017, "Version pin revised after real testing").
+    ("pypi", "contourpy"): "BSD-3-Clause",
+    ("pypi", "cycler"): "BSD-3-Clause",
+    ("pypi", "kiwisolver"): "BSD-3-Clause",
+    ("pypi", "pyannote-audio"): "MIT",  # PyPI publishes no license metadata for 4.0.7 either; verified via the
+    # same GitHub LICENSE file as the pyannote.audio PyPI-name entry (they're the same project).
+    ("pypi", "torchcodec"): "BSD-3-Clause",  # PyPI publishes no license metadata; verified via
+    # github.com/pytorch/torchcodec LICENSE (BSD 3-Clause, Meta/PyTorch project).
+    ("pypi", "pyannoteai-sdk"): "MIT",  # PyPI publishes no license metadata. This is pyannoteAI's OPTIONAL
+    # commercial cloud-API SDK client (pulled in as a pyannote.audio 4.x dependency but never invoked by
+    # VocaDox — no API key is ever configured). Verified MIT via
+    # raw.githubusercontent.com/pyannoteAI/pyannoteai-sdk-python/main/LICENSE, 2026-08-18. See
+    # docs/architecture/adr/0017-diarization-provider-selection.md for the full note on why this dependency
+    # exists and is safe despite being a commercial-product SDK.
 }
 
 

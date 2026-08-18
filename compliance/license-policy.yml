@@ -52,6 +52,7 @@ approved:
   # available/non-compete restriction. Verified individually (torch's
   # license expression), never assumed from the abbreviation alone.
   - BSL-1.0             # Boost Software License 1.0 — permissive. (component of torch's license expression; NOT Business Source License 1.1)
+  - MIT-CMU             # Pillow's actual PyPI license_expression — an MIT variant with a Carnegie Mellon University attribution clause, still fully permissive. Not a standalone SPDX-registered id but verified via Pillow's own PyPI metadata and LICENSE file, 2026-08-18. (pillow, transitive of pyannote.audio's matplotlib dependency)
 
 review_required:
   - MPL-2.0
