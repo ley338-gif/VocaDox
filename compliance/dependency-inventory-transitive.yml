@@ -4,7 +4,7 @@ _note: 'Full resolved dependency tree (direct + transitive) for both ecosystems.
   `npm ls --production`) and therefore ships in the actual Docker runtime image / built bundle. ''scope:
   dev'' means it was only found in the full dev/build tree (lint/test/build tooling) and is never shipped.'
 summary:
-  approved: 418
+  approved: 424
   review_required: 2
   blocked: 0
   unknown: 0
@@ -483,6 +483,13 @@ dependencies:
   version: 7.0.15
   scope: dev
   direct: false
+  license: MIT
+  approval_status: approved
+- name: '@types/node'
+  ecosystem: npm
+  version: 26.2.0
+  scope: dev
+  direct: true
   license: MIT
   approval_status: approved
 - name: '@types/prop-types'
@@ -2319,6 +2326,13 @@ dependencies:
   direct: true
   license: Apache-2.0
   approval_status: approved
+- name: undici-types
+  ecosystem: npm
+  version: 8.3.0
+  scope: dev
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: update-browserslist-db
   ecosystem: npm
   version: 1.3.1
@@ -2564,6 +2578,20 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: argon2-cffi
+  ecosystem: pypi
+  version: 23.1.0
+  scope: runtime
+  direct: true
+  license: MIT
+  approval_status: approved
+- name: argon2-cffi-bindings
+  ecosystem: pypi
+  version: 25.1.0
+  scope: runtime
+  direct: false
+  license: MIT
+  approval_status: approved
 - name: asyncpg
   ecosystem: pypi
   version: 0.31.0
@@ -2585,6 +2613,13 @@ dependencies:
   direct: false
   license: MPL-2.0
   approval_status: review_required
+- name: cffi
+  ecosystem: pypi
+  version: 2.1.1
+  scope: runtime
+  direct: false
+  license: MIT-0
+  approval_status: approved
 - name: charset-normalizer
   ecosystem: pypi
   version: 3.5.1
@@ -2666,7 +2701,7 @@ dependencies:
     this script).
 - name: idna
   ecosystem: pypi
-  version: '3.18'
+  version: '3.19'
   scope: runtime
   direct: false
   license: BSD-3-Clause
@@ -2789,6 +2824,13 @@ dependencies:
   scope: dev
   direct: false
   license: Apache-2.0
+  approval_status: approved
+- name: pycparser
+  ecosystem: pypi
+  version: '3.0'
+  scope: runtime
+  direct: false
+  license: BSD-3-Clause
   approval_status: approved
 - name: pydantic
   ecosystem: pypi

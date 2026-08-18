@@ -2,12 +2,14 @@
 
 **On-premise, evidence-based conversation documentation.**
 
-> **Status: Phase 0 — Architecture & Foundation scaffold.** No domain
-> features (authentication, conversations, transcription, ...) are
-> implemented yet. This repository currently contains project scaffolding,
-> architecture decisions, and compliance tooling only. See
-> [`PHASE_0_VALIDATION_REPORT.md`](PHASE_0_VALIDATION_REPORT.md) for the
-> full validation report and GO/NO-GO recommendation before Phase 1 begins.
+> **Status: Phase 1 — Identity & Security.** Local authentication,
+> permission-based RBAC (users/groups/roles/permissions), Valkey-backed
+> sessions, CSRF protection, an organizations foundation, and login
+> audit logging are implemented. Conversations, transcription, and every
+> other domain feature are still not implemented. See
+> [`PHASE_0_VALIDATION_REPORT.md`](PHASE_0_VALIDATION_REPORT.md) and
+> [`PHASE_1_VALIDATION_REPORT.md`](PHASE_1_VALIDATION_REPORT.md) for the
+> full validation reports and GO/NO-GO recommendations.
 
 ## What VocaDox is
 
@@ -103,8 +105,19 @@ cd backend
 alembic upgrade head
 ```
 
-Phase 0 ships only a no-op baseline migration (no domain tables yet — see
-[ADR-0004](docs/architecture/adr/0004-evidence-first-data-model.md)).
+Phase 0 shipped only a no-op baseline migration (see
+[ADR-0004](docs/architecture/adr/0004-evidence-first-data-model.md)); Phase 1
+adds the first real domain tables — identity, RBAC, organizations, audit
+(`0002_identity_rbac.py`, downgrade supported).
+
+### Bootstrapping the first admin user
+
+```sh
+cd backend
+python -m app.identity.bootstrap_admin --username admin --display-name "Administrator"
+```
+
+See [`docs/admin/README.md`](docs/admin/README.md) for details.
 
 ### License / compliance check
 

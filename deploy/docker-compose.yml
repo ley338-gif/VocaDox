@@ -49,6 +49,11 @@ services:
       VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
       VOCADOX_VALKEY_URL: ${VOCADOX_VALKEY_URL:-valkey://valkey:6379/0}
       VOCADOX_CORS_ALLOW_ORIGINS: ${VOCADOX_CORS_ALLOW_ORIGINS:-["http://localhost:5173"]}
+      # Plain-HTTP local dev stack (no TLS termination here) — the `Secure`
+      # cookie flag would otherwise stop the browser from storing/sending
+      # the session cookie at all. A real deployment sits behind TLS and
+      # must leave this at its secure-by-default `true`.
+      VOCADOX_SESSION_COOKIE_SECURE: ${VOCADOX_SESSION_COOKIE_SECURE:-false}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -62,6 +67,10 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
       target: dev
+    environment:
+      # Vite dev server proxy target (see frontend/vite.config.ts) —
+      # "backend" resolves via the compose network's internal DNS.
+      VITE_BACKEND_URL: http://backend:8000
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:

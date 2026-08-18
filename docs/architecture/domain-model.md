@@ -1,19 +1,38 @@
 # Domain model (target architecture)
 
-**Status: documentation only.** None of the entities below exist as
-database tables in Phase 0 (spec §65: the domain schema starts Phase 1 —
-`backend/alembic/versions/0001_baseline.py` is intentionally a no-op). This
-document describes the target-state model so Phase 1+ implementation has an
-agreed blueprint, and so each domain package's placeholder README can point
-here for "what will eventually live in this package."
+**Status: identity/organizations/audit are now implemented (Phase 1) —
+everything else below is still documentation-only target state.** The
+`identity`, `organizations`, and `audit` sections describe what actually
+exists as of `backend/alembic/versions/0002_identity_rbac.py`; every other
+domain remains an empty placeholder package (spec §65: the rest of the
+schema ships in later phases) and this document is still the agreed
+blueprint for them.
 
 ## Target entity list (spec §65)
 
 Grouped by the domain package that will own them (see
 `backend/app/<domain>/README.md` for the phase each ships in):
 
-- **identity**: `users`, `groups`, `roles`, `permissions`, `auth_providers`
-- **organizations**: `organizations`, `organization_memberships`
+- **identity** (Phase 1 — implemented): `users`, `groups`, `roles`,
+  `permissions`, plus the join tables `user_group_memberships`,
+  `group_roles`, `role_permissions` that make authorization genuinely
+  permission-based (`app.identity.rbac.get_user_permissions`) rather than
+  role-name comparisons. `auth_providers` from the original target list is
+  not a table — it's the `AuthProvider` interface
+  (`app.identity.auth_providers`) plus a `users.auth_provider` enum column
+  (`local` implemented; `oidc` / `ldap_ad` / `reverse_proxy` reserved for
+  later phases). Sessions are deliberately NOT a table — see
+  [ADR-0009](adr/0009-session-storage.md).
+- **organizations** (Phase 1 — implemented, foundation only):
+  `organizations`, `organization_memberships`. Departmental separation
+  within one on-prem install, not SaaS multi-tenancy — org-scoped
+  filtering of *other* domains' data ships alongside those domains.
+- **audit** (Phase 1 — implemented, `login`/`login_failed`/`logout` events
+  only so far): `audit_events` (id, event_type, user_id, username,
+  ip_address, user_agent, event_metadata, created_at). General-purpose by
+  design — later phases add more `event_type` values, not new tables.
+  Hard rule carried forward from the spec: `event_metadata` must never
+  contain full conversation content, passwords, tokens, or other secrets.
 - **conversations**: `conversations`, `conversation_markers`
 - **media**: `media_assets`
 - **transcription / diarization**: `speakers`, `transcript_segments`
@@ -28,7 +47,6 @@ Grouped by the domain package that will own them (see
 - **administration**: `dictionaries`, `dictionary_entries`
 - **integrations**: `service_accounts`, `webhooks`, `webhook_deliveries`
 - **administration / compliance**: `retention_policies`
-- **audit**: `audit_events`
 
 ## Conversation state machine (spec §22)
 

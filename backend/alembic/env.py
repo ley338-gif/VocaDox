@@ -7,6 +7,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from app.platform.config import get_settings
+from app.platform.db import model_registry  # noqa: F401 - registers all domain models
 from app.platform.db.session import Base
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
@@ -16,8 +17,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# No domain models exist yet (Phase 0) — Base.metadata is empty, so
-# autogenerate will produce no-op diffs until Phase 1 adds models.
+# Phase 1+: app.platform.db.model_registry imports every domain package's
+# models module so they're registered on Base.metadata before autogenerate
+# runs.
 target_metadata = Base.metadata
 
 

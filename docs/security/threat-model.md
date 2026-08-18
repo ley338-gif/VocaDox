@@ -72,24 +72,66 @@ This same rule extends to future observability additions (metrics,
 tracing) — a span attribute or metric label is just as much a leak vector
 as a log line.
 
-## 5. Auth boundaries (deferred to Phase 1)
+## 5. Auth boundaries (implemented in Phase 1)
 
-Authentication/authorization are **not implemented in Phase 0** — there is
-no `identity` domain logic yet, only the placeholder package. The boundary
-is nonetheless documented now:
+Authentication/authorization are now real, not deferred. Local
+username/password auth, server-side sessions (Valkey-backed — see
+[ADR-0009](../architecture/adr/0009-session-storage.md)), CSRF protection,
+and genuine permission-based RBAC (`app.identity.rbac`) are implemented in
+`backend/app/identity/`. What was recorded here as a Phase 1 requirement in
+Phase 0 is now the actual state:
 
-- All routers registered under `app.platform.health` are intentionally
-  unauthenticated (liveness/readiness probes must not require credentials
-  — that's standard practice for orchestrator health checks) and must stay
-  that way even after Phase 1 adds auth middleware.
-- Every domain router added from Phase 1 onward must sit behind
-  authentication by default; "public by default" is the wrong default for
-  this product and must be an explicit, reviewed opt-in per route if it's
-  ever needed.
+- All routers registered under `app.platform.health` remain intentionally
+  unauthenticated (liveness/readiness probes must not require credentials)
+  — verified: `RequestIdMiddleware`/CORS wrap them but no auth dependency
+  does, and `tests/identity/test_api_auth.py` covers the auth endpoints
+  without touching `/health/*`.
+- `POST /api/v1/auth/login` and `POST /api/v1/auth/logout` and `GET
+  /api/v1/auth/me` are the only identity endpoints; every *future* domain
+  router must depend on `app.identity.deps.get_current_user` (or
+  `require_permission(code)`) by default — "public by default" remains the
+  wrong default and needs an explicit, reviewed opt-in per route.
+- **CSRF**: a synchronizer token (`SessionData.csrf_token`), generated
+  server-side at login and handed to the client once in the login response
+  body (never as a separately readable cookie), must be echoed in the
+  `X-CSRF-Token` header on state-changing requests
+  (`app.identity.deps.require_csrf`). Verified with an integration test
+  that a request carrying only the (httponly) session cookie and no/wrong
+  CSRF header is rejected with 403
+  (`tests/identity/test_api_auth.py::test_logout_without_csrf_header_is_rejected`,
+  `::test_logout_with_wrong_csrf_token_is_rejected`).
+- **Session cookie**: `httponly`, `SameSite=Lax`, and `Secure` by default
+  (`VOCADOX_SESSION_COOKIE_SECURE`, disabled only in the plain-HTTP local
+  dev compose stack — see `deploy/docker-compose.yml`'s comment on that
+  variable). Session tokens are opaque (`secrets.token_urlsafe(32)`),
+  carry no user data, and are invalidated server-side immediately on
+  logout (`SessionStore.delete`) — verified end-to-end
+  (`test_logout_invalidates_session`).
+- **No username enumeration**: `POST /auth/login` returns an identical
+  generic 401 body for "unknown username" and "wrong password" — verified
+  (`test_login_rejects_inactive_user_and_does_not_leak_reason`).
+- **Passwords**: Argon2id via `argon2-cffi` (see
+  [ADR-0010](../architecture/adr/0010-argon2-password-hashing.md)), never
+  logged, never returned by any endpoint or included in any audit event.
+- **RBAC is permission-based, not role-string comparison**: every
+  authorization check resolves a caller's actual permission set
+  (`app.identity.rbac.get_user_permissions`, walking
+  User → Group → Role → Permission) and checks for a specific code (e.g.
+  `system:admin`) — there is no `if role == "admin"` anywhere in the
+  codebase, and `tests/identity/test_rbac.py` exercises the resolution
+  chain directly (union across multiple groups, removal of a membership
+  removing the permission, etc.).
 - Organization-scoped data (spec's `organizations`/`organization_memberships`)
-  must be filtered at the query layer by the caller's organization
-  membership, not left to the UI to hide — this is a Phase 1 implementation
-  requirement to record now so it isn't missed later.
+  still needs query-layer filtering by the caller's organization
+  membership once domains that own org-scoped data exist — Phase 1 only
+  ships the `organizations`/`organization_memberships` foundation tables
+  and basic CRUD, so this requirement carries forward unchanged to
+  whichever phase adds the first org-scoped domain data.
+- **Known gap, tracked, not blocking**: there is no server-side registry
+  of a user's active sessions, so there is no "revoke this user's other
+  sessions" admin action yet (see ADR-0009's Consequences) — acceptable
+  for Phase 1 since the admin portal that would host that action doesn't
+  exist until Phase 7.
 
 ## 6. Privacy-zone ("Nicht dokumentieren") handling
 

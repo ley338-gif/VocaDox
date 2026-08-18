@@ -1,8 +1,7 @@
 """FastAPI application factory.
 
-Phase 0 wires only cross-cutting platform concerns (health, logging, request
-id, CORS, OpenAPI). No domain routers exist yet — they are registered here
-starting Phase 1+.
+Phase 0 wired only cross-cutting platform concerns (health, logging, request
+id, CORS, OpenAPI). Phase 1 adds the first domain router (identity/auth).
 """
 
 from __future__ import annotations
@@ -10,7 +9,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.identity.router import router as identity_router
 from app.platform.config import get_settings
+from app.platform.db import model_registry  # noqa: F401 - registers all domain models
 from app.platform.health import router as health_router
 from app.platform.logging import configure_logging
 from app.platform.middleware import RequestIdMiddleware
@@ -36,5 +37,6 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
+    app.include_router(identity_router, prefix=settings.api_prefix)
 
     return app
