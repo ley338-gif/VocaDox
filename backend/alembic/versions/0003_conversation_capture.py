@@ -35,7 +35,10 @@ def upgrade() -> None:
         sa.Column("delete_derived_media", sa.Boolean(), nullable=False),
         sa.Column("active", sa.Boolean(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name"),
@@ -58,15 +61,23 @@ def upgrade() -> None:
         sa.Column("privacy_mode", sa.String(length=32), nullable=False),
         sa.Column("retention_policy_id", sa.Uuid(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["retention_policy_id"], ["retention_policies.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["retention_policy_id"], ["retention_policies.id"], ondelete="SET NULL"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_conversations_organization_id", "conversations", ["organization_id"])
@@ -94,11 +105,16 @@ def upgrade() -> None:
         sa.Column("derived_from_media_id", sa.Uuid(), nullable=True),
         sa.Column("created_by_user_id", sa.Uuid(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["derived_from_media_id"], ["media_assets.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["derived_from_media_id"], ["media_assets.id"], ondelete="SET NULL"
+        ),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -116,13 +132,18 @@ def upgrade() -> None:
         sa.Column("external_reference", sa.String(length=255), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "ix_conversation_participants_conversation_id", "conversation_participants", ["conversation_id"]
+        "ix_conversation_participants_conversation_id",
+        "conversation_participants",
+        ["conversation_id"],
     )
 
     op.create_table(
@@ -134,16 +155,24 @@ def upgrade() -> None:
         sa.Column("label", sa.String(length=255), nullable=True),
         sa.Column("note", sa.Text(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_conversation_markers_conversation_id", "conversation_markers", ["conversation_id"])
+    op.create_index(
+        "ix_conversation_markers_conversation_id", "conversation_markers", ["conversation_id"]
+    )
 
     op.create_table(
         "conversation_notes",
@@ -153,16 +182,24 @@ def upgrade() -> None:
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("timestamp_ms", sa.BigInteger(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_conversation_notes_conversation_id", "conversation_notes", ["conversation_id"])
+    op.create_index(
+        "ix_conversation_notes_conversation_id", "conversation_notes", ["conversation_id"]
+    )
 
     op.create_table(
         "recording_uploads",
@@ -175,10 +212,16 @@ def upgrade() -> None:
         sa.Column("received_bytes", sa.BigInteger(), nullable=False),
         sa.Column("result_media_id", sa.Uuid(), nullable=True),
         sa.Column(
-            "started_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "started_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "last_activity_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "last_activity_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
@@ -186,8 +229,12 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["result_media_id"], ["media_assets.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_recording_uploads_conversation_id", "recording_uploads", ["conversation_id"])
-    op.create_index("ix_recording_uploads_idempotency_key", "recording_uploads", ["idempotency_key"])
+    op.create_index(
+        "ix_recording_uploads_conversation_id", "recording_uploads", ["conversation_id"]
+    )
+    op.create_index(
+        "ix_recording_uploads_idempotency_key", "recording_uploads", ["idempotency_key"]
+    )
 
 
 def downgrade() -> None:
