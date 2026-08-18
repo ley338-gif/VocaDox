@@ -42,7 +42,10 @@ def upgrade() -> None:
         sa.Column("error_code", sa.String(length=64), nullable=True),
         sa.Column("error_message_safe", sa.String(length=1024), nullable=True),
         sa.Column(
-            "started_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "started_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
@@ -77,10 +80,16 @@ def upgrade() -> None:
         sa.Column("job_metadata", sa.JSON(), nullable=True),
         sa.Column("created_by_user_id", sa.Uuid(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["source_media_id"], ["media_assets.id"], ondelete="CASCADE"),
@@ -110,10 +119,16 @@ def upgrade() -> None:
         sa.Column("error_code", sa.String(length=64), nullable=True),
         sa.Column("error_message_safe", sa.String(length=1024), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["source_media_id"], ["media_assets.id"], ondelete="CASCADE"),
@@ -138,10 +153,16 @@ def upgrade() -> None:
         sa.Column("assigned_by_user_id", sa.Uuid(), nullable=True),
         sa.Column("assigned_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
@@ -153,7 +174,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["assigned_by_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_detected_speakers_conversation_id", "detected_speakers", ["conversation_id"])
+    op.create_index(
+        "ix_detected_speakers_conversation_id", "detected_speakers", ["conversation_id"]
+    )
 
     op.create_table(
         "diarization_segments",
@@ -165,7 +188,10 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Float(), nullable=True),
         sa.Column("is_overlap", sa.Boolean(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.ForeignKeyConstraint(
             ["diarization_run_id"], ["processing_runs.id"], ondelete="CASCADE"
@@ -198,19 +224,29 @@ def upgrade() -> None:
         sa.Column("diarization_run_id", sa.Uuid(), nullable=True),
         sa.Column("alignment_run_id", sa.Uuid(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.ForeignKeyConstraint(["transcript_id"], ["transcripts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["speaker_id"], ["detected_speakers.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["speech_run_id"], ["processing_runs.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["diarization_run_id"], ["processing_runs.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["diarization_run_id"], ["processing_runs.id"], ondelete="SET NULL"
+        ),
         sa.ForeignKeyConstraint(["alignment_run_id"], ["processing_runs.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_transcript_segments_transcript_id", "transcript_segments", ["transcript_id"])
+    op.create_index(
+        "ix_transcript_segments_transcript_id", "transcript_segments", ["transcript_id"]
+    )
     op.create_index("ix_transcript_segments_speaker_id", "transcript_segments", ["speaker_id"])
     op.create_index(
         "ix_transcript_segments_review_status", "transcript_segments", ["review_status"]
@@ -224,7 +260,10 @@ def upgrade() -> None:
         sa.Column("previous_corrected_text", sa.Text(), nullable=True),
         sa.Column("new_corrected_text", sa.Text(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False
         ),
         sa.ForeignKeyConstraint(["segment_id"], ["transcript_segments.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["corrected_by_user_id"], ["users.id"], ondelete="SET NULL"),
