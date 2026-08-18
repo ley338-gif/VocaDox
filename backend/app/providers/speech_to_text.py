@@ -21,6 +21,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 class SpeechModelUnavailableError(RuntimeError):
@@ -184,7 +185,7 @@ class FasterWhisperSpeechProvider(SpeechToTextProvider):
             return select_device(prefer_gpu=True)
         return self._config.device
 
-    def _ensure_loaded(self):  # noqa: ANN202
+    def _ensure_loaded(self) -> Any:
         if self._model is not None:
             return self._model
         if not self._is_installed():

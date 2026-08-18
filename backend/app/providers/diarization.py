@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 
 class DiarizationModelUnavailableError(RuntimeError):
@@ -129,7 +130,7 @@ class PyannoteDiarizationProvider(DiarizationProvider):
             return select_device(prefer_gpu=True)
         return self._config.device
 
-    def _ensure_loaded(self):  # noqa: ANN202
+    def _ensure_loaded(self) -> Any:
         if self._pipeline is not None:
             return self._pipeline
         if not self._is_installed():

@@ -87,6 +87,14 @@ def test_domain_packages_do_not_import_concrete_provider_implementations() -> No
         "FakeDiarizationProvider",
         "FakeLLMProvider",
         "LocalFilesystemStorage",
+        # Phase 3 real providers — domain code (app.transcription,
+        # app.diarization, app.processing, app.workers) must depend on
+        # SpeechToTextProvider/DiarizationProvider/MediaNormalizer and get
+        # a concrete instance injected via app.core.ai_providers, exactly
+        # like the Phase 0 Fake*/LocalFilesystemStorage precedent above.
+        "FasterWhisperSpeechProvider",
+        "PyannoteDiarizationProvider",
+        "FfmpegMediaNormalizer",
     }
     offenders = []
     for path in _domain_python_files():

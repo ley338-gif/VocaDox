@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.ai_providers import (
     get_diarization_provider,
@@ -24,8 +24,10 @@ from app.core.ai_providers import (
     get_speech_provider,
 )
 from app.core.storage import get_storage_provider
+from app.media.normalizer import MediaNormalizer
 from app.platform.config import get_settings
 from app.platform.db.session import get_sessionmaker
+from app.platform.valkey.backends import QueueBackend
 from app.platform.valkey.valkey_backend import get_valkey_backend
 from app.processing.models import JobType, ProcessingJob, ProcessingStatus
 from app.processing.orchestrator import (
@@ -45,6 +47,9 @@ from app.processing.service import (
     reclaim_stale_jobs,
     start_job,
 )
+from app.providers.diarization import DiarizationProvider
+from app.providers.speech_to_text import SpeechToTextProvider
+from app.providers.storage import StorageProvider
 
 logger = logging.getLogger("vocadox.worker")
 
@@ -67,12 +72,12 @@ class ProcessingWorker:
         *,
         worker_id: str,
         job_types: list[JobType],
-        sessionmaker=None,  # noqa: ANN001
-        queue=None,  # noqa: ANN001
-        storage=None,  # noqa: ANN001
-        normalizer=None,  # noqa: ANN001
-        speech_provider=None,  # noqa: ANN001
-        diarization_provider=None,  # noqa: ANN001
+        sessionmaker: async_sessionmaker[AsyncSession] | None = None,
+        queue: QueueBackend | None = None,
+        storage: StorageProvider | None = None,
+        normalizer: MediaNormalizer | None = None,
+        speech_provider: SpeechToTextProvider | None = None,
+        diarization_provider: DiarizationProvider | None = None,
     ) -> None:
         self.worker_id = worker_id
         self.job_types = job_types

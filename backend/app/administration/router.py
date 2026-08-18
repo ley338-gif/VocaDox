@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from app.core.ai_providers import get_diarization_provider, get_speech_provider
 from app.identity.deps import require_permission
+from app.identity.models import User
 from app.providers.diarization import DiarizationProvider
 from app.providers.speech_to_text import SpeechToTextProvider
 
@@ -47,7 +48,7 @@ class DiarizationProviderStatusResponse(BaseModel):
 
 @router.get("/speech", response_model=SpeechProviderStatusResponse)
 async def speech_provider_status_endpoint(
-    _user=Depends(_require_provider_read),
+    _user: User = Depends(_require_provider_read),
     speech_provider: SpeechToTextProvider = Depends(get_speech_provider),
 ) -> SpeechProviderStatusResponse:
     status_ = speech_provider.status()
@@ -64,7 +65,7 @@ async def speech_provider_status_endpoint(
 
 @router.get("/diarization", response_model=DiarizationProviderStatusResponse)
 async def diarization_provider_status_endpoint(
-    _user=Depends(_require_provider_read),
+    _user: User = Depends(_require_provider_read),
     diarization_provider: DiarizationProvider = Depends(get_diarization_provider),
 ) -> DiarizationProviderStatusResponse:
     status_ = diarization_provider.status()

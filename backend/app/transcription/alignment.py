@@ -163,18 +163,18 @@ def _align_segment_word_level(
 
     groups: list[list[AlignedWord]] = []
     current: list[AlignedWord] = [aligned_words[0]]
-    for w in aligned_words[1:]:
-        if w.speaker_label == current[-1].speaker_label:
-            current.append(w)
+    for aligned_word in aligned_words[1:]:
+        if aligned_word.speaker_label == current[-1].speaker_label:
+            current.append(aligned_word)
         else:
             groups.append(current)
-            current = [w]
+            current = [aligned_word]
     groups.append(current)
 
     results: list[AlignedSegment] = []
     for group in groups:
-        text = " ".join(w.text for w in group).strip()
-        confidences = [w.confidence for w in group if w.confidence is not None]
+        text = " ".join(aw.text for aw in group).strip()
+        confidences = [aw.confidence for aw in group if aw.confidence is not None]
         results.append(
             AlignedSegment(
                 start_ms=group[0].start_ms,
