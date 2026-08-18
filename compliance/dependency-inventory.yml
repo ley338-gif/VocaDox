@@ -1,0 +1,382 @@
+# compliance/dependency-inventory.yml
+#
+# One entry per direct Phase 0 dependency. Licenses were looked up live
+# against the PyPI JSON API (https://pypi.org/pypi/<pkg>/json) and the
+# npm registry JSON API (https://registry.npmjs.org/<pkg>/latest) on
+# 2026-08-17. Where PyPI's info.license / info.license_expression fields
+# were empty, the classifiers and/or the project's canonical LICENSE file
+# on GitHub were used as a fallback (noted per-entry).
+#
+# approval_status is computed against compliance/license-policy.yml.
+#
+# NOTE ON VERSIONS: license lookups below were performed against whatever
+# the latest published version was at research time. `pyproject.toml` /
+# `package.json` deliberately pin somewhat narrower, more conservative
+# ranges for a few dev-tooling packages (mypy, pytest, pytest-asyncio) and
+# for the frontend's major React/TypeScript/Vite/react-router/zod versions,
+# for stability of this initial scaffold. `version_constraint` below has
+# been corrected to match what is actually pinned and installed
+# (`pip list` / `npm ls`, captured 2026-08-17) rather than left at the
+# research-time "latest" figure — the recorded license is unaffected by
+# this (all of these projects have used the same license across the
+# versions in question).
+
+dependencies:
+  # ---------------------------------------------------------------------
+  # Python (PyPI)
+  # ---------------------------------------------------------------------
+  - name: fastapi
+    ecosystem: pypi
+    version_constraint: ">=0.141,<0.142"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/fastapi/json
+    approval_status: approved
+    notes: "info.license_expression = MIT (PyPI JSON, version 0.141.1)."
+
+  - name: uvicorn
+    ecosystem: pypi
+    version_constraint: ">=0.52,<0.53"
+    license: BSD-3-Clause
+    license_source_url: https://pypi.org/pypi/uvicorn/json
+    approval_status: approved
+    notes: "info.license_expression = BSD-3-Clause (PyPI JSON, version 0.52.3)."
+
+  - name: pydantic
+    ecosystem: pypi
+    version_constraint: ">=2.13,<3.0"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/pydantic/json
+    approval_status: approved
+    notes: >
+      PyPI JSON info.license and info.license_expression are both null for
+      this release (version 2.13.4); no License :: classifier present
+      either. Confirmed MIT via the project's canonical LICENSE file at
+      https://raw.githubusercontent.com/pydantic/pydantic/main/LICENSE.
+
+  - name: pydantic-settings
+    ecosystem: pypi
+    version_constraint: ">=2.4,<3.0 (installed: 2.15.0)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/pydantic-settings/json
+    approval_status: approved
+    notes: >
+      Direct runtime dependency (used in app/platform/config.py) that was
+      missing from this inventory until Phase 0's final closeout pass
+      caught the gap during a version-accuracy sweep — added here rather
+      than left untracked. info.license_expression = MIT (PyPI JSON).
+
+  - name: sqlalchemy
+    ecosystem: pypi
+    version_constraint: ">=2.0,<2.1"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/sqlalchemy/json
+    approval_status: approved
+    notes: "info.license = MIT (PyPI JSON, version 2.0.52)."
+
+  - name: alembic
+    ecosystem: pypi
+    version_constraint: ">=1.19,<1.20"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/alembic/json
+    approval_status: approved
+    notes: "info.license_expression = MIT (PyPI JSON, version 1.19.1)."
+
+  - name: asyncpg
+    ecosystem: pypi
+    version_constraint: ">=0.31,<0.32"
+    license: Apache-2.0
+    license_source_url: https://pypi.org/pypi/asyncpg/json
+    approval_status: approved
+    notes: >
+      Verified as requested: info.license_expression = Apache-2.0 (PyPI
+      JSON, version 0.31.0), matching the expected Apache-2.0. Chosen over
+      psycopg (LGPL-3.0, would land in review_required) for the async
+      Postgres driver.
+
+  - name: valkey
+    ecosystem: pypi
+    version_constraint: ">=6.1,<6.2"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/valkey/json
+    approval_status: approved
+    notes: >
+      Verified as requested rather than assumed: PyPI JSON reports
+      info.license = "MIT" and classifier "License :: OSI Approved ::
+      MIT License" (version 6.1.1). This is the valkey Python client
+      library on PyPI; the Valkey server project itself (the Redis fork)
+      is BSD-3-Clause. Since this dependency entry is the pip package, MIT
+      is recorded here.
+
+  - name: python-multipart
+    ecosystem: pypi
+    version_constraint: ">=0.0.32,<0.1"
+    license: Apache-2.0
+    license_source_url: https://pypi.org/pypi/python-multipart/json
+    approval_status: approved
+    notes: "info.license_expression = Apache-2.0, classifier 'License :: OSI Approved :: Apache Software License' (PyPI JSON, version 0.0.32)."
+
+  - name: ruff
+    ecosystem: pypi
+    version_constraint: ">=0.16,<0.17"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/ruff/json
+    approval_status: approved
+    notes: "info.license_expression = MIT (PyPI JSON, version 0.16.3). Dev-only dependency."
+
+  - name: mypy
+    ecosystem: pypi
+    version_constraint: ">=1.11,<2.0 (installed: 1.20.2)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/mypy/json
+    approval_status: approved
+    notes: "info.license_expression = MIT (PyPI JSON). Dev-only dependency. Pinned <2.0 in pyproject.toml for stability; license unchanged across the 1.x/2.x line."
+
+  - name: pytest
+    ecosystem: pypi
+    version_constraint: ">=9.0.3,<10.0 (installed: 9.1.1)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/pytest/json
+    approval_status: approved
+    notes: >
+      info.license_expression = MIT (PyPI JSON). Dev/test-only dependency.
+      Upgraded from the <9.0 pin during Phase 0 remediation (2026-08-17)
+      to fix PYSEC-2026-1845 / GHSA-6w46-j5rx-g56g (insecure /tmp/pytest-of-{user}
+      tmpdir handling on UNIX — local-only DoS/privilege issue, found via
+      pip-audit), patched at 9.0.3+. Verified: all 9 backend tests still
+      pass on 9.1.1.
+
+  - name: pytest-asyncio
+    ecosystem: pypi
+    version_constraint: ">=1.0,<2.0 (installed: 1.4.0)"
+    license: Apache-2.0
+    license_source_url: https://pypi.org/pypi/pytest-asyncio/json
+    approval_status: approved
+    notes: >
+      info.license_expression = Apache-2.0 (PyPI JSON). Dev/test-only
+      dependency. Upgraded from the 0.24-0.x pin during Phase 0
+      remediation (2026-08-17) — required alongside the pytest 9.x
+      upgrade above, since pytest-asyncio 0.26.0 pinned `pytest<9`.
+
+  - name: setuptools
+    ecosystem: pypi
+    version_constraint: ">=83.0 (build-system requirement in pyproject.toml; installed: 84.0.0)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/setuptools/json
+    approval_status: approved
+    notes: >
+      PEP 517 build-backend requirement, not a runtime dependency (not
+      imported by the app; only used at package-build time, both for
+      local dev installs and inside backend/Dockerfile's `pip install .`
+      build step). Pinned >=83.0 during Phase 0 remediation (2026-08-17)
+      to fix PYSEC-2026-3447 / GHSA-h35f-9h28-mq5c (Unicode-normalization
+      MANIFEST.in exclude-pattern bypass on macOS APFS/HFS+ — irrelevant
+      to our Linux Docker build in practice, but patched anyway since
+      pip-audit flagged it). license = MIT per PyPI JSON.
+
+  - name: pip-licenses
+    ecosystem: pypi
+    version_constraint: ">=5.5,<6.0 (installed: 5.5.5)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/pip-licenses/json
+    approval_status: approved
+    notes: >
+      Build/compliance-tooling-only dependency, added during Phase 0
+      remediation to generate compliance/dependency-inventory-transitive.yml
+      from the real resolved dependency tree. Never imported by
+      application code, never shipped in the backend Docker image
+      (backend/Dockerfile installs `pip install .`, not `.[dev]`).
+      info.license_expression = MIT (PyPI JSON).
+
+  - name: pip-audit
+    ecosystem: pypi
+    version_constraint: ">=2.10,<3.0 (installed: 2.10.1)"
+    license: Apache-2.0
+    license_source_url: https://pypi.org/pypi/pip-audit/json
+    approval_status: approved
+    notes: >
+      Build/compliance-tooling-only dependency, added during Phase 0
+      remediation to scan the Python dependency tree for known
+      vulnerabilities (used in CI, see .github/workflows/ci.yml). Never
+      shipped in the backend Docker image. Apache Software License
+      classifier confirmed via PyPI JSON.
+
+  - name: license-checker
+    ecosystem: npm
+    version_constraint: "not persisted in package.json (installed on demand via `npm install --no-save -D license-checker`, pinned in CI to the version below)"
+    license: BSD-3-Clause
+    license_source_url: https://registry.npmjs.org/license-checker/latest
+    approval_status: approved
+    notes: >
+      Build/compliance-tooling-only dependency, added during Phase 0
+      remediation to generate the npm side of
+      dependency-inventory-transitive.yml. Deliberately installed with
+      `--no-save` (not added to package.json/package-lock.json) since it's
+      a one-shot compliance-report-generation tool, not a build
+      dependency the frontend needs to build/test/run — see
+      generate_transitive_inventory.py's docstring for the exact command.
+      Never shipped in the frontend build output. license = BSD-3-Clause
+      per npm registry.
+
+  - name: httpx
+    ecosystem: pypi
+    version_constraint: ">=0.28,<0.29"
+    license: BSD-3-Clause
+    license_source_url: https://pypi.org/pypi/httpx/json
+    approval_status: approved
+    notes: "info.license = BSD-3-Clause (PyPI JSON, version 0.28.1)."
+
+  # ---------------------------------------------------------------------
+  # Node (npm)
+  # ---------------------------------------------------------------------
+  - name: react
+    ecosystem: npm
+    version_constraint: "^18.3.1 (installed: 18.3.1)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/react/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry; verified against the latest published version, 19.2.8 at research time). Pinned to the 18.x line in package.json for stability; MIT throughout React's history."
+
+  - name: react-dom
+    ecosystem: npm
+    version_constraint: "^18.3.1 (installed: 18.3.1)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/react-dom/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry; verified against the latest published version, 19.2.8 at research time). Pinned to the 18.x line for stability alongside react."
+
+  - name: react-router
+    ecosystem: npm
+    version_constraint: "^7.0.0 (installed: 7.18.2)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/react-router/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry; verified against the latest published version, 8.3.0 at research time). Pinned to the 7.x line (unified react-router/react-router-dom package) for a well-documented, stable API surface."
+
+  - name: "@tanstack/react-query"
+    ecosystem: npm
+    version_constraint: "^5.101.4"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/@tanstack/react-query/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry, version 5.101.4)."
+
+  - name: zod
+    ecosystem: npm
+    version_constraint: "^3.23.8 (installed: 3.25.76)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/zod/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry; verified against the latest published version, 4.4.3 at research time). Pinned to the 3.x line for API stability; MIT throughout."
+
+  - name: vite
+    ecosystem: npm
+    version_constraint: "^7.3.6 (installed: 7.3.6)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/vite/latest
+    approval_status: approved
+    notes: >
+      license = MIT (npm registry, version 7.3.6). Dev-only dependency.
+      Upgraded from the 5.x line during Phase 0 remediation (2026-08-17)
+      to resolve npm audit findings GHSA-4w7w-66w2-5vf9 (path traversal in
+      optimized-deps .map handling), GHSA-fx2h-pf6j-xcff (server.fs.deny
+      bypass on Windows), GHSA-v6wh-96g9-6wx3 (launch-editor NTLMv2 hash
+      disclosure), and GHSA-g7r4-m6w7-qqqr (esbuild arbitrary file read on
+      Windows dev server) — fixed as of 7.3.4+. Initially tried jumping
+      straight to the 8.x line, but backed off: Vite 8 defaults to the
+      new Rolldown bundler, whose optional native binary packages hit a
+      known npm cross-platform-optional-dependency bug
+      (npm/cli#4828 — lockfile generated on Windows failed to resolve the
+      Linux native binding inside the Docker build). Vite 7.3.x still
+      uses the previous (esbuild/rollup) bundler and has none of that
+      friction, resolves the same CVEs, and required an
+      `@vitejs/plugin-react` downgrade to 5.2.0 (its 6.x line requires
+      vite ^8) — verified: lint, typecheck, all tests, `npm run build`,
+      and the actual `docker build` (frontend Dockerfile `build`/`runtime`
+      targets) all pass on this combination.
+
+  - name: "@vitejs/plugin-react"
+    ecosystem: npm
+    version_constraint: "^5.2.0 (installed: 5.2.0)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/@vitejs/plugin-react/latest
+    approval_status: approved
+    notes: >
+      license = MIT (npm registry). Dev-only dependency, not in the
+      original Phase 0 dependency list but tracked here since Phase 0
+      remediation (2026-08-17) explicitly pinned its version as part of
+      the vite CVE fix (see the vite entry's notes above for why 5.2.0
+      rather than the newer 6.x line, which requires vite ^8).
+
+  - name: typescript
+    ecosystem: npm
+    version_constraint: "^5.6.3 (installed: 5.9.3)"
+    license: Apache-2.0
+    license_source_url: https://registry.npmjs.org/typescript/latest
+    approval_status: approved
+    notes: "license = Apache-2.0 (npm registry; verified against the latest published version, 7.0.2 at research time). Pinned to the 5.x line for stability. Dev-only dependency."
+
+  - name: eslint
+    ecosystem: npm
+    version_constraint: "^9.12.0 (installed: 9.39.5)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/eslint/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry; verified against the latest published version, 10.8.1, at research time). Pinned to the 9.x line actually installed for stability; MIT throughout eslint's history. Dev-only dependency."
+
+  - name: vitest
+    ecosystem: npm
+    version_constraint: "^4.1.10 (installed: 4.1.10)"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/vitest/latest
+    approval_status: approved
+    notes: >
+      license = MIT (npm registry, version 4.1.10). Dev/test-only
+      dependency. Upgraded from the 2.x line during Phase 0 remediation
+      (2026-08-17) to resolve npm audit finding GHSA-5xrq-8626-4rwp
+      (CRITICAL — Vitest UI server allowed arbitrary file read/execute),
+      fixed as of 3.2.6+; also required to match the vite 8.x upgrade
+      above (vitest 2.x's transitive vite/esbuild pin was the actual root
+      cause pulled in by npm audit). Verified: all tests still pass on
+      4.1.10.
+
+  - name: "@testing-library/react"
+    ecosystem: npm
+    version_constraint: "^16.3.2"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/@testing-library/react/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry, version 16.3.2). Dev/test-only dependency."
+
+  - name: openapi-typescript
+    ecosystem: npm
+    version_constraint: "^7.13.0"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/openapi-typescript/latest
+    approval_status: approved
+    notes: "license = MIT (npm registry, version 7.13.0). Dev/codegen-only dependency."
+
+  - name: lucide-react
+    ecosystem: npm
+    version_constraint: "^0.451.0 (installed: 0.451.0)"
+    license: ISC
+    license_source_url: https://registry.npmjs.org/lucide-react/latest
+    approval_status: approved
+    notes: >
+      Verified as requested: license = ISC (npm registry; verified against
+      the latest published version, 1.31.0, at research time — matches the
+      expected ISC). Pinned to the 0.x line actually installed for API
+      stability; license unaffected. See also docs/licenses/fonts-assets.md
+      for the Lucide icon-set project license.
+
+  - name: "@fontsource/inter"
+    ecosystem: npm
+    version_constraint: "^5.3.0"
+    license: OFL-1.1
+    license_source_url: https://registry.npmjs.org/@fontsource/inter/latest
+    approval_status: approved
+    notes: >
+      Verified as requested: license = OFL-1.1 (npm registry, version
+      5.3.0), matching the expected OFL-1.1. This covers the npm
+      packaging; the underlying Inter font itself is also licensed under
+      the SIL Open Font License 1.1 by its author. See
+      docs/licenses/fonts-assets.md.

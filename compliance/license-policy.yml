@@ -1,0 +1,60 @@
+# compliance/license-policy.yml
+#
+# Encodes the VocaDox dependency license policy (spec §10).
+# Every dependency in dependency-inventory.yml MUST resolve its license
+# against exactly one of the three buckets below. Any license not listed
+# anywhere here should be treated as "unknown" until explicitly classified.
+#
+# - approved:         May be used freely. No copyleft / redistribution
+#                      obligations that conflict with on-premise, closed
+#                      deployment of VocaDox.
+# - review_required:  Weak-copyleft (file-level, e.g. MPL) or LGPL licenses.
+#                      Usable in most cases (esp. as unmodified dynamic
+#                      dependencies) but require a human sign-off recorded
+#                      in exceptions.yml or a note before merging.
+# - blocked:          Strong copyleft (GPL/AGPL), source-available-but-not-
+#                      open-source licenses (SSPL, RSAL, BSL), licenses with
+#                      commercial-use carve-outs (Commons Clause), proprietary
+#                      terms, or licenses we could not determine (UNKNOWN).
+
+approved:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - PostgreSQL
+  - OFL-1.1
+  # --- Added during transitive-dependency-tree analysis (2026-08-17) ---
+  # Every one of these was found on a *transitive* (never direct)
+  # dependency by compliance/generate_transitive_inventory.py, individually
+  # identified (not guessed), and is a permissive or public-domain-style
+  # license with no copyleft/redistribution obligation that conflicts with
+  # closed, on-premise deployment. None of these appear in the production
+  # runtime dependency tree — see dependency-inventory-transitive.yml,
+  # scope: dev entries.
+  - MIT-0            # MIT No Attribution — public-domain-equivalent, even more permissive than MIT. (@csstools/color-helpers, dev-only build tool dep)
+  - Python-2.0        # PSF-style permissive license used by some Python-ecosystem-adjacent npm shims. (argparse npm package, dev-only)
+  - BlueOak-1.0.0      # Blue Oak Council model license — permissive, no attribution/copyleft requirement. (minimatch, dev-only)
+  - CC0-1.0            # Public domain dedication. (spdx-license-ids, dev-only)
+  - CC-BY-3.0          # Attribution-only Creative Commons — fine for closed-source use, just requires credit. (spdx-exceptions, dev-only)
+  - CC-BY-4.0          # Attribution-only Creative Commons, same rationale. (caniuse-lite data tables, dev-only)
+  - PSF-2.0            # Python Software Foundation License 2.0 — permissive, OSI-approved. Found on typing_extensions (runtime, transitive of pydantic) and defusedxml (dev-only, transitive of pip-audit).
+
+review_required:
+  - MPL-2.0
+  - LGPL-2.1
+  - LGPL-2.1-or-later
+  - LGPL-3.0
+  - LGPL-3.0-or-later
+
+blocked:
+  - GPL-2.0
+  - GPL-3.0
+  - AGPL-3.0
+  - SSPL-1.0
+  - RSAL
+  - BSL-1.1
+  - "Commons-Clause"
+  - proprietary
+  - UNKNOWN

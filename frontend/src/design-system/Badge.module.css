@@ -1,0 +1,52 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-caption-size);
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.neutral {
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+.success {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+.warning {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
+.danger {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+.info {
+  background: color-mix(in srgb, var(--color-info) 18%, transparent);
+  color: var(--color-info);
+}
+.purple {
+  background: color-mix(in srgb, var(--color-purple) 18%, transparent);
+  color: var(--color-purple);
+}
+.teal {
+  background: color-mix(in srgb, var(--color-teal) 18%, transparent);
+  color: var(--color-teal);
+}
+
+.dot.neutral { background: var(--color-gray-500); }
+.dot.success { background: var(--color-success); }
+.dot.warning { background: var(--color-warning); }
+.dot.danger { background: var(--color-danger); }
+.dot.info { background: var(--color-info); }
+.dot.purple { background: var(--color-purple); }
+.dot.teal { background: var(--color-teal); }

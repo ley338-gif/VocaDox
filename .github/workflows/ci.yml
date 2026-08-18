@@ -1,0 +1,238 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "phase-*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (lint / typecheck / test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: ruff
+        run: ruff check .
+
+      - name: mypy
+        run: mypy app
+
+      - name: pytest
+        run: pytest -q
+
+      - name: pip-audit (Python dependency vulnerabilities)
+        run: pip-audit
+
+  frontend:
+    name: Frontend (lint / typecheck / test / build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: eslint
+        run: npm run lint
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: vitest
+        run: npm run test
+
+      - name: build
+        run: npm run build
+
+      - name: npm audit (Node dependency vulnerabilities)
+        run: npm audit --audit-level=high
+
+  openapi-client-drift:
+    name: OpenAPI TS client drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci || npm install
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 20); do
+            curl -sf http://127.0.0.1:8000/health/live && break
+            sleep 1
+          done
+
+      - name: Fetch current openapi.json
+        working-directory: frontend
+        run: curl -sf http://127.0.0.1:8000/openapi.json -o openapi.json
+
+      - name: Regenerate TS client
+        working-directory: frontend
+        run: npm run generate:api-client
+
+      - name: Fail on drift
+        run: |
+          if ! git diff --quiet -- frontend/openapi.json frontend/src/api/generated; then
+            echo "::error::Generated OpenAPI client is out of date. Run 'npm run generate:api-client' in frontend/ and commit the result."
+            git diff -- frontend/openapi.json frontend/src/api/generated
+            exit 1
+          fi
+
+  docker-build:
+    name: Docker build (backend + frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t vocadox-backend:ci ./backend
+
+      - name: Build frontend production image
+        run: docker build --target runtime -t vocadox-frontend:ci ./frontend
+
+      - name: Validate compose config
+        run: docker compose -f deploy/docker-compose.yml config --quiet
+
+  compliance:
+    name: License compliance (direct + full transitive tree)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install PyYAML (for the compliance scripts themselves)
+        run: pip install pyyaml
+
+      # Regenerate the transitive inventory from the ACTUAL resolved
+      # trees on every run — never trust a possibly-stale committed copy.
+      # Production-only Python tree (what backend/Dockerfile ships):
+      - name: Resolve production Python dependency tree
+        run: |
+          python -m venv /tmp/prod_venv
+          /tmp/prod_venv/bin/pip install -e backend/
+          /tmp/prod_venv/bin/pip install pip-licenses
+          /tmp/prod_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_prod_licenses.json
+
+      # Full dev Python tree (adds ruff/mypy/pytest/pip-audit/pip-licenses):
+      - name: Resolve full Python dev dependency tree
+        working-directory: backend
+        run: |
+          pip install -e ".[dev]"
+          pip-licenses --format=json --with-urls > ../compliance/_raw_pip_licenses.json
+
+      # Node trees (production-only and full dev+prod):
+      - name: Resolve Node dependency trees
+        working-directory: frontend
+        run: |
+          npm ci || npm install
+          npm install --no-save -D license-checker
+          npx license-checker --production --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_prod.json
+          npx license-checker --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_all.json
+
+      - name: Regenerate dependency-inventory-transitive.yml
+        run: |
+          python compliance/generate_transitive_inventory.py \
+            --pip-prod compliance/_raw_pip_prod_licenses.json \
+            --pip-dev compliance/_raw_pip_licenses.json \
+            --npm-prod compliance/_raw_npm_licenses_prod.json \
+            --npm-all compliance/_raw_npm_licenses_all.json
+
+      - name: Fail if the regenerated transitive inventory drifted from the committed one
+        run: |
+          if ! git diff --quiet -- compliance/dependency-inventory-transitive.yml; then
+            echo "::error::compliance/dependency-inventory-transitive.yml is out of date. Regenerate it locally (see generate_transitive_inventory.py) and commit the result."
+            git diff -- compliance/dependency-inventory-transitive.yml
+            exit 1
+          fi
+
+      - name: Run license compliance check (direct + transitive + containers + models)
+        run: python compliance/check_licenses.py
+
+  container-vulnerability-scan:
+    name: Container vulnerability scan (Trivy — backend/frontend runtime + frontend build/dev images)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image (shipped)
+        run: docker build -t vocadox-backend:ci ./backend
+
+      - name: Build frontend production image (shipped)
+        run: docker build --target runtime -t vocadox-frontend:ci ./frontend
+
+      - name: Build frontend build/dev image (not shipped, but scanned anyway — see ADR-0008)
+        run: docker build --target dev -t vocadox-frontend-dev:ci ./frontend
+
+      # Trivy itself: Apache-2.0, license-checked (see
+      # compliance/container-inventory.yml), pinned image, never installed
+      # as a host binary.
+      - name: Scan backend image — fail on any unresolved CRITICAL
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --exit-code 1 --severity CRITICAL vocadox-backend:ci
+
+      - name: Scan frontend runtime image — fail on any unresolved CRITICAL
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --exit-code 1 --severity CRITICAL vocadox-frontend:ci
+
+      - name: Scan frontend build/dev image — fail on any unresolved CRITICAL
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --exit-code 1 --severity CRITICAL vocadox-frontend-dev:ci
+
+      - name: Report HIGH/MEDIUM/LOW findings (non-blocking, for visibility)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --severity HIGH,MEDIUM,LOW vocadox-backend:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --severity HIGH,MEDIUM,LOW vocadox-frontend:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --severity HIGH,MEDIUM,LOW vocadox-frontend-dev:ci

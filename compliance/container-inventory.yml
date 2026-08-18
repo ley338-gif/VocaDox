@@ -1,0 +1,171 @@
+# Container image inventory (spec §10/§12 policy extended to base images).
+#
+# Every image used anywhere in the Phase 0 stack (deploy/docker-compose.yml,
+# root docker-compose.yml, backend/Dockerfile, frontend/Dockerfile) is
+# listed here with a pinned version tag AND digest — `latest` is never used.
+# All digests below were captured by actually pulling and inspecting the
+# images locally (`docker inspect --format='{{index .RepoDigests 0}}'
+# <tag>`), not guessed.
+#
+# The same GO/NO-GO rule as dependencies/models applies: any container with
+# approval_status blocked or unknown => NO-GO for Phase 1.
+#
+# License notes: for OS-level base images (python, node, nginx official
+# images), the "license" recorded is the license of the primary
+# application/runtime the image packages (Python interpreter, Node.js
+# runtime, nginx server), not an exhaustive audit of every OS package layer
+# (openssl, coreutils, ...) baked into the underlying Debian/Alpine base —
+# that transitive OS-package surface is a known limitation, documented in
+# PHASE_0_VALIDATION_REPORT.md's Known Limitations section, consistent with
+# how the software dependency inventory also scopes to direct dependencies.
+#
+# --- Vulnerability scanning (added Phase 0 remediation) ---
+# Tool: Trivy 0.56.2 (Apache-2.0 — license-checked before use, see
+# dependency-inventory.yml's entry for it as a build/scan-tool-only
+# dependency). Run via the official `aquasec/trivy` Docker image (pinned
+# tag+digest, never installed on the host) against the FINAL built images
+# — `vocadox-backend` (backend/Dockerfile's only stage) and
+# `vocadox-frontend` (frontend/Dockerfile's `runtime` target, i.e. exactly
+# what ships to a customer: nginx serving the static Vite build, NOT the
+# Vite dev server). Raw scan output: compliance/_container-scan/ (gitignored,
+# regenerate via the commands in PHASE_0_VALIDATION_REPORT.md's Security
+# Findings section).
+#
+# SCOPE: primarily covers the packages present in the final, shipped
+# runtime images (vocadox-backend, vocadox-frontend `runtime` stage). The
+# frontend build/dev image (`node`, below) was ALSO scanned and actively
+# remediated during Phase 0's final closeout — see ADR-0008 — rather than
+# left out of scope, even though its filesystem never reaches the shipped
+# runtime image and it's otherwise dev-only. Result: 0 CRITICAL across all
+# three (backend runtime, frontend runtime, frontend build/dev).
+
+containers:
+  - image: postgres
+    tag: "16.6-alpine3.20"
+    digest: "sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc"
+    purpose: "Primary datastore (system of record)"
+    source: "docker.io/library/postgres (Docker Official Image)"
+    license: "PostgreSQL License (PostgreSQL Global Development Group)"
+    pinned: true
+    approval_status: approved
+    notes: "PostgreSQL License is in the approved list (equivalent to MIT/BSD-style permissive)."
+
+  - image: valkey/valkey
+    tag: "8.0.2-alpine"
+    digest: "sha256:752ba000a58bc8925d11ee863a39b5225617cd2cb3dbc9ec8ac65268b65ebb6d"
+    purpose: "Queue / cache / coordination backend"
+    source: "docker.io/valkey/valkey (Linux Foundation Valkey project, official image)"
+    license: "BSD-3-Clause"
+    pinned: true
+    approval_status: approved
+    notes: >
+      Verified as BSD-3-Clause for the Valkey server itself (distinct from
+      the `valkey` PyPI client package, also BSD/MIT-family — see
+      dependency-inventory.yml).
+
+  - image: python
+    tag: "3.11-slim-trixie"
+    digest: "sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7"
+    purpose: "Backend build/runtime base image (SHIPPED — this is the only stage in backend/Dockerfile)"
+    source: "docker.io/library/python (Docker Official Image, Debian trixie base)"
+    license: "PSF-2.0 (Python interpreter); Debian base layer under mixed OS-package licenses (not individually audited — see header note)"
+    pinned: true
+    approval_status: approved
+    notes: >
+      PSF-2.0 is a permissive license consistent with the approved policy
+      list's intent (MIT/BSD/Apache-style). Switched from
+      python:3.11.10-slim-bookworm during Phase 0 remediation: a Trivy scan
+      found CRITICAL CVEs (perl-base, libsqlite3-0, zlib1g) with no fix
+      backported to bookworm on ANY point release (verified against the
+      Debian security tracker) — trixie carries fixed versions of
+      sqlite3/zlib/util-linux. backend/Dockerfile additionally runs
+      `apt-get upgrade` and purges perl-base entirely (unused by the
+      running application; was the source of trixie's remaining 4 CRITICAL
+      findings) — see PHASE_0_VALIDATION_REPORT.md, Security Findings, for
+      the full before/after scan results. Final scanned image
+      (vocadox-backend, this stage): 0 CRITICAL, 8 HIGH (all
+      no-upstream-fix-available OS packages unused by the app, or pip's
+      own internals — individually justified in the validation report).
+
+  - image: node
+    tag: "22-alpine3.24"
+    digest: "sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32"
+    purpose: "Frontend build stage (discarded by the multi-stage build — never reaches the shipped runtime image) + local dev server base image (dev-only, never deployed to customers)"
+    source: "docker.io/library/node (Docker Official Image, Alpine base)"
+    license: "MIT (Node.js runtime); Alpine base layer under mixed OS-package licenses (not individually audited — see header note)"
+    pinned: true
+    approval_status: approved
+    notes: >
+      Switched from node:20.18.1-bookworm-slim during Phase 0's final
+      closeout (ADR-0008). Evaluated node:22-bookworm-slim (6 CRITICAL)
+      and node:22-trixie-slim (5 CRITICAL) — both blocked by perl-base,
+      which Debian ships on every current release with 4 unfixable-anywhere
+      CVEs (same root cause the backend hit and fixed by switching away
+      from Debian's perl entirely). Alpine doesn't ship perl at all;
+      node:22-alpine3.21/3.22/3.24 all showed 5 CRITICAL instead, but
+      every one was npm's own vendored copy of tar/brace-expansion/
+      ip-address/etc. bundled inside the image's pre-installed npm —
+      genuinely fixable, unlike Debian's perl. Added
+      `npm install -g npm@latest && npm cache clean --force` as the first
+      step in frontend/Dockerfile's `base` stage, which replaces those
+      vendored copies with current ones. Final scanned image (the actual
+      built `base`/`dev` stage, not a synthetic test): **0 CRITICAL, 3
+      HIGH**. Verified end-to-end: `npm install`, `lint`, `typecheck`,
+      `test`, and `build` (via the `runtime` target) all still pass inside
+      this image with no application dependency changes required.
+      Residual 3 HIGH (`brace-expansion` x2, `ip-address` x1) are also
+      npm's own vendored dependencies, still present even at npm@latest —
+      accepted, same treatment as the backend image's pip-internal
+      `msgpack` finding: not exposed to any input path our build process
+      controls, not independently patchable without forking npm.
+
+  - image: nginx
+    tag: "1.31.3-alpine3.24"
+    digest: "sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752"
+    purpose: "Production frontend runtime (SHIPPED) — serves the static Vite build. The Vite dev server is never used in production; see frontend/Dockerfile `runtime` target."
+    source: "docker.io/library/nginx (Docker Official Image, Alpine base)"
+    license: "BSD-2-Clause (nginx license)"
+    pinned: true
+    approval_status: approved
+    notes: >
+      Switched from nginx:1.27.3-alpine3.20 during Phase 0 remediation: a
+      Trivy scan warned "This OS version is no longer supported by the
+      distribution" for Alpine 3.20 and found 3 CRITICAL / 35 HIGH findings
+      (libssl3, libcrypto3, libxml2, libpng, musl, ...) all with fixes
+      already published upstream — this was purely a stale/EOL base image
+      pin, not an unfixable issue. alpine3.24 is the current supported
+      Alpine release. Final scanned image (vocadox-frontend, `runtime`
+      stage — exactly what ships to a customer): 0 vulnerabilities of any
+      severity.
+
+  - image: aquasec/trivy
+    tag: "0.56.2"
+    digest: "sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a"
+    purpose: "Vulnerability + SBOM scanning tool (CI/audit-only — never part of the deployed stack, never shipped to customers)"
+    source: "docker.io/aquasec/trivy (Aqua Security, official image)"
+    license: "Apache-2.0"
+    pinned: true
+    approval_status: approved
+    notes: >
+      Chosen over Docker Scout (bundled with Docker Desktop) specifically
+      because Docker Scout CLI's license is the proprietary "Docker
+      Subscription Service Agreement" — blocked per license-policy.yml —
+      whereas Trivy is Apache-2.0 (verified via its GitHub LICENSE file).
+      Run via this pinned official image (never installed as a host
+      binary) against the final backend/frontend runtime images; see
+      PHASE_0_VALIDATION_REPORT.md, Security Findings, for results and the
+      exact commands used (also wired into CI, see .github/workflows/ci.yml).
+
+# Summary (verified against license-policy.yml):
+#   approved: 6
+#   review_required: 0
+#   blocked: 0
+#   unknown: 0
+#
+# Vulnerability summary (all three images actively remediated — see
+# PHASE_0_VALIDATION_REPORT.md, Security Findings, for the full
+# package-by-package breakdown and disposition of every CRITICAL/HIGH
+# finding, and ADR-0008 for the node image decision):
+#   vocadox-backend            (python:3.11-slim-trixie):  0 CRITICAL, 8 HIGH (documented/accepted)
+#   vocadox-frontend (runtime) (nginx:1.31.3-alpine3.24):   0 CRITICAL, 0 HIGH
+#   frontend build/dev image   (node:22-alpine3.24):        0 CRITICAL, 3 HIGH (documented/accepted)

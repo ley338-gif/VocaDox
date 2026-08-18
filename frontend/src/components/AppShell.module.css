@@ -1,0 +1,40 @@
+.shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-4) var(--space-8);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.brand {
+  font-size: var(--font-h4-size);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.nav {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: var(--font-body-base-size);
+}
+
+.nav a:hover {
+  color: var(--accent);
+}
+
+.main {
+  flex: 1;
+  padding: var(--space-8);
+}

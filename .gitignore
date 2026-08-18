@@ -1,0 +1,43 @@
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+backend/data/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+frontend/.vite/
+coverage/
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+!deploy/.env.example
+*.pem
+*.key
+
+# --- Compliance scan intermediates (regenerable, not source of truth) ---
+compliance/_raw_*.json
+compliance/_raw_*.txt
+compliance/_container-scan/
+
+# --- Local data / media ---
+data/
+*.sqlite3
+*.db
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
