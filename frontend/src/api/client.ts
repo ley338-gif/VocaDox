@@ -78,3 +78,13 @@ export function logout(csrfToken: string): Promise<void> {
 export function me(): Promise<CurrentUserResponse> {
   return request<CurrentUserResponse>("/auth/me", { method: "GET" });
 }
+
+export interface CsrfTokenResponse {
+  csrf_token: string;
+}
+
+/** Recovers the current session's CSRF token after a full page reload —
+ * see AuthContext.tsx for why this is needed in addition to /auth/me. */
+export function csrf(): Promise<CsrfTokenResponse> {
+  return request<CsrfTokenResponse>("/auth/csrf", { method: "GET" });
+}

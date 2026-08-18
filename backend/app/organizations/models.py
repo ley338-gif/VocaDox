@@ -59,6 +59,4 @@ class OrganizationMembership(Base):
 
     organization: Mapped[Organization] = relationship(back_populates="memberships")
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "organization_id", name="uq_org_membership"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "organization_id", name="uq_org_membership"),)

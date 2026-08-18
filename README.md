@@ -2,13 +2,17 @@
 
 **On-premise, evidence-based conversation documentation.**
 
-> **Status: Phase 1 — Identity & Security.** Local authentication,
-> permission-based RBAC (users/groups/roles/permissions), Valkey-backed
-> sessions, CSRF protection, an organizations foundation, and login
-> audit logging are implemented. Conversations, transcription, and every
-> other domain feature are still not implemented. See
-> [`PHASE_0_VALIDATION_REPORT.md`](PHASE_0_VALIDATION_REPORT.md) and
-> [`PHASE_1_VALIDATION_REPORT.md`](PHASE_1_VALIDATION_REPORT.md) for the
+> **Status: Phase 2 — Conversation Capture & Media Foundation.** Local
+> authentication, permission-based RBAC, Valkey-backed sessions, CSRF
+> protection, organizations, and audit logging (Phase 1) plus
+> conversations, browser/upload audio capture, immutable SHA-256-verified
+> source media, participants/markers/notes, and organization-scoped
+> authorization (Phase 2) are implemented. Speech-to-text, diarization,
+> summarization, and Evidence/document generation are still not
+> implemented — deliberately: Phase 2 is an AI-free source-media layer.
+> See [`PHASE_0_VALIDATION_REPORT.md`](PHASE_0_VALIDATION_REPORT.md),
+> [`PHASE_1_VALIDATION_REPORT.md`](PHASE_1_VALIDATION_REPORT.md), and
+> [`PHASE_2_VALIDATION_REPORT.md`](PHASE_2_VALIDATION_REPORT.md) for the
 > full validation reports and GO/NO-GO recommendations.
 
 ## What VocaDox is
@@ -36,7 +40,9 @@ possible, and `VocaDox - Userinterface.png` / `VocaDox - Architektur.png` /
 - **Datastore**: PostgreSQL (sole system of record). **Queue/cache/coordination**:
   Valkey, accessed only through the `CacheBackend`/`QueueBackend`/`CoordinationBackend`
   abstractions (see [ADR-0002](docs/architecture/adr/0002-valkey-over-redis.md)).
-  **Media storage**: local filesystem in Phase 0, via `LocalFilesystemStorage`.
+  **Media storage**: local filesystem, via `LocalFilesystemStorage`
+  (namespaced opaque keys as of Phase 2 — see
+  [ADR-0013](docs/architecture/adr/0013-media-storage-layout.md)).
 - **Compliance**: every dependency, container image, and (eventually) AI
   model is tracked in `compliance/*.yml` against `compliance/license-policy.yml`,
   enforced by `compliance/check_licenses.py` (see below).
@@ -108,7 +114,13 @@ alembic upgrade head
 Phase 0 shipped only a no-op baseline migration (see
 [ADR-0004](docs/architecture/adr/0004-evidence-first-data-model.md)); Phase 1
 adds the first real domain tables — identity, RBAC, organizations, audit
-(`0002_identity_rbac.py`, downgrade supported).
+(`0002_identity_rbac.py`, downgrade supported). Phase 2 adds conversations,
+media assets, participants, markers, notes, retention policies, and
+recording-upload sessions (`0003_conversation_capture.py`, downgrade
+supported). Upgrading an existing Phase 1 database: `alembic upgrade head`
+then `python -m app.identity.seed` to pick up the new `conversation:*`/
+`media:*` RBAC permissions on existing roles (idempotent — safe to run
+anytime).
 
 ### Bootstrapping the first admin user
 

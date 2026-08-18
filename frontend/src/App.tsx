@@ -6,8 +6,11 @@ import { RequireAuth, RequirePermission } from "./auth/RequireAuth";
 import { DesignSystemPage } from "./design-system/DesignSystemPage";
 import { AdminHomePage } from "./pages/AdminHomePage";
 import { AppHomePage } from "./pages/AppHomePage";
+import { ConversationDetailPage } from "./pages/ConversationDetailPage";
+import { ConversationsListPage } from "./pages/ConversationsListPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { NewConversationPage } from "./pages/NewConversationPage";
 
 export function App() {
   return (
@@ -22,6 +25,30 @@ export function App() {
             element={
               <RequireAuth>
                 <AppHomePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/app/conversations"
+            element={
+              <RequireAuth>
+                <ConversationsListPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/app/conversations/new"
+            element={
+              <RequireAuth>
+                <NewConversationPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/app/conversations/:id"
+            element={
+              <RequireAuth>
+                <ConversationDetailPage />
               </RequireAuth>
             }
           />

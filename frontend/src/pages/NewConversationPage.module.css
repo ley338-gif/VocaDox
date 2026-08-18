@@ -1,0 +1,46 @@
+.choiceRow {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.choiceCard {
+  flex: 1;
+  padding: var(--space-6);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  cursor: pointer;
+  text-align: left;
+}
+
+.choiceCard.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 480px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field label {
+  font-size: var(--font-body-sm-size);
+  color: var(--text-secondary);
+}
+
+.dropzone {
+  border: 2px dashed var(--border-default);
+  border-radius: 12px;
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-muted);
+}

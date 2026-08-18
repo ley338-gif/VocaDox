@@ -69,9 +69,7 @@ async def bootstrap_admin(
             return 1
 
         if await get_user_by_username(session, username) is not None:
-            print(
-                f"Refusing to bootstrap: username {username!r} already exists.", file=sys.stderr
-            )
+            print(f"Refusing to bootstrap: username {username!r} already exists.", file=sys.stderr)
             return 1
 
         role: Role | None = await get_role_by_name(session, SYSTEM_ADMIN_ROLE)

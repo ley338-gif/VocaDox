@@ -45,4 +45,35 @@ async def test_local_filesystem_storage_rejects_path_traversal(tmp_path) -> None
     with pytest.raises(ValueError):
         await storage.load("../../etc/passwd")
     with pytest.raises(ValueError):
-        await storage.load("nested/path.txt")
+        await storage.load("nested/../../escape.txt")
+    with pytest.raises(ValueError):
+        await storage.load("/etc/passwd")
+    with pytest.raises(ValueError):
+        await storage.load("..%2f..%2fetc%2fpasswd")
+
+
+async def test_local_filesystem_storage_namespace_roundtrip(tmp_path) -> None:
+    storage = LocalFilesystemStorage(tmp_path)
+    key = await storage.save(
+        b"hello", suffix=".wav", namespace="organizations/org1/conversations/conv1/source"
+    )
+    assert "/" in key
+    assert await storage.exists(key)
+    assert await storage.load(key) == b"hello"
+
+
+async def test_local_filesystem_storage_namespace_rejects_dangerous_segments(tmp_path) -> None:
+    storage = LocalFilesystemStorage(tmp_path)
+    # A namespace segment that sanitizes down to nothing (e.g. "..", which
+    # contains no alphanumeric/-/_ characters) is rejected outright rather
+    # than silently continuing with an empty/ambiguous path segment.
+    with pytest.raises(ValueError):
+        await storage.save(b"hello", namespace="../../etc")
+
+
+async def test_local_filesystem_storage_namespace_strips_unsafe_characters(tmp_path) -> None:
+    storage = LocalFilesystemStorage(tmp_path)
+    key = await storage.save(b"hello", namespace="org.1/conv#1")
+    assert "." not in key.split("/")[0]
+    assert "#" not in key
+    assert await storage.load(key) == b"hello"

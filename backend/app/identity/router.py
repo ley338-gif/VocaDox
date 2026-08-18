@@ -18,7 +18,7 @@ from app.identity.deps import (
 )
 from app.identity.models import User
 from app.identity.rbac import get_user_permissions
-from app.identity.schemas import CurrentUserResponse, LoginRequest, LoginResponse
+from app.identity.schemas import CsrfTokenResponse, CurrentUserResponse, LoginRequest, LoginResponse
 from app.identity.sessions import SESSION_COOKIE_NAME, SessionData, SessionStore
 from app.platform.config import get_settings
 from app.platform.db.session import get_session
@@ -114,6 +114,18 @@ async def logout(
     )
     await db.commit()
     response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+
+
+@router.get("/csrf", response_model=CsrfTokenResponse)
+async def csrf(
+    session_data: SessionData = Depends(get_current_session),
+) -> CsrfTokenResponse:
+    """Recover the current session's CSRF token after a full page reload
+    wiped the frontend's in-memory copy (session cookie itself is
+    httponly and unaffected by reload). Safe as a plain GET: it only
+    re-reads a token already bound to the caller's own authenticated
+    session, never mints a new one or reveals another user's token."""
+    return CsrfTokenResponse(csrf_token=session_data.csrf_token)
 
 
 @router.get("/me", response_model=CurrentUserResponse)

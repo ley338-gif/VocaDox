@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { ApiError, login as apiLogin, logout as apiLogout, me as apiMe } from "../api/client";
+import {
+  ApiError,
+  csrf as apiCsrf,
+  login as apiLogin,
+  logout as apiLogout,
+  me as apiMe,
+} from "../api/client";
 import type { AuthUser } from "./context";
 import { AuthContext } from "./context";
 
@@ -12,13 +18,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // On load, an existing session cookie (if any) is still valid
-    // server-side even though we don't have its CSRF token in memory —
-    // GET /auth/me doesn't require CSRF (only state-changing requests do).
-    // The user can still view their session; logout will simply be
-    // unavailable until they next log in fresh, which is an acceptable
-    // Phase 1 tradeoff (documented in PHASE_1_VALIDATION_REPORT.md).
+    // server-side even though we don't have its CSRF token in memory yet
+    // — GET /auth/me and GET /auth/csrf are both safe GETs, so neither
+    // needs the CSRF header. /auth/csrf re-reads the token already bound
+    // to this session (see backend/app/identity/router.py) so mutating
+    // actions (create conversation, upload, delete, ...) keep working
+    // after a full page reload instead of silently no-oping — this
+    // closed a real Phase 2 gap where every reload left CSRF-protected
+    // actions unusable with no error shown until this fix.
     apiMe()
-      .then((response) => {
+      .then(async (response) => {
         setUser({
           userId: response.user_id,
           username: response.username,
@@ -26,6 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: response.email,
           permissions: response.permissions,
         });
+        try {
+          const csrfResponse = await apiCsrf();
+          setCsrfToken(csrfResponse.csrf_token);
+        } catch {
+          // Non-fatal: user stays signed in and can still read data; a
+          // mutating action will surface its own auth error if this
+          // somehow still fails (e.g. a session that expired between
+          // the two calls).
+        }
       })
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
