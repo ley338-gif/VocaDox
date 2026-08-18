@@ -9,7 +9,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.administration.router import router as administration_router
 from app.conversations.router import router as conversations_router
+from app.diarization.router import router as diarization_router
 from app.identity.router import router as identity_router
 from app.organizations.router import router as organizations_router
 from app.platform.config import get_settings
@@ -18,6 +20,7 @@ from app.platform.health import router as health_router
 from app.platform.logging import configure_logging
 from app.platform.middleware import RequestIdMiddleware
 from app.platform.version import APPLICATION_VERSION
+from app.transcription.router import router as transcription_router
 
 
 def create_app() -> FastAPI:
@@ -43,5 +46,8 @@ def create_app() -> FastAPI:
     app.include_router(identity_router, prefix=settings.api_prefix)
     app.include_router(conversations_router, prefix=settings.api_prefix)
     app.include_router(organizations_router, prefix=settings.api_prefix)
+    app.include_router(transcription_router, prefix=settings.api_prefix)
+    app.include_router(diarization_router, prefix=settings.api_prefix)
+    app.include_router(administration_router, prefix=settings.api_prefix)
 
     return app

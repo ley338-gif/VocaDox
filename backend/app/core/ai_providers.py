@@ -16,6 +16,8 @@ from pathlib import Path
 
 from app.media.normalizer import FfmpegMediaNormalizer, MediaNormalizer, NoOpMediaNormalizer
 from app.platform.config import get_settings
+from app.platform.valkey.backends import QueueBackend
+from app.platform.valkey.valkey_backend import get_valkey_backend
 from app.providers.diarization import (
     DiarizationProvider,
     FakeDiarizationProvider,
@@ -28,6 +30,10 @@ from app.providers.speech_to_text import (
     FasterWhisperSpeechProvider,
     SpeechToTextProvider,
 )
+
+
+def get_queue_backend() -> QueueBackend:
+    return get_valkey_backend()
 
 
 def get_speech_provider() -> SpeechToTextProvider:

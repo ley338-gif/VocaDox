@@ -59,7 +59,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from app.providers.diarization import DiarizationResult, SpeakerTurn
-from app.providers.speech_to_text import TranscriptionResult, TranscriptSegment, Word
+from app.providers.speech_to_text import TranscriptionResult, TranscriptSegment
 
 CONFIDENT_THRESHOLD = 0.66
 

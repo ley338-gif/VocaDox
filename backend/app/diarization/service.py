@@ -40,7 +40,7 @@ async def persist_diarization_result(
     await session.flush()
 
     turns_sorted = sorted(result.turns, key=lambda t: t.start_seconds)
-    for i, turn in enumerate(turns_sorted):
+    for turn in turns_sorted:
         is_overlap = any(
             other is not turn
             and turn.start_seconds < other.end_seconds

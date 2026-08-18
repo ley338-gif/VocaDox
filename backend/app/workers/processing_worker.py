@@ -18,7 +18,11 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.ai_providers import get_diarization_provider, get_media_normalizer, get_speech_provider
+from app.core.ai_providers import (
+    get_diarization_provider,
+    get_media_normalizer,
+    get_speech_provider,
+)
 from app.core.storage import get_storage_provider
 from app.platform.config import get_settings
 from app.platform.db.session import get_sessionmaker
@@ -86,7 +90,10 @@ class ProcessingWorker:
                 return  # already claimed/cancelled/stale payload
 
             await start_job(
-                session, job, worker_id=self.worker_id, lease_seconds=self._settings.job_lease_seconds
+                session,
+                job,
+                worker_id=self.worker_id,
+                lease_seconds=self._settings.job_lease_seconds,
             )
             await session.commit()
 
@@ -153,7 +160,9 @@ class ProcessingWorker:
             return await execute_align(session, job)
         raise ValueError(f"unknown job_type: {job.job_type}")
 
-    async def _on_success(self, session: AsyncSession, job: ProcessingJob, run_id: uuid.UUID) -> None:
+    async def _on_success(
+        self, session: AsyncSession, job: ProcessingJob, run_id: uuid.UUID
+    ) -> None:
         job_type = JobType(job.job_type)
         if job_type == JobType.NORMALIZE:
             # run_id here is the NORMALIZATION ProcessingRun id; fetch its
@@ -161,7 +170,9 @@ class ProcessingWorker:
             from app.processing.models import ProcessingRun
 
             run = await session.get(ProcessingRun, run_id)
-            output_media_id = (run.configuration_snapshot or {}).get("output_media_id") if run else None
+            output_media_id = (
+                (run.configuration_snapshot or {}).get("output_media_id") if run else None
+            )
             if output_media_id:
                 await trigger_post_normalize(
                     session, self._queue, job, normalized_media_id=uuid.UUID(output_media_id)
@@ -170,7 +181,9 @@ class ProcessingWorker:
             await maybe_trigger_align(session, self._queue, job)
         # ALIGN success needs no further chaining — it's the terminal stage.
 
-    async def _mark_transcript_and_conversation_failed(self, session: AsyncSession, job: ProcessingJob) -> None:
+    async def _mark_transcript_and_conversation_failed(
+        self, session: AsyncSession, job: ProcessingJob
+    ) -> None:
         from app.conversations.models import Conversation, ConversationStatus
         from app.conversations.state_machine import is_valid_transition
         from app.transcription.service import get_active_transcript, mark_transcript_failed
@@ -191,6 +204,8 @@ class ProcessingWorker:
                 await session.flush()
 
 
-async def run_worker(*, worker_id: str, job_types: list[JobType], max_iterations: int | None = None) -> None:
+async def run_worker(
+    *, worker_id: str, job_types: list[JobType], max_iterations: int | None = None
+) -> None:
     worker = ProcessingWorker(worker_id=worker_id, job_types=job_types)
     await worker.run_forever(max_iterations=max_iterations)

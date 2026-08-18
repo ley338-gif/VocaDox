@@ -166,7 +166,9 @@ async def persist_aligned_segments(
     return rows
 
 
-async def list_segments(session: AsyncSession, *, transcript_id: uuid.UUID) -> list[TranscriptSegment]:
+async def list_segments(
+    session: AsyncSession, *, transcript_id: uuid.UUID
+) -> list[TranscriptSegment]:
     result = await session.execute(
         select(TranscriptSegment)
         .where(TranscriptSegment.transcript_id == transcript_id)

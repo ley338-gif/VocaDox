@@ -37,6 +37,7 @@ from app.providers.diarization import DiarizationProvider
 from app.providers.speech_to_text import SpeechToTextProvider
 from app.providers.storage import StorageProvider
 from app.transcription.alignment import align_transcript
+from app.transcription.models import Transcript
 from app.transcription.serialization import (
     diarization_result_from_dict,
     diarization_result_to_dict,
@@ -116,7 +117,6 @@ async def start_transcription(
     """API entry point for `POST /conversations/{id}/process/transcript`.
     Idempotent unless `reprocess=True` (spec: "Job idempotency" /
     "Reprocessing")."""
-    from app.transcription.models import Transcript  # local import avoids a cycle at module load
 
     if not reprocess:
         active = await get_active_transcript(session, source_media_id=source_media.id)
@@ -246,9 +246,11 @@ async def execute_normalize(
     await session.flush()
 
     source_path = await storage.open_path(source.storage_key)
-    data = Path(source_path).read_bytes()
+    data = Path(source_path).read_bytes()  # noqa: ASYNC240 - reads a locally-spooled file once
     result = await normalizer.normalize(
-        NormalizationInput(data=data, content_type=source.content_type, container=source.container)
+        NormalizationInput(
+            data=data, content_type=source.content_type, container=source.container
+        )
     )
 
     metadata = extract_audio_metadata(result.data, container=result.container or "wav")
@@ -296,7 +298,11 @@ async def execute_normalize(
 
 
 async def trigger_post_normalize(
-    session: AsyncSession, queue: QueueBackend, job: ProcessingJob, *, normalized_media_id: uuid.UUID
+    session: AsyncSession,
+    queue: QueueBackend,
+    job: ProcessingJob,
+    *,
+    normalized_media_id: uuid.UUID,
 ) -> None:
     """Called by the worker after a NORMALIZE job succeeds: enqueues
     TRANSCRIBE (and DIARIZE, if requested) against the freshly-normalized
@@ -510,8 +516,6 @@ async def execute_align(session: AsyncSession, job: ProcessingJob) -> uuid.UUID:
             select(DetectedSpeaker).where(DetectedSpeaker.diarization_run_id == diarization_run.id)
         )
         speaker_label_to_id = {s.internal_label: s.id for s in result.scalars().all()}
-
-    from app.transcription.models import Transcript
 
     transcript_result = await session.execute(
         select(Transcript).where(

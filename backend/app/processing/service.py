@@ -33,7 +33,9 @@ async def get_active_job(
         select(ProcessingJob).where(
             ProcessingJob.source_media_id == source_media_id,
             ProcessingJob.job_type == job_type.value,
-            ProcessingJob.status.in_([ProcessingStatus.QUEUED.value, ProcessingStatus.RUNNING.value]),
+            ProcessingJob.status.in_(
+                [ProcessingStatus.QUEUED.value, ProcessingStatus.RUNNING.value]
+            ),
         )
     )
     return result.scalars().first()
@@ -45,7 +47,9 @@ async def count_active_jobs_for_conversation(
     result = await session.execute(
         select(ProcessingJob).where(
             ProcessingJob.conversation_id == conversation_id,
-            ProcessingJob.status.in_([ProcessingStatus.QUEUED.value, ProcessingStatus.RUNNING.value]),
+            ProcessingJob.status.in_(
+                [ProcessingStatus.QUEUED.value, ProcessingStatus.RUNNING.value]
+            ),
         )
     )
     return len(result.scalars().all())

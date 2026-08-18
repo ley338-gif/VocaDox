@@ -154,7 +154,9 @@ class ProcessingJob(Base):
     # Lease/heartbeat for worker-crash recovery: a job RUNNING with a
     # heartbeat older than the lease timeout is considered abandoned and
     # eligible for requeue. See app.processing.service.reclaim_stale_jobs.
-    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     processing_run_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("processing_runs.id", ondelete="SET NULL"), nullable=True
