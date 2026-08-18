@@ -67,6 +67,17 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .
 
 RUN useradd --create-home --uid 10001 vocadox
+
+# Phase 2: media_storage_root/upload_temp_dir default to ./data/media and
+# ./data/tmp-uploads (relative to WORKDIR /app). /app itself is owned by
+# root (everything above was COPY'd/built before this point) so the
+# non-root `vocadox` user can't mkdir under it at runtime without this —
+# found via a real fresh-install run (`docker compose down -v && build
+# --no-cache && up -d`), not assumed. The actual persistent data lives in
+# a named volume mounted at /app/data (see deploy/docker-compose.yml), so
+# this only needs to own the mount point, not pre-populate real content.
+RUN mkdir -p /app/data/media /app/data/tmp-uploads && chown -R vocadox:vocadox /app/data
+
 USER vocadox
 
 EXPOSE 8000

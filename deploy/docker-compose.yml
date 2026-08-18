@@ -56,6 +56,13 @@ services:
       VOCADOX_SESSION_COOKIE_SECURE: ${VOCADOX_SESSION_COOKIE_SECURE:-false}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      # Phase 2: media_storage_root (./data/media) and upload_temp_dir
+      # (./data/tmp-uploads) both live under /app/data — a named volume so
+      # ingested conversation audio survives container recreation, not
+      # just an in-place restart (verified as part of the Phase 2
+      # restart-persistence validation).
+      - vocadox_backend_data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,3 +86,4 @@ services:
 volumes:
   vocadox_postgres_data:
   vocadox_valkey_data:
+  vocadox_backend_data:
