@@ -128,7 +128,7 @@ models:
       not require one). The model card states the VoxCeleb-trained
       checkpoint follows CC-BY-4.0, i.e. attribution required, no other
       field-of-use restriction; VocaDox attributes it here and in
-      THIRD_PARTY_NOTICES.md.
+      THIRD_PARTY_NOTICES.md's "AI models" section.
     sha256: null
     bundled: false
     downloaded_at_install: true
@@ -136,4 +136,41 @@ models:
     bundled_with_product: false
     disk_size_mb: 26
     runtime_requirements: "pyannote.audio>=4.0,<5.0; loaded fully offline (HF_HUB_OFFLINE=1) from the shared HF cache — see app/providers/diarization.py's PyannoteDiarizationProvider"
+    approval_status: approved
+
+  # Third dependent repo — not named in speaker-diarization-3.1's own
+  # config.yaml at all. Found by real diarization inference testing: a
+  # pyannote.audio 4.x library quirk (SpeakerDiarization.__init__
+  # unconditionally constructs a PLDA transform at pipeline-load time
+  # regardless of which `clustering:` algorithm the loaded pipeline
+  # actually configures — even for AgglomerativeClustering, which never
+  # uses it downstream) defaults that transform to a different, newer,
+  # gated pipeline VocaDox does not use or select (ADR-0017 selected
+  # speaker-diarization-3.1, not community-1). See ADR-0017's Phase 3.1
+  # amendment and app/cli/install_models.py's DependentRepo for the full
+  # account.
+  - name: pyannote/speaker-diarization-community-1 (plda/ subfolder only)
+    purpose: Unused-but-required PLDA transform pyannote.audio 4.x's SpeakerDiarization pipeline loads unconditionally at construction time
+    provider: pyannote (Hervé Bredin / pyannoteAI)
+    version: "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee"  # HF revision (commit), pinned
+    source: "https://huggingface.co/pyannote/speaker-diarization-community-1"
+    license: CC-BY-4.0
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      GATED on Hugging Face — its own separate terms acceptance is
+      required. VocaDox's installer restricts the download to this
+      repo's `plda/` subfolder only (via huggingface_hub's
+      `allow_patterns`) — the rest of this pipeline (its own,
+      much larger, segmentation/embedding weights) is never downloaded
+      and never used; VocaDox continues to use
+      pyannote/segmentation-3.0 and pyannote/wespeaker-voxceleb-
+      resnet34-LM for those roles, per ADR-0017's selection.
+    sha256: null
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated, automatically as part of `docker compose run --rm model-manager install diarization-default` (never a separate command an admin has to know about)."
+    bundled_with_product: false
+    disk_size_mb: 2  # plda/ subfolder only (plda.npz + xvec_transform.npz)
+    runtime_requirements: "pyannote.audio>=4.0,<5.0; loaded fully offline (HF_HUB_OFFLINE=1) from the shared HF cache — see app/providers/diarization.py's PyannoteDiarizationProvider. Constructed but never actually invoked by VocaDox's AgglomerativeClustering configuration — an upstream library inefficiency, not a VocaDox design choice."
     approval_status: approved

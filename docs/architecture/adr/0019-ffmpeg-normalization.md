@@ -92,3 +92,31 @@ perform real transcoding.
   above as its sign-off note (unmodified LGPL dynamic dependency, no
   static-linking/redistribution obligation conflict for an on-premise
   deployment).
+
+## Phase 3.1 amendment: a second FFmpeg download — shared libraries, not just the CLI
+
+This ADR originally covered only the **static** `ffmpeg`/`ffprobe` CLI
+binaries VocaDox's own `FfmpegMediaNormalizer` subprocess-invokes. Real
+diarization inference testing in Phase 3.1 found a second, independent
+FFmpeg requirement that had gone completely unaddressed: `torchcodec` (a
+transitive dependency pulled in by `pyannote.audio` 4.x's move off
+`torchaudio` — see ADR-0017) does its own audio decoding by dynamically
+loading FFmpeg's **shared libraries** (`libavutil.so`, `libavcodec.so`,
+...) via `ctypes`/`torch.ops.load_library` the first time a pipeline
+actually processes audio — a completely different code path from the
+CLI-subprocess normalizer, and one no earlier Phase 3 test happened to
+exercise (Phase 3's diarization testing never got past pipeline *loading*
+— see PHASE_3_VALIDATION_REPORT.md's honest NOT VERIFIED for real
+inference). With no FFmpeg shared libraries present anywhere in the
+image, this failed with `OSError: Could not load this library:
+.../libtorchcodec_core*.so` / `libavutil.so.58: cannot open shared object
+file: No such file or directory`.
+
+Fixed by downloading a second BtbN/FFmpeg-Builds asset —
+`ffmpeg-master-latest-linux64-lgpl-shared.tar.xz` (the "shared" build
+variant, same source, same LGPL-only configuration audit as the static
+build above, pinned by its own separate sha256) — and installing its
+`lib/*.so*` files into `/usr/local/lib` + `ldconfig`, in
+`backend/worker.Dockerfile`. Same licensing conclusion applies: LGPL-3.0,
+dynamically linked, no static-linking/redistribution conflict for an
+on-premise deployment.

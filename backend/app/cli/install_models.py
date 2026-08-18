@@ -55,6 +55,12 @@ class DependentRepo:
     repo_id: str
     revision: str
     license_note: str
+    # Restricts the download to matching files only (huggingface_hub
+    # `allow_patterns` glob syntax) — used for
+    # pyannote/speaker-diarization-community-1 below, where VocaDox only
+    # needs its `plda/` subfolder, not that pipeline's own (much larger,
+    # unused) segmentation/embedding weights.
+    allow_patterns: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -117,6 +123,34 @@ _register(
                     "trained on VoxCeleb, which the model card states carries the "
                     "dataset's own CC-BY-4.0 license; not gated."
                 ),
+            ),
+            # NOT named anywhere in config.yaml — a pyannote.audio 4.x
+            # library quirk found by real diarization inference testing,
+            # not by reading any pyannote documentation:
+            # `SpeakerDiarization.__init__` unconditionally loads a PLDA
+            # transform at construction time regardless of which
+            # `clustering:` algorithm config.yaml actually selects — even
+            # though the PLDA object is only ever *used* downstream by
+            # `VBxClustering`, never by `AgglomerativeClustering` (what
+            # speaker-diarization-3.1's own config.yaml sets). Its default
+            # value points at `pyannote/speaker-diarization-community-1`
+            # (a newer, different, gated pipeline VocaDox does not use and
+            # was not selected in ADR-0017) — so without this download, a
+            # fully-installed, correctly-configured speaker-diarization-3.1
+            # pipeline still fails at load time on a repo it doesn't
+            # actually need for AgglomerativeClustering. Restricted to only
+            # the `plda/` subfolder (a few MB) — the rest of that pipeline
+            # (its own segmentation/embedding weights) is never touched.
+            DependentRepo(
+                repo_id="pyannote/speaker-diarization-community-1",
+                revision="3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+                license_note=(
+                    "CC-BY-4.0 (verified: "
+                    "https://huggingface.co/pyannote/speaker-diarization-community-1) — "
+                    "gated; only its plda/ subfolder is downloaded, never its own "
+                    "segmentation/embedding pipeline weights, which VocaDox does not use."
+                ),
+                allow_patterns=("plda/*",),
             ),
         ),
     )
@@ -191,6 +225,8 @@ def install(profile: ModelProfile, *, model_volume_root: Path, token: str | None
     # PyannoteDiarizationProvider's HF_HUB_OFFLINE=1 load finds them
     # without ever reaching the network.
     if profile.dependent_repos:
+        from huggingface_hub.file_download import repo_folder_name
+
         cache_dir = hf_cache_dir(model_volume_root)
         cache_dir.mkdir(parents=True, exist_ok=True)
         for dep in profile.dependent_repos:
@@ -201,7 +237,28 @@ def install(profile: ModelProfile, *, model_volume_root: Path, token: str | None
                 revision=dep.revision,
                 cache_dir=str(cache_dir),
                 token=token,
+                allow_patterns=list(dep.allow_patterns) or None,
             )
+            # pyannote.audio resolves each dependent repo by its bare repo_id
+            # at pipeline-load time, with NO revision pinned on its end — it
+            # always effectively asks for "main". `snapshot_download` above
+            # was called with an explicit commit-hash `revision=`, which
+            # huggingface_hub treats as already-resolved and therefore never
+            # writes a `refs/main -> commit_hash` pointer for (that pointer
+            # is only written when the requested revision is a *symbolic*
+            # name, not already a commit hash). Real testing found this the
+            # hard way: with HF_HUB_OFFLINE=1 forced (see
+            # app/workers/_offline_env.py) and this repo genuinely fully
+            # downloaded at the pinned commit, pyannote's own unpinned
+            # `get_model(dep.repo_id)` call still failed with
+            # `LocalEntryNotFoundError` because there was no `refs/main`
+            # entry for it to resolve. Writing it explicitly here — to the
+            # exact commit we already verified and downloaded, no extra
+            # network round-trip — closes that gap.
+            ref_path = cache_dir / repo_folder_name(repo_id=dep.repo_id, repo_type="model")
+            ref_path = ref_path / "refs" / "main"
+            ref_path.parent.mkdir(parents=True, exist_ok=True)
+            ref_path.write_text(dep.revision)
         print(
             f"[{profile.name}] {len(profile.dependent_repos)} dependent repo(s) cached at "
             f"{cache_dir}"

@@ -25,14 +25,28 @@ before you can download it. VocaDox never bundles or silently downloads
 this model on your behalf: it's a deliberate legal/operational boundary
 (see `docs/security/model-supply-chain.md`).
 
+The pipeline is also not a single download: its `config.yaml` names two
+further Hugging Face repos by id, which `pyannote.audio` resolves
+internally at pipeline-load time —
+`pyannote/segmentation-3.0` (MIT, also gated, its own separate terms) and
+`pyannote/wespeaker-voxceleb-resnet34-LM` (CC-BY-4.0, not gated). This
+was discovered by real testing during Phase 3.1 (installing only the
+top-level pipeline and then running real diarization inference produced
+a live, unauthorized network call for `segmentation-3.0` at request
+time) — see `compliance/model-inventory.yml` for all three entries and
+`app/cli/install_models.py`'s `DependentRepo` for how they're installed
+together.
+
 To install it:
 1. Create a (free) Hugging Face account if you don't have one.
 2. Visit `https://huggingface.co/pyannote/speaker-diarization-3.1` and
    `https://huggingface.co/pyannote/segmentation-3.0`, and accept each
-   model's terms while logged in.
+   model's terms while logged in (`wespeaker-voxceleb-resnet34-LM` is not
+   gated — no acceptance step needed for it).
 3. Generate a personal access token (Settings → Access Tokens).
-4. Run the install step with that token — see
-   `docs/admin/model-installation.md`.
+4. Run `docker compose run --rm -e VOCADOX_HUGGINGFACE_TOKEN=<token>
+   model-manager install diarization-default` — this downloads all three
+   repos in one command. See `docs/admin/model-installation.md`.
 
 ## Checking status
 

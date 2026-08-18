@@ -32,8 +32,18 @@ RUN apt-get update \
 # tag/commit — if upstream ever republishes different bytes under the same
 # tag, this build fails closed (checksum mismatch) instead of silently
 # accepting a different, unaudited binary.
+# Phase 3.1: this pin was bumped after `docker compose build` genuinely
+# failed closed exactly as designed — BtbN's `latest` tag had republished
+# different bytes under the same tag since Phase 3 (a real occurrence of
+# the rolling-tag risk this Dockerfile's original comment warned about,
+# not a hypothetical). Re-verified before bumping: re-downloaded, hashed,
+# and re-inspected `ffmpeg -version`'s configuration string for the same
+# LGPL-only markers (`--enable-version3`, no `--enable-gpl`/
+# `--enable-nonfree`, `libx264`/`libx265`/`libxavs2`/`libxvid` all still
+# `--disable`d) before trusting the new hash — never bumped blindly just
+# to unblock a build.
 ARG FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl.tar.xz
-ARG FFMPEG_SHA256=079be6e766720bf2b1e1d71073214a51cae831295cbcc92e64d31e422fcb5ec1
+ARG FFMPEG_SHA256=9f5f7d49ef9e7c43834a27e298f64db32655843655b27ec08b6b0067124c36df
 RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
     && echo "${FFMPEG_SHA256}  /tmp/ffmpeg.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg-extract \
@@ -41,7 +51,36 @@ RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
     && install -m 0755 /tmp/ffmpeg-extract/bin/ffmpeg /usr/local/bin/ffmpeg \
     && install -m 0755 /tmp/ffmpeg-extract/bin/ffprobe /usr/local/bin/ffprobe \
     && install -Dm 0644 /tmp/ffmpeg-extract/LICENSE.txt /usr/share/doc/ffmpeg/LICENSE.txt \
-    && rm -rf /tmp/ffmpeg.tar.xz /tmp/ffmpeg-extract \
+    && rm -rf /tmp/ffmpeg.tar.xz /tmp/ffmpeg-extract
+
+# torchcodec (a transitive dependency of pyannote.audio 4.x — see
+# ADR-0017's account of the 3.x->4.x pin change, which moved pyannote off
+# torchaudio's removed AudioMetaData API and onto torchcodec instead) does
+# its own audio decoding via FFmpeg's *shared libraries*
+# (libavutil.so/libavcodec.so/...), loaded with `ctypes`/`torch.ops.
+# load_library` at first real use — a completely separate requirement
+# from the `ffmpeg`/`ffprobe` CLI binaries installed above (which only
+# VocaDox's own `FfmpegMediaNormalizer` subprocess-invokes). Found by real
+# diarization inference testing, not by reading pyannote/torchcodec's
+# docs: with only the CLI binaries present, actually calling the loaded
+# pipeline against real audio failed with `OSError: Could not load this
+# library: .../libtorchcodec_core*.so` / `libavutil.so.58: cannot open
+# shared object file` — torchcodec was never able to find ANY FFmpeg
+# shared library on the system, because none had ever been installed.
+# Same BtbN source, same LGPL-only stance as above (never Debian's own
+# GPL-configured `ffmpeg`/libav* packages) — just the "shared" build
+# variant instead of "static", pinned by sha256 the same way.
+ARG FFMPEG_SHARED_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl-shared.tar.xz
+ARG FFMPEG_SHARED_SHA256=fb97c54d9a17d6e140074919625b6b0496d7d0b0719300a92efad323aa21f814
+RUN curl -sL -o /tmp/ffmpeg-shared.tar.xz "$FFMPEG_SHARED_URL" \
+    && echo "${FFMPEG_SHARED_SHA256}  /tmp/ffmpeg-shared.tar.xz" | sha256sum -c - \
+    && mkdir -p /tmp/ffmpeg-shared-extract \
+    && tar xf /tmp/ffmpeg-shared.tar.xz -C /tmp/ffmpeg-shared-extract --strip-components=1 \
+    && cp -P /tmp/ffmpeg-shared-extract/lib/*.so* /usr/local/lib/ \
+    && install -Dm 0644 /tmp/ffmpeg-shared-extract/LICENSE.txt \
+       /usr/share/doc/ffmpeg-shared/LICENSE.txt \
+    && ldconfig \
+    && rm -rf /tmp/ffmpeg-shared.tar.xz /tmp/ffmpeg-shared-extract \
     && apt-get purge -y xz-utils \
     && apt-get autoremove -y
 

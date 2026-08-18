@@ -208,7 +208,22 @@ class PyannoteDiarizationProvider(DiarizationProvider):
                 kwargs["min_speakers"] = min_speakers
             if max_speakers is not None:
                 kwargs["max_speakers"] = max_speakers
-            diarization = pipeline(media_path, **kwargs)
+            output = pipeline(media_path, **kwargs)
+            # pyannote.audio 4.x's SpeakerDiarization pipeline returns a
+            # `DiarizeOutput` dataclass (speaker_diarization /
+            # exclusive_speaker_diarization / speaker_embeddings), not the
+            # bare `pyannote.core.Annotation` earlier pyannote versions
+            # returned directly — found by real diarization inference
+            # testing (a mock/fake-provider-only test suite could never
+            # have caught this: `FakeDiarizationProvider` never calls the
+            # real library at all). `speaker_diarization` (inclusive of
+            # overlapping speech) is the correct field to use here, not
+            # `exclusive_speaker_diarization` — VocaDox's own
+            # `DiarizationResult`/alignment stage represents overlapping
+            # speech honestly via multiple simultaneous turns (see this
+            # module's docstring), which `exclusive_speaker_diarization`
+            # would silently collapse away.
+            diarization = getattr(output, "speaker_diarization", output)
 
             turns: list[SpeakerTurn] = []
             labels: set[str] = set()
