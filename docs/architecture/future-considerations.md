@@ -42,6 +42,37 @@ lost and aren't quietly decided by accident later.
   since retrofitting RLS onto existing tables is more painful than
   designing it in.
 
+- **Multi-tenancy enforcement mechanism, resolved for Phase 1's own
+  scope**: Phase 1 shipped `organizations`/`organization_memberships` as
+  foundation tables + basic CRUD only, with no row-level security and no
+  application-layer org-scoped filtering yet — because no other domain's
+  data exists yet to filter. The RLS-vs-application-layer decision above
+  is still open and should be made before the first domain that owns
+  org-scoped *data* (conversations, documents, ...) lands, not before.
+
+- **Per-user session listing/revocation**: Phase 1's session store
+  (Valkey, opaque tokens — see ADR-0009) has no secondary index from user
+  → their active session tokens, so there's no way for an admin to "log
+  this user out everywhere" or for a user to see/revoke their own other
+  sessions. Reasonable to defer since the admin portal that would host
+  that action doesn't exist until Phase 7, but worth designing the index
+  in deliberately then rather than retrofitting.
+
+- **Password strength policy beyond a length floor**: Phase 1 only
+  enforces `MIN_PASSWORD_LENGTH = 12` at hash time
+  (`app.identity.passwords`) — no dictionary/breach-list checks, no
+  complexity rules. Worth a deliberate decision (and likely a
+  `have-i-been-pwned`-style k-anonymity check, license-reviewed) before
+  this becomes a real multi-user on-prem deployment, not before.
+
+- **Account lockout / brute-force throttling on `POST /auth/login`**: Phase
+  1 logs every failed attempt to `audit_events` (`login_failed`) but
+  doesn't rate-limit or lock accounts after repeated failures — noted in
+  the future-considerations list above under "Rate limiting / abuse
+  protection," but calling it out specifically for the auth endpoint since
+  it's now implemented and unprotected against credential-stuffing/brute
+  force.
+
 If you're implementing a later phase and considering adding something that
 feels like it belongs here instead of in your phase's actual scope, add it
 to this list rather than building it opportunistically.
