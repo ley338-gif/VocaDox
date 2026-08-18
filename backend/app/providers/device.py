@@ -20,11 +20,9 @@ class DeviceCapabilities:
     cpu_fallback_available: bool = True
 
 
-def detect_device_capabilities() -> DeviceCapabilities:
-    """Best-effort, exception-safe. Any detection failure (torch missing,
-    driver issue) degrades to "no CUDA, CPU-only" rather than crashing —
-    provider status endpoints must always be able to render something
-    understandable."""
+def _detect_via_torch() -> DeviceCapabilities | None:
+    """torch (pyannote.audio's runtime) reports the richest info (device
+    name, free/total VRAM) when it's installed."""
     try:
         import torch
 
@@ -40,8 +38,43 @@ def detect_device_capabilities() -> DeviceCapabilities:
             )
     except Exception:  # noqa: BLE001 - detection must never raise
         pass
-    return DeviceCapabilities(
-        cuda_available=False, device_name=None, total_vram_mb=None, free_vram_mb=None
+    return None
+
+
+def _detect_via_ctranslate2() -> DeviceCapabilities | None:
+    """faster-whisper's runtime (ctranslate2) does NOT depend on torch —
+    found via real testing (app.providers.speech_to_text.FasterWhisperSpeechProvider
+    reported cuda_available=False on a machine with a working GPU, purely
+    because torch happened not to be installed in that environment).
+    ctranslate2 exposes its own CUDA device count, so a speech-only worker
+    that never installs torch still gets honest GPU detection — no VRAM
+    figures available via this path, only presence."""
+    try:
+        import ctranslate2
+
+        if ctranslate2.get_cuda_device_count() > 0:
+            return DeviceCapabilities(
+                cuda_available=True,
+                device_name=None,
+                total_vram_mb=None,
+                free_vram_mb=None,
+            )
+    except Exception:  # noqa: BLE001 - detection must never raise
+        pass
+    return None
+
+
+def detect_device_capabilities() -> DeviceCapabilities:
+    """Best-effort, exception-safe. Any detection failure (neither torch
+    nor ctranslate2 installed/working, driver issue) degrades to "no
+    CUDA, CPU-only" rather than crashing — provider status endpoints must
+    always be able to render something understandable."""
+    return (
+        _detect_via_torch()
+        or _detect_via_ctranslate2()
+        or DeviceCapabilities(
+            cuda_available=False, device_name=None, total_vram_mb=None, free_vram_mb=None
+        )
     )
 
 
