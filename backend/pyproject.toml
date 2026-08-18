@@ -18,6 +18,17 @@ dependencies = [
     # see compliance/dependency-inventory.yml.
     "argon2-cffi>=23.1,<24.0",
 ]
+# NOTE on audio metadata extraction: `mutagen` was evaluated as a
+# candidate for MP3/M4A/WebM duration/codec/sample-rate extraction and
+# REJECTED — its actual PyPI-declared license is GPL-2.0-or-later (live
+# lookup against https://pypi.org/pypi/mutagen/json, 2026-08-18; the
+# initial assumption of "permissive" was wrong and caught by the license
+# gate before merge, not after). GPL-2.0 is in the `blocked` bucket of
+# compliance/license-policy.yml. Phase 2 therefore only extracts audio
+# metadata for WAV (via the stdlib `wave` module — no dependency); MP3/M4A/
+# WebM ship without duration/codec/sample-rate metadata for now. See
+# app/media/metadata.py and docs/architecture/media-ingestion.md,
+# "Known limitation: metadata extraction" for the honest scope of this.
 
 [project.optional-dependencies]
 dev = [

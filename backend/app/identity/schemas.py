@@ -29,3 +29,16 @@ class CurrentUserResponse(BaseModel):
     display_name: str
     email: str | None
     permissions: list[str]
+
+
+class CsrfTokenResponse(BaseModel):
+    """Returned by `GET /auth/csrf` so a page that still has a valid
+    session cookie (but lost its in-memory CSRF token to a full page
+    reload — see `frontend/src/auth/AuthContext.tsx`) can recover it
+    without forcing the user to log in again. Not a new secret: it's the
+    same token already bound to the caller's own session and already
+    returned once by `POST /auth/login`; this just re-reads it, gated by
+    the same session-cookie authentication as every other identity
+    endpoint."""
+
+    csrf_token: str

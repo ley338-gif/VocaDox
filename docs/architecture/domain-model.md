@@ -1,12 +1,17 @@
 # Domain model (target architecture)
 
-**Status: identity/organizations/audit are now implemented (Phase 1) —
-everything else below is still documentation-only target state.** The
-`identity`, `organizations`, and `audit` sections describe what actually
-exists as of `backend/alembic/versions/0002_identity_rbac.py`; every other
-domain remains an empty placeholder package (spec §65: the rest of the
-schema ships in later phases) and this document is still the agreed
-blueprint for them.
+**Status: identity/organizations/audit (Phase 1) and conversations/media
+(Phase 2) are now implemented — everything else below is still
+documentation-only target state.** The `identity`, `organizations`, and
+`audit` sections describe what exists as of
+`backend/alembic/versions/0002_identity_rbac.py`; `conversations` and
+`media` describe what exists as of
+`backend/alembic/versions/0003_conversation_capture.py` (see
+`docs/architecture/conversations.md`, `docs/architecture/media-storage.md`,
+`docs/architecture/media-ingestion.md` for the full detail — this document
+stays the high-level index). Every other domain remains an empty
+placeholder package (spec §65: the rest of the schema ships in later
+phases) and this document is still the agreed blueprint for them.
 
 ## Target entity list (spec §65)
 
@@ -33,8 +38,17 @@ Grouped by the domain package that will own them (see
   design — later phases add more `event_type` values, not new tables.
   Hard rule carried forward from the spec: `event_metadata` must never
   contain full conversation content, passwords, tokens, or other secrets.
-- **conversations**: `conversations`, `conversation_markers`
-- **media**: `media_assets`
+- **conversations** (Phase 2 — implemented): `conversations`,
+  `conversation_participants`, `conversation_markers`,
+  `conversation_notes`, `retention_policies`. State machine intentionally
+  limited to states that genuinely exist (CREATED/RECORDING/UPLOADED/
+  NORMALIZING/READY/FAILED/DELETED) — see
+  `docs/architecture/conversations.md`.
+- **media** (Phase 2 — implemented): `media_assets`, `recording_uploads`.
+  Source media is immutable, SHA-256-verified, and never overwritten by
+  normalization — see `docs/architecture/media-storage.md` and
+  `docs/architecture/media-ingestion.md`. No AI/transcription/diarization
+  of any kind exists yet.
 - **transcription / diarization**: `speakers`, `transcript_segments`
 - **intelligence / evidence**: `extracted_facts`, `fact_evidence`
 - **review**: `review_issues`
@@ -49,6 +63,14 @@ Grouped by the domain package that will own them (see
 - **administration / compliance**: `retention_policies`
 
 ## Conversation state machine (spec §22)
+
+**Note:** this is still the full *target* lifecycle spanning every future
+phase. Phase 2's actual, implemented state machine
+(`app.conversations.state_machine`) only covers the CREATED → RECORDING/
+UPLOADED → NORMALIZING → READY (+ FAILED/DELETED) subset that genuinely
+exists today — see `docs/architecture/conversations.md` for the real
+state diagram. TRANSCRIBING/DIARIZING/EXTRACTING/etc. below remain
+documentation-only until their own phase is approved.
 
 Target lifecycle (each transition to be enforced by the `conversations`
 domain once implemented):

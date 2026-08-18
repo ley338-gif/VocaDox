@@ -1,0 +1,45 @@
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+}
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.timeText {
+  font-size: var(--font-body-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 88px;
+}
+
+.seekWrap {
+  position: relative;
+  flex: 1;
+}
+
+.seek {
+  width: 100%;
+}
+
+.markerTick {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--color-warning);
+  pointer-events: none;
+}
+
+.sourceLine {
+  font-size: var(--font-caption-size);
+  color: var(--text-muted);
+}

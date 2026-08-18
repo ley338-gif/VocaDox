@@ -1,0 +1,77 @@
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+}
+
+.consentBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  border-radius: 8px;
+}
+
+.consentDisclaimer {
+  font-size: var(--font-caption-size);
+  color: var(--text-muted);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.elapsed {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--font-h3-size);
+  color: var(--text-primary);
+}
+
+.levelMeterTrack {
+  flex: 1;
+  height: 12px;
+  background: var(--surface-sunken);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.levelMeterFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 80ms linear;
+}
+
+.controls {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.markerList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.markerItem {
+  font-size: var(--font-body-sm-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.errorBanner {
+  padding: var(--space-3);
+  background: var(--color-danger);
+  color: var(--text-on-primary);
+  border-radius: 8px;
+  font-size: var(--font-body-sm-size);
+}

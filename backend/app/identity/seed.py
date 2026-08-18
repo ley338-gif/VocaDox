@@ -29,7 +29,16 @@ PERMISSIONS: dict[str, str] = {
     "audit:read": "Read audit log events.",
     "conversation:create": "Start/upload new conversations.",
     "conversation:read": "View conversations.",
+    "conversation:update": "Edit conversation metadata.",
     "conversation:delete": "Delete conversations.",
+    "conversation:record": "Record audio via the browser capture workflow.",
+    "conversation:upload": "Upload an existing audio file as conversation source media.",
+    "conversation:manage-participants": "Add/edit/remove conversation participants.",
+    "conversation:manage-notes": "Add/edit/remove conversation notes.",
+    "conversation:manage-markers": "Add/edit/remove conversation recording markers.",
+    "media:read": "View/play conversation media.",
+    "media:upload": "Upload media onto an existing conversation.",
+    "media:delete": "Delete conversation media.",
     "document:review": "Review generated documents.",
     "document:approve": "Approve/finalize generated documents.",
     "template:write": "Create/edit documentation templates.",
@@ -54,6 +63,13 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "organization:manage",
             "audit:read",
             "conversation:read",
+            "conversation:update",
+            "conversation:delete",
+            "conversation:manage-participants",
+            "conversation:manage-notes",
+            "conversation:manage-markers",
+            "media:read",
+            "media:delete",
             "document:review",
             "document:approve",
             "analytics:read",
@@ -67,12 +83,25 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
     "Reviewer": (
         "Reviews and approves generated documents.",
         True,
-        ["conversation:read", "document:review", "document:approve"],
+        ["conversation:read", "media:read", "document:review", "document:approve"],
     ),
     "User": (
         "Standard clinician/end-user access.",
         True,
-        ["conversation:create", "conversation:read"],
+        [
+            "conversation:create",
+            "conversation:read",
+            "conversation:update",
+            "conversation:record",
+            "conversation:upload",
+            "conversation:manage-participants",
+            "conversation:manage-notes",
+            "conversation:manage-markers",
+            "conversation:delete",
+            "media:read",
+            "media:upload",
+            "media:delete",
+        ],
     ),
     "Auditor": (
         "Read-only access to audit trails and analytics.",
@@ -82,7 +111,14 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
     "API Service Account": (
         "Non-interactive service-to-service API access.",
         True,
-        ["api:access", "conversation:create", "conversation:read"],
+        [
+            "api:access",
+            "conversation:create",
+            "conversation:read",
+            "conversation:upload",
+            "media:read",
+            "media:upload",
+        ],
     ),
 }
 
@@ -90,8 +126,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
 async def apply_seed(session: AsyncSession) -> None:
     """Idempotently ensure all baseline permissions and system roles exist."""
     existing_permissions = {
-        p.code: p
-        for p in (await session.execute(select(Permission))).scalars().all()
+        p.code: p for p in (await session.execute(select(Permission))).scalars().all()
     }
     for code, description in PERMISSIONS.items():
         if code not in existing_permissions:
@@ -119,3 +154,27 @@ async def apply_seed(session: AsyncSession) -> None:
                 session.add(RolePermission(role_id=role.id, permission_id=permission.id))
 
     await session.flush()
+
+
+async def _reseed_cli() -> int:  # pragma: no cover - trivial CLI wrapper
+    """`python -m app.identity.seed` — idempotently apply the current
+    PERMISSIONS/ROLES tables against the configured database, without
+    creating any user. This is the Phase-1 -> Phase-2 upgrade path for
+    picking up the new conversation:*/media:* permission codes on an
+    existing installation: `alembic upgrade head` (schema) followed by this
+    (RBAC seed data) — no manual SQL, no re-running bootstrap_admin."""
+    from app.platform.db import model_registry  # noqa: F401 - registers all domain models
+    from app.platform.db.session import get_sessionmaker
+
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as session:
+        await apply_seed(session)
+        await session.commit()
+    print("RBAC seed applied (permissions/roles created or already up to date).")
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    import asyncio
+
+    raise SystemExit(asyncio.run(_reseed_cli()))

@@ -28,7 +28,7 @@ def _patch_sessionmaker(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatc
             return None
 
     monkeypatch.setattr(
-        "app.identity.bootstrap_admin.get_sessionmaker", lambda: (lambda: _NoCloseWrapper())
+        "app.identity.bootstrap_admin.get_sessionmaker", lambda: lambda: _NoCloseWrapper()
     )
 
 

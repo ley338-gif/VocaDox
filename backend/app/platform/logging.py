@@ -18,9 +18,7 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
-_REQUEST_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "request_id", default=None
-)
+_REQUEST_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_id", default=None)
 
 # Field names that must never appear in log output, even if a caller
 # accidentally passes them via `extra=`.
@@ -67,10 +65,27 @@ class JsonFormatter(logging.Formatter):
 
         for key, value in record.__dict__.items():
             if key in (
-                "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-                "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-                "created", "msecs", "relativeCreated", "thread", "threadName",
-                "processName", "process", "taskName",
+                "name",
+                "msg",
+                "args",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "taskName",
             ):
                 continue
             if key.lower() in _SENSITIVE_KEYS:
@@ -93,9 +108,7 @@ def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
     if fmt == "json":
         handler.setFormatter(JsonFormatter())
     else:
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-        )
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
 
     root.handlers.clear()
     root.addHandler(handler)

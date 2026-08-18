@@ -152,6 +152,95 @@ Requirements to carry into Phase 1+ implementation:
   `audit_events` even though the zone's *content* is excluded from
   processing.
 
+## 7. Conversation/media handling (implemented in Phase 2)
+
+Section 1's Phase 0 skeleton predicted this correctly; here is what
+Phase 2 actually implemented, plus threats specific to conversation
+capture that weren't anticipated in the skeleton.
+
+- **MIME/format/size validation, streaming.** `app.media.service.
+  spool_upload` streams the request body to a controlled temp file
+  (`Settings.upload_temp_dir`), hashing and enforcing
+  `Settings.max_upload_size_bytes` as bytes arrive — never buffers the
+  full payload before checking the size cap. `app.media.validation.
+  sniff_audio_format` inspects magic bytes against a small allow-list
+  (WebM/Opus, WAV, MP3, M4A); the client-supplied `Content-Type` is never
+  trusted alone. Empty files and unrecognized formats are rejected with
+  `422`, verified in `tests/media/test_service.py` and
+  `tests/conversations/test_api.py::test_upload_empty_file_is_rejected` /
+  `::test_upload_non_audio_file_is_rejected`.
+- **No transcoding tool is invoked in Phase 2** (see
+  [ADR-0014](../architecture/adr/0014-media-normalization-and-metadata.md)),
+  so the ffmpeg-subprocess-injection risk flagged in section 1 has no
+  active code path yet — it remains a requirement for whichever future
+  phase actually adopts a transcoding tool.
+- **Path traversal / malicious filenames.** Confirmed still true under
+  Phase 2's namespaced storage keys (see
+  [ADR-0013](../architecture/adr/0013-media-storage-layout.md)):
+  `original_filename` is metadata only, sanitized on both display
+  (`sanitize_display_filename`) and `Content-Disposition`
+  (`content_disposition_filename`, tested against CRLF-injection and
+  quote-breaking payloads in `tests/media/test_validation.py` and
+  end-to-end in `tests/conversations/test_api.py::
+  test_malicious_filename_does_not_leak_into_storage_or_headers`).
+- **Cross-organization IDOR.** The hard security property for Phase 2:
+  every conversation/media/participant/marker/note endpoint resolves
+  access through `app.conversations.authz.authorize_conversation_access`
+  (Permission + Organization Membership + Conversation's Organization),
+  and returns `404` — never `403` — when the resource exists but belongs
+  to an organization the caller isn't a member of, so UUID-guessing can't
+  even distinguish "doesn't exist" from "exists, not yours." Verified by
+  `tests/conversations/test_api.py::
+  test_cross_organization_uuid_guessing_is_denied` and
+  `::test_media_access_denied_across_organizations`.
+- **Unauthorized/anonymous media access.** The storage directory is never
+  exposed as a static file server; every byte returned by `GET .../media/
+  {id}/content` passes through `authorize_conversation_access` first.
+  There is no unauthenticated path to any media content.
+- **Storage exhaustion / resource bombs.** `max_upload_size_bytes` bounds
+  any single object; there is currently no per-organization or
+  per-user aggregate storage quota — flagged as a residual risk in
+  `PHASE_2_VALIDATION_REPORT.md` (Known Limitations), acceptable for a
+  single-tenant on-prem deployment where the operator controls who has
+  upload permission at all, but a real gap if that assumption ever
+  changes.
+- **Abandoned/incomplete uploads and temp-file leakage.** `spool_upload`
+  writes to `Settings.upload_temp_dir` with an unpredictable
+  `tempfile.mkstemp`-derived name (never the client's filename) and
+  `0o600` permissions where the platform supports it; the temp file is
+  deleted on any validation failure (empty file, oversize, unrecognized
+  format) and on ingestion failure after the DB row is flushed but before
+  the atomic move into permanent storage. What is **not** yet
+  implemented: a scheduled sweep of `upload_temp_dir` for orphans left by
+  a hard process crash mid-upload (the OS-level temp dir is not
+  auto-cleared) — see `docs/operations/media-cleanup.md` for the interim
+  manual/cron-based mitigation.
+- **Source tampering / hash mismatch.** SHA-256 is computed once, during
+  ingestion, from the exact bytes that get moved into permanent storage
+  (`app.media.service.ingest_media`) — there is no code path that
+  recomputes or overwrites `media_assets.sha256` afterward. The Phase 2
+  validation report records a live before/after/restart hash comparison
+  (see "Source Integrity Validation" there) as the operational proof this
+  holds in practice, not just in code review.
+- **Deletion failures.** `soft_delete_conversation` calls
+  `StorageProvider.delete` for each `MediaAsset` inside the same request/
+  transaction as the DB soft-delete; if the filesystem delete throws, the
+  whole request fails (the DB transaction is not committed), so a
+  conversation can't end up "marked deleted" while its media survives on
+  disk due to a partial failure. A storage-layer delete that silently
+  no-ops on a missing file (already-gone) does not raise, matching
+  idempotent-delete semantics.
+- **Recording without consent / browser mic misuse.** The frontend never
+  calls `getUserMedia` until the user explicitly clicks past the consent
+  notice AND clicks "Start recording" a second time via
+  `useRecorder.requestPermission()` — there is no auto-start anywhere
+  (`frontend/src/recording/recordingMachine.test.ts`, "never auto-starts
+  recording"). The consent notice
+  text itself is explicit that confirming it does **not** make the
+  recording legally compliant — that responsibility stays with the
+  deploying organization, documented in
+  `docs/security/recording-privacy.md`.
+
 ## Out of scope for this document
 
 Full STRIDE-style analysis per domain, and anything specific to

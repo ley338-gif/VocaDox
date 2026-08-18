@@ -121,6 +121,38 @@ async def test_login_then_me_returns_permissions(api_client: AsyncClient) -> Non
     assert "system:admin" not in body["permissions"]
 
 
+async def test_csrf_requires_authentication(api_client: AsyncClient) -> None:
+    response = await api_client.get("/api/v1/auth/csrf")
+    assert response.status_code == 401
+
+
+async def test_csrf_returns_same_token_as_login(api_client: AsyncClient) -> None:
+    login_response = await api_client.post(
+        "/api/v1/auth/login",
+        json={"username": "alice", "password": "a very strong password 123"},
+    )
+    login_token = login_response.json()["csrf_token"]
+
+    csrf_response = await api_client.get("/api/v1/auth/csrf")
+    assert csrf_response.status_code == 200
+    assert csrf_response.json()["csrf_token"] == login_token
+
+
+async def test_csrf_token_from_recovery_endpoint_works_for_mutations(
+    api_client: AsyncClient,
+) -> None:
+    await api_client.post(
+        "/api/v1/auth/login",
+        json={"username": "alice", "password": "a very strong password 123"},
+    )
+    recovered_token = (await api_client.get("/api/v1/auth/csrf")).json()["csrf_token"]
+
+    logout_response = await api_client.post(
+        "/api/v1/auth/logout", headers={"X-CSRF-Token": recovered_token}
+    )
+    assert logout_response.status_code == 204
+
+
 async def test_logout_without_csrf_header_is_rejected(api_client: AsyncClient) -> None:
     await api_client.post(
         "/api/v1/auth/login",

@@ -110,6 +110,5 @@ def test_no_class_named_redis_service_anywhere() -> None:
             if isinstance(node, ast.ClassDef) and "redis" in node.name.lower():
                 offenders.append(f"{path}:{node.lineno} class {node.name}")
     assert not offenders, (
-        "No class may be named to imply a hard Redis dependency (ADR-0002). "
-        f"Offenders: {offenders}"
+        f"No class may be named to imply a hard Redis dependency (ADR-0002). Offenders: {offenders}"
     )

@@ -24,6 +24,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {user ? (
             <>
               <Link to="/app">App</Link>
+              <Link to="/app/conversations">Conversations</Link>
               {hasPermission("system:admin") && <Link to="/admin">Admin</Link>}
             </>
           ) : (
