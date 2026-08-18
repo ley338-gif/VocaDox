@@ -5,6 +5,21 @@ or `--role diarization`. This is what `deploy/docker-compose.yml`'s
 
 from __future__ import annotations
 
+# isort: off
+# Phase 3.1: force `huggingface_hub` (and therefore `pyannote.audio`, which
+# uses it internally to resolve every model a pipeline's config.yaml
+# names) into offline-only mode for the ENTIRE worker process lifetime.
+# Must be the FIRST import in this file, before every import below,
+# including stdlib ones that could transitively pull it in — see
+# app/workers/_offline_env.py's docstring for why setting the env var
+# later (e.g. right before calling `Pipeline.from_pretrained`) has no
+# effect once huggingface_hub has already been imported anywhere in the
+# process, and the real network call this silently caused before this
+# fix. The `isort: off`/`on` pair keeps tooling from "helpfully"
+# re-sorting this import back below the stdlib ones.
+from app.workers import _offline_env  # noqa: F401 - side effect must run first
+# isort: on
+
 import argparse
 import asyncio
 import logging

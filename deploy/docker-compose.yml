@@ -52,6 +52,38 @@ services:
       timeout: 5s
       retries: 10
 
+  # Phase 3.1: deterministic migration lifecycle (Postgres -> migrations ->
+  # application -> bootstrap admin). A real fresh/local install previously
+  # let `backend`/the workers start against a database with NO Alembic
+  # revision at all — `python -m app.identity.bootstrap_admin` then failed
+  # with `asyncpg.exceptions.UndefinedTableError: relation "permissions"
+  # does not exist` because nothing had ever run `alembic upgrade head`.
+  # This one-shot service runs the migration exactly once per `docker
+  # compose up`, before anything that touches the schema starts, instead
+  # of every API replica racing to run its own migration on boot (which
+  # would risk concurrent-DDL failures under >1 backend replica) or
+  # relying on an administrator to remember a manual `docker compose exec
+  # backend alembic upgrade head` step (the exact gap that caused the
+  # bug). `restart: "no"` + no `command` re-run on `docker compose up`
+  # after the first successful run — Compose still executes this service's
+  # container on every `up`, but `alembic upgrade head` is itself
+  # idempotent (a no-op against an already-current database), so this is
+  # safe and cheap to run every time, not just on first install.
+  migrate:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
+      VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
+      VOCADOX_LOG_FORMAT: ${VOCADOX_LOG_FORMAT:-json}
+      VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     build:
       context: ../backend
@@ -81,6 +113,8 @@ services:
       # restart-persistence validation).
       - vocadox_backend_data:/app/data
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       valkey:
@@ -110,6 +144,8 @@ services:
       - vocadox_backend_data:/app/data
       - vocadox_models_data:/app/data/models
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       valkey:
@@ -143,6 +179,8 @@ services:
       - vocadox_backend_data:/app/data
       - vocadox_models_data:/app/data/models
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       valkey:
@@ -154,6 +192,41 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+
+  # Phase 3.1: the administrator-facing model-installation command. Not
+  # started by a plain `docker compose up` (the `tools` profile keeps it
+  # out of the default service set — nothing "up" needs it running) —
+  # invoked directly instead:
+  #
+  #   docker compose run --rm model-manager list
+  #   docker compose run --rm model-manager install speech-default
+  #   docker compose run --rm -e VOCADOX_HUGGINGFACE_TOKEN=<token> \
+  #       model-manager install diarization-default
+  #
+  # See docs/admin/model-installation.md. Fixes the Phase 3 bug where the
+  # documented command against `worker-diarization` failed with "the
+  # following arguments are required: --role" — see
+  # backend/app/cli/model_manager.py's docstring for the exact root cause
+  # (worker.Dockerfile's ENTRYPOINT swallowing the intended command).
+  # Shares the same image and model volume as the workers (so a model
+  # installed here is immediately visible to worker-speech/
+  # worker-diarization without a rebuild) but needs neither Postgres nor
+  # Valkey — this is a pure filesystem/network operation.
+  model-manager:
+    profiles: ["tools"]
+    build:
+      context: ../backend
+      dockerfile: worker.Dockerfile
+    entrypoint: ["python", "-m", "app.cli.model_manager"]
+    command: ["list"]
+    environment:
+      VOCADOX_MODEL_VOLUME_ROOT: /app/data/models
+      # Only ever read for the duration of this one-shot `run` — never
+      # baked into the image, never persisted, never logged (see
+      # backend/app/cli/install_models.py and docs/security/model-supply-chain.md).
+      VOCADOX_HUGGINGFACE_TOKEN: ${VOCADOX_HUGGINGFACE_TOKEN:-}
+    volumes:
+      - vocadox_models_data:/app/data/models
 
   frontend:
     build:

@@ -30,6 +30,34 @@ PROFILES: dict[str, ModelProfile] = {}
 
 
 @dataclass(frozen=True)
+class DependentRepo:
+    """A model repo the profile's PRIMARY pipeline references by name and
+    resolves internally at pipeline-construction time (e.g. pyannote's
+    `config.yaml` names `segmentation: pyannote/segmentation-3.0` — a
+    second, separate Hugging Face repo, not bundled inside
+    speaker-diarization-3.1's own snapshot).
+
+    Found by real testing, not by reading pyannote's docs: installing only
+    `pyannote/speaker-diarization-3.1` and then running real diarization
+    inference against it failed with a live `HEAD
+    https://huggingface.co/pyannote/segmentation-3.0/... 401 Unauthorized`
+    network call from inside the worker container — i.e. the "one model,
+    one download" assumption baked into Phase 3's `install_models.py` was
+    simply wrong. `pyannote/speaker-diarization-3.1` actually needs THREE
+    Hugging Face repos to run fully offline: itself, its segmentation
+    sub-model, and its speaker-embedding sub-model. All three are
+    downloaded together by installing the `diarization-default` profile,
+    into a shared, offline-forced Hugging Face cache directory (not each
+    profile's own `local_dir`) — see PyannoteConfig.cache_dir and
+    PyannoteDiarizationProvider._ensure_loaded's `HF_HUB_OFFLINE=1`.
+    """
+
+    repo_id: str
+    revision: str
+    license_note: str
+
+
+@dataclass(frozen=True)
 class ModelProfile:
     name: str
     repo_id: str
@@ -37,6 +65,7 @@ class ModelProfile:
     marker_file: str
     requires_token: bool
     license_note: str
+    dependent_repos: tuple[DependentRepo, ...] = ()
 
 
 def _register(profile: ModelProfile) -> None:
@@ -65,8 +94,46 @@ _register(
             "gated download, requires accepting the model's terms on Hugging Face and a "
             "user access token (never bundled/redistributed by VocaDox itself)."
         ),
+        dependent_repos=(
+            # config.yaml's `segmentation:` component. Also gated (MIT) —
+            # requires accepting its own separate terms at
+            # https://hf.co/pyannote/segmentation-3.0, even for a token that
+            # already has speaker-diarization-3.1 access.
+            DependentRepo(
+                repo_id="pyannote/segmentation-3.0",
+                revision="e66f3d3b9eb0873085418a7b813d3b369bf160bb",
+                license_note=(
+                    "MIT (verified: https://huggingface.co/pyannote/segmentation-3.0) — "
+                    "gated, requires its own separate terms acceptance."
+                ),
+            ),
+            # config.yaml's `embedding:` component. NOT gated.
+            DependentRepo(
+                repo_id="pyannote/wespeaker-voxceleb-resnet34-LM",
+                revision="837717ddb9ff5507820346191109dc79c958d614",
+                license_note=(
+                    "CC-BY-4.0 (verified: "
+                    "https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM) — "
+                    "trained on VoxCeleb, which the model card states carries the "
+                    "dataset's own CC-BY-4.0 license; not gated."
+                ),
+            ),
+        ),
     )
 )
+
+
+def hf_cache_dir(model_volume_root: Path) -> Path:
+    """Shared Hugging Face cache for every profile's dependent repos —
+    deliberately separate from each profile's own `local_dir` snapshot
+    (which uses the flat, non-cache `local_dir=` layout `snapshot_download`
+    produces) since dependent repos are resolved by pyannote.audio's own
+    internal `Model.from_pretrained` calls, which expect the normal
+    huggingface_hub cache layout, not a flat directory. Lives under the
+    same persistent model volume so it survives container recreation
+    exactly like every other installed model (`docker compose down -v`
+    removes it, same as everything else here)."""
+    return model_volume_root / "hf-cache"
 
 
 def _is_installed(target_dir: Path, marker_file: str) -> bool:
@@ -75,10 +142,7 @@ def _is_installed(target_dir: Path, marker_file: str) -> bool:
 
 def install(profile: ModelProfile, *, model_volume_root: Path, token: str | None) -> int:
     target_dir = model_volume_root / profile.name
-
-    if _is_installed(target_dir, profile.marker_file):
-        print(f"[{profile.name}] already installed at {target_dir} — skipping re-download.")
-        return 0
+    already_installed = _is_installed(target_dir, profile.marker_file)
 
     if profile.requires_token and not token:
         print(
@@ -100,25 +164,49 @@ def install(profile: ModelProfile, *, model_volume_root: Path, token: str | None
         )
         return 1
 
-    print(f"[{profile.name}] downloading {profile.repo_id}@{profile.revision} -> {target_dir}")
-    print(f"[{profile.name}] license: {profile.license_note}")
-    target_dir.mkdir(parents=True, exist_ok=True)
-    snapshot_download(
-        repo_id=profile.repo_id,
-        revision=profile.revision,
-        local_dir=str(target_dir),
-        token=token,
-    )
-
-    if not _is_installed(target_dir, profile.marker_file):
-        print(
-            f"[{profile.name}] ERROR: download completed but expected marker file "
-            f"{profile.marker_file} is missing — install did not land correctly.",
-            file=sys.stderr,
+    if already_installed:
+        print(f"[{profile.name}] already installed at {target_dir} — skipping re-download.")
+    else:
+        print(f"[{profile.name}] downloading {profile.repo_id}@{profile.revision} -> {target_dir}")
+        print(f"[{profile.name}] license: {profile.license_note}")
+        target_dir.mkdir(parents=True, exist_ok=True)
+        snapshot_download(
+            repo_id=profile.repo_id,
+            revision=profile.revision,
+            local_dir=str(target_dir),
+            token=token,
         )
-        return 1
+        if not _is_installed(target_dir, profile.marker_file):
+            print(
+                f"[{profile.name}] ERROR: download completed but expected marker file "
+                f"{profile.marker_file} is missing — install did not land correctly.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"[{profile.name}] installed successfully at {target_dir}")
 
-    print(f"[{profile.name}] installed successfully at {target_dir}")
+    # Dependent repos: the primary pipeline resolves these BY NAME at
+    # pipeline-construction time (see DependentRepo's docstring) — they
+    # must land in the shared HF cache (not target_dir) so
+    # PyannoteDiarizationProvider's HF_HUB_OFFLINE=1 load finds them
+    # without ever reaching the network.
+    if profile.dependent_repos:
+        cache_dir = hf_cache_dir(model_volume_root)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        for dep in profile.dependent_repos:
+            print(f"[{profile.name}] fetching dependent repo {dep.repo_id}@{dep.revision}")
+            print(f"[{profile.name}]   license: {dep.license_note}")
+            snapshot_download(
+                repo_id=dep.repo_id,
+                revision=dep.revision,
+                cache_dir=str(cache_dir),
+                token=token,
+            )
+        print(
+            f"[{profile.name}] {len(profile.dependent_repos)} dependent repo(s) cached at "
+            f"{cache_dir}"
+        )
+
     return 0
 
 

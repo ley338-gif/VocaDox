@@ -49,9 +49,15 @@ def get_speech_provider() -> SpeechToTextProvider:
 def get_diarization_provider() -> DiarizationProvider:
     settings = get_settings()
     if settings.diarization_provider == "pyannote":
+        from app.cli.install_models import hf_cache_dir
+
         model_dir = str(Path(settings.model_volume_root) / settings.diarization_model_dir_name)
         return PyannoteDiarizationProvider(
-            PyannoteConfig(model_dir=model_dir, device=settings.diarization_device)
+            PyannoteConfig(
+                model_dir=model_dir,
+                device=settings.diarization_device,
+                hf_cache_dir=str(hf_cache_dir(Path(settings.model_volume_root))),
+            )
         )
     return FakeDiarizationProvider()
 

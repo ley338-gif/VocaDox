@@ -105,6 +105,12 @@ class PyannoteConfig:
     model_name: str = "pyannote/speaker-diarization-3.1"
     model_revision: str = "84fd25912480287da0247647c3d2b4853cb3ee5"
     device: str = "auto"
+    # Shared Hugging Face cache holding the pipeline's dependent sub-models
+    # (segmentation, speaker embedding — see app.cli.install_models'
+    # DependentRepo docstring for why these are separate downloads).
+    # `None` disables offline-forced loading entirely (only used by tests
+    # that never construct a real pipeline).
+    hf_cache_dir: str | None = None
 
 
 class PyannoteDiarizationProvider(DiarizationProvider):
@@ -136,7 +142,7 @@ class PyannoteDiarizationProvider(DiarizationProvider):
         if not self._is_installed():
             raise DiarizationModelUnavailableError(
                 f"diarization model not installed at {self._config.model_dir} — run "
-                "`vocadox models install diarization-default` "
+                "`docker compose run --rm model-manager install diarization-default` "
                 "(see docs/admin/model-installation.md)"
             )
         try:
@@ -147,16 +153,43 @@ class PyannoteDiarizationProvider(DiarizationProvider):
                 "pyannote.audio is not installed in this environment"
             ) from exc
 
+        # The pipeline's config.yaml names two further Hugging Face repos by
+        # id (segmentation, speaker embedding — see
+        # app.cli.install_models.DependentRepo) that pyannote.audio resolves
+        # internally via huggingface_hub, not from `model_dir` itself.
+        # `hf_cache_dir` points it at the shared local cache those repos
+        # were installed into; whether it's actually forced offline (so a
+        # missing dependent repo fails clearly instead of silently reaching
+        # the network) is decided once, process-wide, by
+        # `app.workers._offline_env` at worker startup — NOT here.
+        # `HF_HUB_OFFLINE` cannot be toggled per-call: huggingface_hub reads
+        # it from `os.environ` exactly once, at that module's own first
+        # import, and caches it as a plain bool forever after — a real
+        # fresh-install test found this the hard way when an earlier
+        # version of this fix set the env var right here, immediately
+        # before this call, and it silently did nothing (huggingface_hub
+        # was already imported by this point in the process).
         try:
-            pipeline = Pipeline.from_pretrained(self._config.model_dir)
-            device = self._resolved_device()
-            if device == "cuda":
-                pipeline.to(torch.device("cuda"))
-            self._pipeline = pipeline
+            pipeline = Pipeline.from_pretrained(
+                self._config.model_dir, cache_dir=self._config.hf_cache_dir
+            )
         except Exception as exc:  # noqa: BLE001
             raise DiarizationModelUnavailableError(
                 f"failed to load diarization model: {exc}"
             ) from exc
+
+        if pipeline is None:
+            raise DiarizationModelUnavailableError(
+                "failed to load diarization model: Pipeline.from_pretrained returned None "
+                "(a dependent sub-model is likely missing from the local Hugging Face cache — "
+                "re-run `docker compose run --rm model-manager install diarization-default`)"
+            )
+        device = self._resolved_device()
+        if device == "cuda":
+            import torch
+
+            pipeline.to(torch.device("cuda"))
+        self._pipeline = pipeline
         return self._pipeline
 
     async def diarize(
