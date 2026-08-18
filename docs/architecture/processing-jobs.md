@@ -66,6 +66,26 @@ terminally if `max_attempts` is exhausted) — a crashed worker never
 leaves a job stuck `RUNNING` forever. Tested in
 `tests/processing/test_pipeline_api.py::test_worker_lease_expiry_reclaims_stale_running_job`.
 
+## Known limitation: dual-write between Valkey and Postgres
+
+`create_and_enqueue_job` does `session.add(job)` + `flush()` then
+`queue.enqueue(...)` — these are not one atomic operation. Found by real
+fresh-install testing (not hypothesized): if the *caller* of
+`create_and_enqueue_job` (e.g. `trigger_post_normalize`, which creates
+TRANSCRIBE and DIARIZE in the same success-handler call) raises **after**
+the enqueue but **before** the surrounding session commits, the DB row is
+rolled back while the Valkey message was already sent — an orphaned
+message referencing a job_id that no longer exists. A worker dequeuing it
+finds `load_job(...) is None` and discards it — logged as a warning
+(`"discarded a dequeued job_id with no matching QUEUED row"`) rather than
+silently swallowed, so an admin can tell this happened, but the
+downstream stage genuinely does not get (re-)triggered automatically.
+Recovery today is manual (an admin/operator re-enqueueing the affected
+stage, or the user re-triggering "reprocess"). A fully transactional
+outbox pattern (only enqueue after commit, via a durable local record) is
+the correct long-term fix and is not implemented in Phase 3 — documented
+here as a real, encountered limitation rather than swept under the rug.
+
 ## Cancellation
 
 Only `QUEUED` jobs can be cleanly cancelled

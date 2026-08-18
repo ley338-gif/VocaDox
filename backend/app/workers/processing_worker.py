@@ -123,7 +123,27 @@ class ProcessingWorker:
         async with self._sessionmaker() as session:
             job = await load_job(session, job_id)
             if job is None or job.status != ProcessingStatus.QUEUED.value:
-                return  # already claimed/cancelled/stale payload
+                # Not necessarily a bug on its own (a job can legitimately
+                # already be CANCELLED, or reclaimed by another worker) —
+                # but also the observable symptom of a real dual-write
+                # inconsistency found by fresh-install testing: if a
+                # previous success-handler chain (e.g. NORMALIZE ->
+                # trigger_post_normalize) pushed this job_id onto the
+                # queue and then crashed *before* committing the row, the
+                # DB row never exists (job is None) even though the Valkey
+                # message did get sent. Logged rather than silently
+                # discarded so an admin can tell "a queued message
+                # referenced no job" apart from ordinary quiet operation —
+                # see docs/operations/processing-troubleshooting.md.
+                logger.warning(
+                    "discarded a dequeued job_id with no matching QUEUED row",
+                    extra={
+                        "job_id": str(job_id),
+                        "found": job is not None,
+                        "status": job.status if job is not None else None,
+                    },
+                )
+                return
 
             await start_job(
                 session,
@@ -178,11 +198,27 @@ class ProcessingWorker:
                     await fail_session.commit()
                 return
 
-        async with self._sessionmaker() as session:
-            job = await load_job(session, job_id)
-            assert job is not None
-            await self._on_success(session, job, run_id)
-            await session.commit()
+        try:
+            async with self._sessionmaker() as session:
+                job = await load_job(session, job_id)
+                assert job is not None
+                await self._on_success(session, job, run_id)
+                await session.commit()
+        except Exception:  # noqa: BLE001 - the job itself already succeeded and
+            # committed above; a failure only in the *next*-stage chaining
+            # (e.g. enqueueing TRANSCRIBE after NORMALIZE) must never crash
+            # the worker process or be confused with the job's own failure.
+            # Found by real testing: a mapper-configuration error triggered
+            # here by a since-fixed startup bug took the whole worker down
+            # even though the job it was chaining from had already
+            # succeeded. The next reclaim/dequeue cycle continues normally;
+            # the downstream stage simply won't have been enqueued yet,
+            # which is surfaced to users as "stuck" processing rather than
+            # a silent success — a real limitation, not swept under the rug.
+            logger.exception(
+                "post-success stage chaining failed",
+                extra={"job_id": str(job_id)},
+            )
 
     async def _dispatch(self, session: AsyncSession, job: ProcessingJob) -> uuid.UUID:
         job_type = JobType(job.job_type)
