@@ -115,6 +115,20 @@ dependencies:
     approval_status: approved
     notes: "info.license_expression = Apache-2.0, classifier 'License :: OSI Approved :: Apache Software License' (PyPI JSON, version 0.0.32)."
 
+  - name: argon2-cffi
+    ecosystem: pypi
+    version_constraint: ">=23.1,<24.0 (installed: 23.1.0)"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/argon2-cffi/json
+    approval_status: approved
+    notes: >
+      info.license_expression = MIT (PyPI JSON, version 23.1.0). Added in
+      Phase 1 for Argon2id password hashing (OWASP-recommended default),
+      actively maintained (https://github.com/hynek/argon2-cffi). Its
+      runtime transitive dependencies (argon2-cffi-bindings: MIT; cffi:
+      MIT-0; pycparser: BSD-3-Clause) are all already-approved licenses —
+      see dependency-inventory-transitive.yml.
+
   - name: ruff
     ecosystem: pypi
     version_constraint: ">=0.16,<0.17"
@@ -306,6 +320,18 @@ dependencies:
       remediation (2026-08-17) explicitly pinned its version as part of
       the vite CVE fix (see the vite entry's notes above for why 5.2.0
       rather than the newer 6.x line, which requires vite ^8).
+
+  - name: "@types/node"
+    ecosystem: npm
+    version_constraint: "^26.2.0"
+    license: MIT
+    license_source_url: https://registry.npmjs.org/@types/node/latest
+    approval_status: approved
+    notes: >
+      license = MIT (npm registry, DefinitelyTyped). Added in Phase 1 so
+      vite.config.ts's dev-server proxy config (process.env,
+      process.cwd()) type-checks; type-declarations-only package, no
+      runtime code, dev-only dependency.
 
   - name: typescript
     ecosystem: npm
