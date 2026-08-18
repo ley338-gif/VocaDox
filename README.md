@@ -2,18 +2,26 @@
 
 **On-premise, evidence-based conversation documentation.**
 
-> **Status: Phase 2 — Conversation Capture & Media Foundation.** Local
+> **Status: Phase 3.1 — Hardening & Real-World Validation.** Local
 > authentication, permission-based RBAC, Valkey-backed sessions, CSRF
-> protection, organizations, and audit logging (Phase 1) plus
-> conversations, browser/upload audio capture, immutable SHA-256-verified
-> source media, participants/markers/notes, and organization-scoped
-> authorization (Phase 2) are implemented. Speech-to-text, diarization,
-> summarization, and Evidence/document generation are still not
-> implemented — deliberately: Phase 2 is an AI-free source-media layer.
-> See [`PHASE_0_VALIDATION_REPORT.md`](PHASE_0_VALIDATION_REPORT.md),
-> [`PHASE_1_VALIDATION_REPORT.md`](PHASE_1_VALIDATION_REPORT.md), and
-> [`PHASE_2_VALIDATION_REPORT.md`](PHASE_2_VALIDATION_REPORT.md) for the
-> full validation reports and GO/NO-GO recommendations.
+> protection, organizations, and audit logging (Phase 1); conversations,
+> browser/upload audio capture, immutable SHA-256-verified source media,
+> participants/markers/notes, and organization-scoped authorization
+> (Phase 2); real local speech-to-text (faster-whisper) and speaker
+> diarization (pyannote.audio), deterministic transcript alignment, and a
+> reviewable transcript UI (Phase 3); and a hardened, reproducible
+> fresh-install lifecycle, a real administrator-facing model-management
+> command, a Transactional Outbox for job queueing, and real (not just
+> code-reviewed) diarization/offline-runtime validation (Phase 3.1) are
+> all implemented. Summarization and Evidence/document generation
+> (Phase 4+) are still not implemented — deliberately: this remains a
+> transcript-source layer, no LLM/intelligence features anywhere in this
+> codebase. See [`PHASE_0_VALIDATION_REPORT.md`](PHASE_0_VALIDATION_REPORT.md),
+> [`PHASE_1_VALIDATION_REPORT.md`](PHASE_1_VALIDATION_REPORT.md),
+> [`PHASE_2_VALIDATION_REPORT.md`](PHASE_2_VALIDATION_REPORT.md),
+> [`PHASE_3_VALIDATION_REPORT.md`](PHASE_3_VALIDATION_REPORT.md), and
+> [`PHASE_3_1_VALIDATION_REPORT.md`](PHASE_3_1_VALIDATION_REPORT.md) for
+> the full validation reports and GO/NO-GO recommendations.
 
 ## What VocaDox is
 
@@ -67,14 +75,35 @@ docker compose up -d
 ```
 
 This runs from the repo root (a root `docker-compose.yml` wraps
-`deploy/docker-compose.yml` — see that file's header comment) and starts
-Postgres, Valkey, the backend (FastAPI on `:8000`), and the frontend dev
-server (Vite on `:5173`). Verify:
+`deploy/docker-compose.yml` — see that file's header comment) and starts,
+in dependency order: Postgres and Valkey, a one-shot `migrate` service
+(`alembic upgrade head` — deterministic, runs before anything else that
+touches the schema; see
+[ADR-0018](docs/architecture/adr/0018-model-installation-strategy.md) and
+`docs/admin/fresh-install.md`), the backend (FastAPI on `:8000`),
+`worker-speech`/`worker-diarization` (real AI processing, `fake`
+providers by default until you install real models — see below), and the
+frontend dev server (Vite on `:5173`). Verify:
 
 ```sh
 curl http://localhost:8000/health/live
 curl http://localhost:8000/health/ready
 ```
+
+Then create the first administrator (see "Bootstrapping the first admin
+user" below) and, if you want real speech/diarization instead of the
+deterministic fake providers, install the AI models (see "Installing AI
+models" below) — full walkthrough:
+[`docs/admin/fresh-install.md`](docs/admin/fresh-install.md).
+
+**Persistent volumes**: conversation media (`vocadox_backend_data`),
+installed AI models (`vocadox_models_data`), Postgres data
+(`vocadox_postgres_data`), and Valkey data (`vocadox_valkey_data`) all
+live in named Docker volumes. `docker compose down` (without `-v`)
+preserves all of them across a restart. **`docker compose down -v`
+deletes all of them**, including every locally installed model — this is
+real, destructive, and not undoable short of re-installing everything
+from scratch.
 
 To build and run the **production** frontend image (static assets served
 via nginx, not the Vite dev server):
@@ -106,6 +135,11 @@ Checks: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`.
 
 ### Database migrations
 
+Under Docker Compose, migrations run automatically via the one-shot
+`migrate` service — you do not need to run `alembic upgrade head`
+yourself for a `docker compose up`. Running the backend directly instead
+(without Compose):
+
 ```sh
 cd backend
 alembic upgrade head
@@ -113,23 +147,50 @@ alembic upgrade head
 
 Phase 0 shipped only a no-op baseline migration (see
 [ADR-0004](docs/architecture/adr/0004-evidence-first-data-model.md)); Phase 1
-adds the first real domain tables — identity, RBAC, organizations, audit
-(`0002_identity_rbac.py`, downgrade supported). Phase 2 adds conversations,
-media assets, participants, markers, notes, retention policies, and
-recording-upload sessions (`0003_conversation_capture.py`, downgrade
-supported). Upgrading an existing Phase 1 database: `alembic upgrade head`
-then `python -m app.identity.seed` to pick up the new `conversation:*`/
-`media:*` RBAC permissions on existing roles (idempotent — safe to run
-anytime).
+adds identity/RBAC/organizations/audit (`0002_identity_rbac.py`); Phase 2
+adds conversations/media/participants/markers/notes/retention
+(`0003_conversation_capture.py`); Phase 3 adds processing
+jobs/runs/transcripts/diarization (`0004_speech_diarization.py`); Phase
+3.1 adds the Transactional Outbox table (`0005_processing_outbox.py`) —
+see [ADR-0018](docs/architecture/adr/0018-model-installation-strategy.md)
+and `docs/architecture/processing-jobs.md`. All downgrades supported.
+Upgrading an existing Phase 1 database: `alembic upgrade head` then
+`python -m app.identity.seed` to pick up new RBAC permissions on existing
+roles (idempotent — safe to run anytime).
 
 ### Bootstrapping the first admin user
 
 ```sh
-cd backend
-python -m app.identity.bootstrap_admin --username admin --display-name "Administrator"
+docker compose exec backend python -m app.identity.bootstrap_admin \
+  --username admin --display-name "Administrator"
 ```
 
-See [`docs/admin/README.md`](docs/admin/README.md) for details.
+(Or, running the backend directly: `python -m app.identity.bootstrap_admin ...`
+from `backend/` with `alembic upgrade head` already applied.) See
+[`docs/admin/README.md`](docs/admin/README.md) and
+[`docs/admin/fresh-install.md`](docs/admin/fresh-install.md) for details.
+
+### Installing AI models (speech-to-text / diarization)
+
+`worker-speech`/`worker-diarization` run with deterministic `fake`
+providers by default — no model download happens just from
+`docker compose up`. To use real local speech-to-text and speaker
+diarization instead:
+
+```sh
+docker compose run --rm model-manager install speech-default
+docker compose run --rm -e VOCADOX_HUGGINGFACE_TOKEN=<your-hf-token> \
+  model-manager install diarization-default
+```
+
+then set `VOCADOX_SPEECH_PROVIDER=faster_whisper` /
+`VOCADOX_DIARIZATION_PROVIDER=pyannote` and restart the two worker
+services. Full walkthrough, including what the diarization model
+actually needs (three separate Hugging Face repos, not one) and how to
+verify no network access happens at runtime once installed:
+[`docs/admin/model-installation.md`](docs/admin/model-installation.md),
+[`docs/admin/diarization-provider.md`](docs/admin/diarization-provider.md),
+[`docs/operations/offline-model-installation.md`](docs/operations/offline-model-installation.md).
 
 ### License / compliance check
 
