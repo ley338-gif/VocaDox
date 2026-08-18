@@ -44,6 +44,16 @@ class Settings(BaseSettings):
         description="Filesystem root for LocalFilesystemStorage (Phase 0 provider).",
     )
 
+    # -- Identity / sessions (Phase 1) --------------------------------------
+    session_ttl_seconds: int = Field(
+        default=43200,  # 12 hours
+        description="Absolute session lifetime, enforced server-side via Valkey TTL.",
+    )
+    session_cookie_secure: bool = Field(
+        default=True,
+        description="Set the `Secure` cookie flag. Disable only for plain-HTTP local dev.",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

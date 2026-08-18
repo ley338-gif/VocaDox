@@ -14,6 +14,9 @@ dependencies = [
     "asyncpg>=0.29,<1.0",
     "valkey>=6.0,<7.0",
     "python-multipart>=0.0.9",
+    # Argon2id password hashing (OWASP-recommended default). MIT license —
+    # see compliance/dependency-inventory.yml.
+    "argon2-cffi>=23.1,<24.0",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +63,12 @@ src = ["app", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
 ignore = []
+
+# FastAPI's `Depends(...)`-as-default-value is the framework's documented
+# dependency-injection idiom (Phase 1 introduces the first routers/deps
+# that use it) — not the mutable-default-argument bug B008 exists to catch.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.Body"]
 
 [tool.mypy]
 python_version = "3.11"
