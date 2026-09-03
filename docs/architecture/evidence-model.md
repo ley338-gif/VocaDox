@@ -69,6 +69,8 @@ identical to every other Phase 2/3 resource. Heavily tested — see
 
 ## What's NOT built here
 
-Document generation from facts, the Phase 5 Evidence UX (two-column
-layout, "Warum steht das hier?" panel), correction/approval of facts —
-all deferred, see `docs/architecture/future-considerations.md`.
+Document generation from facts, the Evidence UX (two-column layout,
+"Warum steht das hier?" panel), correction/approval of facts — all built
+in Phase 5, see `docs/architecture/documents.md`. `EVIDENCE_USER_CONTEXT`/
+`EVIDENCE_EXTERNAL_SYSTEM`/`EVIDENCE_MANUAL` remain reserved for future
+evidence sources not yet produced by any phase's code.

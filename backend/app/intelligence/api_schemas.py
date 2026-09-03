@@ -26,6 +26,11 @@ class ExtractedFactResponse(BaseModel):
     certainty: str
     confidence: float | None
     status: str
+    # Phase 5 Review Wizard fields.
+    review_status: str = "pending"
+    corrected_structured_value: dict[str, Any] | None = None
+    reviewed_by_user_id: uuid.UUID | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -57,6 +62,13 @@ class ReviewIssueResponse(BaseModel):
     related_fact_ids: list[str]
     description: str
     status: str
+    # Phase 5 Review Wizard resolution fields — null until a human resolves
+    # this issue via PATCH /conversations/{id}/review-issues/{issue_id}
+    # (app.documents.router).
+    resolved_status: str | None = None
+    resolved_fact_id: str | None = None
+    resolved_by_user_id: uuid.UUID | None = None
+    resolved_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

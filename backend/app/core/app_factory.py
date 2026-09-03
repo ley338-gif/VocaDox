@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.administration.router import router as administration_router
 from app.conversations.router import router as conversations_router
 from app.diarization.router import router as diarization_router
+from app.documents.router import router as documents_router
 from app.identity.router import router as identity_router
 from app.intelligence.router import router as intelligence_router
 from app.organizations.router import router as organizations_router
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(transcription_router, prefix=settings.api_prefix)
     app.include_router(diarization_router, prefix=settings.api_prefix)
     app.include_router(intelligence_router, prefix=settings.api_prefix)
+    app.include_router(documents_router, prefix=settings.api_prefix)
     app.include_router(administration_router, prefix=settings.api_prefix)
 
     return app

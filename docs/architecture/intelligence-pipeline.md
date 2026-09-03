@@ -78,17 +78,21 @@ with the same normalized `(subject, attribute)` and a different `value`
 produce a `ReviewIssue(issue_type=POTENTIAL_CONTRADICTION)` referencing
 both facts. Neither fact is auto-resolved.
 
-## Review issues (spec roadmap)
+## Review issues (Phase 4 read surface + Phase 5 Review Wizard)
 
-`review_issues` (`app.review.models.ReviewIssue`) is a minimal, read-only
-surface for Phase 4 — `GET /conversations/{id}/review-issues`. **NOT**
-Phase 5's Review Wizard: no approval gating, no correction workflow, no
-"N found / M reviewed" progress UI. `ReviewIssueStatus` only has `OPEN`/
-`ACKNOWLEDGED` today; resolution semantics are deferred.
+`review_issues` (`app.review.models.ReviewIssue`) — Phase 4 added the
+read-only `GET /conversations/{id}/review-issues` surface; Phase 5 added
+real resolution via `PATCH /conversations/{id}/review-issues/{issue_id}`
+(confirm/correct/remove one targeted fact, closing the issue) and
+approval gating (an unresolved `HIGH`/`CRITICAL` issue blocks a document
+from `APPROVED`). See `docs/architecture/documents.md` for the full
+Review Wizard / approval workflow.
 
-## Deferred to Phase 5/6
+## Deferred to Phase 6
 
-Document generation/composition, document revisions, approval workflow,
-templates/template versions, prompt version lifecycle, the full
-Processing Profiles system, the Review Wizard UX, export,
-analytics/evaluation. See `docs/architecture/future-considerations.md`.
+Document generation/composition, document revisions, the Review Wizard
+UX, and export are now implemented (Phase 5) — see
+`docs/architecture/documents.md`. Still deferred: the full pluggable
+Template Engine/template versions, prompt version lifecycle, the full
+Processing Profiles system, analytics/evaluation. See
+`docs/architecture/future-considerations.md`.

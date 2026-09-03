@@ -3332,7 +3332,7 @@ dependencies:
   approval_status: approved
 - name: ruff
   ecosystem: pypi
-  version: 0.16.5
+  version: 0.16.6
   scope: dev
   direct: true
   license: MIT

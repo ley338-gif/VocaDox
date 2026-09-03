@@ -636,6 +636,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Document Endpoint */
+        get: operations["get_document_endpoint_api_v1_conversations__conversation_id__document_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/document/compose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compose Document Endpoint
+         * @description Explicit user action (spec: "explicit trigger, not automatic") — see
+         *     app.documents.service's module docstring / ADR-0027 for why this runs
+         *     synchronously rather than via the ProcessingJob/worker queue used by
+         *     every provider-backed stage.
+         */
+        post: operations["compose_document_endpoint_api_v1_conversations__conversation_id__document_compose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/document/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Revisions Endpoint */
+        get: operations["list_revisions_endpoint_api_v1_conversations__conversation_id__document_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/document/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Document Endpoint
+         * @description **The AI never calls this.** Requires `document:approve` (only
+         *     granted to System Admin/Manager/Reviewer roles by default — see
+         *     app.identity.seed) and no unresolved HIGH/CRITICAL review issue (spec
+         *     §27).
+         */
+        post: operations["approve_document_endpoint_api_v1_conversations__conversation_id__document_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/document/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Document Endpoint
+         * @description Plain text / JSON export of the current revision (spec: "at minimum
+         *     plain text and/or a simple structured format"). See
+         *     docs/architecture/adr's compliance notes / PHASE_5_VALIDATION_REPORT.md
+         *     for why PDF/DOCX generation is deliberately deferred rather than adding
+         *     an unresearched new dependency under time pressure.
+         */
+        get: operations["export_document_endpoint_api_v1_conversations__conversation_id__document_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/review-issues/{issue_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Resolve Review Issue Endpoint
+         * @description One Review Wizard decision (spec §28: Confirm/Correct/Remove) on one
+         *     flagged item. `body.fact_id` must be one of the issue's
+         *     `related_fact_ids` — resolving a multi-fact (contradiction) issue
+         *     targets exactly the fact the reviewer is acting on; the issue closes
+         *     once this one decision is recorded (matching the wizard's "one
+         *     decision per flagged item" flow), the other fact is left untouched.
+         */
+        patch: operations["resolve_review_issue_endpoint_api_v1_conversations__conversation_id__review_issues__issue_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/providers/speech": {
         parameters: {
             query?: never;
@@ -674,11 +803,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ApprovalBlockedResponse */
+        ApprovalBlockedResponse: {
+            /** Detail */
+            detail: string;
+            /** Blocking Issue Ids */
+            blocking_issue_ids: string[];
+        };
         /** Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post */
         Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post: {
             /** File */
             file: string;
         };
+        /** ComposeRequest */
+        ComposeRequest: Record<string, never>;
         /** ConversationCreateRequest */
         ConversationCreateRequest: {
             /** Title */
@@ -854,6 +992,75 @@ export interface components {
             /** Detail */
             detail: string | null;
         };
+        /** DocumentResponse */
+        DocumentResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Status */
+            status: string;
+            /** Current Revision Id */
+            current_revision_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            current_revision?: components["schemas"]["DocumentRevisionResponse"] | null;
+        };
+        /** DocumentRevisionResponse */
+        DocumentRevisionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Structured Content */
+            structured_content: {
+                [key: string]: unknown;
+            }[];
+            /** Rendered Text */
+            rendered_text: string;
+            /** Status */
+            status: string;
+            /** Blocking Issue Ids */
+            blocking_issue_ids: string[];
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Approved By User Id */
+            approved_by_user_id: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** ExtractRequest */
         ExtractRequest: Record<string, never>;
         /** ExtractedFactResponse */
@@ -884,6 +1091,19 @@ export interface components {
             confidence: number | null;
             /** Status */
             status: string;
+            /**
+             * Review Status
+             * @default pending
+             */
+            review_status: string;
+            /** Corrected Structured Value */
+            corrected_structured_value?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reviewed By User Id */
+            reviewed_by_user_id?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1247,6 +1467,23 @@ export interface components {
             /** Valkey */
             valkey: boolean;
         };
+        /** ResolveReviewIssueRequest */
+        ResolveReviewIssueRequest: {
+            /**
+             * Fact Id
+             * Format: uuid
+             */
+            fact_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "confirm" | "correct" | "remove";
+            /** Corrected Value */
+            corrected_value?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ReviewIssueResponse */
         ReviewIssueResponse: {
             /**
@@ -1271,6 +1508,14 @@ export interface components {
             description: string;
             /** Status */
             status: string;
+            /** Resolved Status */
+            resolved_status?: string | null;
+            /** Resolved Fact Id */
+            resolved_fact_id?: string | null;
+            /** Resolved By User Id */
+            resolved_by_user_id?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2822,6 +3067,212 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewIssueResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_endpoint_api_v1_conversations__conversation_id__document_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compose_document_endpoint_api_v1_conversations__conversation_id__document_compose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComposeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_revisions_endpoint_api_v1_conversations__conversation_id__document_revisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRevisionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_document_endpoint_api_v1_conversations__conversation_id__document_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalBlockedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_document_endpoint_api_v1_conversations__conversation_id__document_export_get: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_review_issue_endpoint_api_v1_conversations__conversation_id__review_issues__issue_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                issue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveReviewIssueRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewIssueResponse"];
                 };
             };
             /** @description Validation Error */

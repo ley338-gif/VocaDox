@@ -47,7 +47,19 @@ class UncertaintyCategory(StrEnum):
 
 class ReviewIssueStatus(StrEnum):
     OPEN = "open"
-    ACKNOWLEDGED = "acknowledged"  # Phase 5 will add resolution/correction; Phase 4 stops here.
+    ACKNOWLEDGED = "acknowledged"
+    RESOLVED = "resolved"  # Phase 5: resolved via the Review Wizard (see resolved_status)
+
+
+class ReviewIssueResolution(StrEnum):
+    """Phase 5: which Review Wizard action closed this issue (spec §28's
+    "Richtig / Korrigieren / Entfernen" — Confirm/Correct/Remove), applied
+    to whichever fact the reviewer targeted (see
+    app.documents.service.resolve_review_issue)."""
+
+    CONFIRMED = "confirmed"
+    CORRECTED = "corrected"
+    REMOVED = "removed"
 
 
 class ReviewIssue(Base):
@@ -73,6 +85,16 @@ class ReviewIssue(Base):
         String(16), nullable=False, default=ReviewIssueStatus.OPEN.value, index=True
     )
     issue_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    # Phase 5 Review Wizard resolution fields — populated only once, by
+    # app.documents.service.resolve_review_issue, never by the extraction
+    # pipeline.
+    resolved_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    resolved_fact_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resolved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
