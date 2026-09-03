@@ -1,9 +1,13 @@
-# AI worker image (worker-speech / worker-diarization) — separate from
-# backend/Dockerfile (the api/frontend-facing image) because this one
-# installs the [ai] extra (faster-whisper, pyannote.audio, torch,
-# torchaudio, ...) and a real FFmpeg binary, both multi-hundred-MB. The
-# api/frontend images never get GPU device access or these packages (spec:
-# "GPU isolation" — see deploy/docker-compose.yml).
+# AI worker image (worker-speech / worker-diarization / worker-extraction)
+# — separate from backend/Dockerfile (the api/frontend-facing image)
+# because this one installs the [ai] extra (faster-whisper,
+# pyannote.audio, torch, torchaudio, httpx, ...) and a real FFmpeg binary,
+# both multi-hundred-MB. The api/frontend images never get GPU device
+# access or these packages (spec: "GPU isolation" — see
+# deploy/docker-compose.yml). Phase 4's worker-extraction role reuses this
+# same image (it only needs httpx to call the separate `ollama` container
+# over HTTP — no local model weights or GPU access of its own) rather than
+# introducing a fourth, near-identical image.
 #
 # Base image: same pinned python:3.11-slim-trixie as backend/Dockerfile —
 # see that file's comments for the trixie-over-bookworm CVE rationale,

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.ai_providers import (
     get_diarization_provider,
+    get_llm_provider,
     get_media_normalizer,
     get_speech_provider,
 )
@@ -37,6 +38,7 @@ from app.processing.models import JobType, ProcessingJob, ProcessingStatus
 from app.processing.orchestrator import (
     execute_align,
     execute_diarize,
+    execute_extract,
     execute_normalize,
     execute_transcribe,
     maybe_trigger_align,
@@ -53,6 +55,7 @@ from app.processing.service import (
     start_job,
 )
 from app.providers.diarization import DiarizationProvider
+from app.providers.llm import LLMProvider
 from app.providers.speech_to_text import SpeechToTextProvider
 from app.providers.storage import StorageProvider
 
@@ -63,6 +66,7 @@ _STAGE_EXECUTORS = {
     JobType.TRANSCRIBE: "transcribe",
     JobType.DIARIZE: "diarize",
     JobType.ALIGN: "align",
+    JobType.EXTRACT: "extract",
 }
 
 
@@ -83,6 +87,7 @@ class ProcessingWorker:
         normalizer: MediaNormalizer | None = None,
         speech_provider: SpeechToTextProvider | None = None,
         diarization_provider: DiarizationProvider | None = None,
+        llm_provider: LLMProvider | None = None,
     ) -> None:
         self.worker_id = worker_id
         self.job_types = job_types
@@ -93,6 +98,7 @@ class ProcessingWorker:
         self._normalizer = normalizer or get_media_normalizer()
         self._speech_provider = speech_provider or get_speech_provider()
         self._diarization_provider = diarization_provider or get_diarization_provider()
+        self._llm_provider = llm_provider or get_llm_provider()
 
     async def run_forever(self, *, max_iterations: int | None = None) -> None:
         """A transient infrastructure error (DB not migrated yet, a
@@ -252,6 +258,8 @@ class ProcessingWorker:
             return await execute_diarize(session, self._storage, self._diarization_provider, job)
         if job_type == JobType.ALIGN:
             return await execute_align(session, job)
+        if job_type == JobType.EXTRACT:
+            return await execute_extract(session, self._llm_provider, job)
         raise ValueError(f"unknown job_type: {job.job_type}")
 
     async def _on_success(
@@ -282,14 +290,18 @@ class ProcessingWorker:
         from app.conversations.state_machine import is_valid_transition
         from app.transcription.service import get_active_transcript, mark_transcript_failed
 
-        transcript = await get_active_transcript(session, source_media_id=job.source_media_id)
-        if transcript is not None:
-            await mark_transcript_failed(
-                session,
-                transcript,
-                error_code=job.error_code or "PROCESSING_FAILED",
-                error_message_safe=job.error_message_safe or "processing failed",
-            )
+        # An EXTRACT failure must never mark the (already-succeeded,
+        # unrelated) Transcript as failed — only TRANSCRIBE/DIARIZE/ALIGN
+        # failures affect transcript state.
+        if JobType(job.job_type) != JobType.EXTRACT:
+            transcript = await get_active_transcript(session, source_media_id=job.source_media_id)
+            if transcript is not None:
+                await mark_transcript_failed(
+                    session,
+                    transcript,
+                    error_code=job.error_code or "PROCESSING_FAILED",
+                    error_message_safe=job.error_message_safe or "processing failed",
+                )
         conversation = await session.get(Conversation, job.conversation_id)
         if conversation is not None:
             current = ConversationStatus(conversation.status)

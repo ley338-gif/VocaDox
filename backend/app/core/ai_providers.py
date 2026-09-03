@@ -24,6 +24,7 @@ from app.providers.diarization import (
     PyannoteConfig,
     PyannoteDiarizationProvider,
 )
+from app.providers.llm import FakeLLMProvider, LLMProvider, OllamaConfig, OllamaLLMProvider
 from app.providers.speech_to_text import (
     FakeSpeechProvider,
     FasterWhisperConfig,
@@ -60,6 +61,19 @@ def get_diarization_provider() -> DiarizationProvider:
             )
         )
     return FakeDiarizationProvider()
+
+
+def get_llm_provider() -> LLMProvider:
+    settings = get_settings()
+    if settings.llm_provider == "ollama":
+        return OllamaLLMProvider(
+            OllamaConfig(
+                base_url=settings.llm_base_url,
+                model=settings.llm_model,
+                timeout_seconds=settings.llm_timeout_seconds,
+            )
+        )
+    return FakeLLMProvider()
 
 
 def get_media_normalizer() -> MediaNormalizer:

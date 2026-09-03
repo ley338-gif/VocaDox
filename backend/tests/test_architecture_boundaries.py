@@ -95,6 +95,8 @@ def test_domain_packages_do_not_import_concrete_provider_implementations() -> No
         "FasterWhisperSpeechProvider",
         "PyannoteDiarizationProvider",
         "FfmpegMediaNormalizer",
+        # Phase 4 real LLM provider — same rule.
+        "OllamaLLMProvider",
     }
     offenders = []
     for path in _domain_python_files():

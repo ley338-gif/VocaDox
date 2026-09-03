@@ -67,12 +67,25 @@ _ALLOWED_TRANSITIONS: dict[ConversationStatus, set[ConversationStatus]] = {
         # processing history (previous Transcript rows/ProcessingRuns are
         # never deleted — see app.processing.orchestrator.start_transcription).
         ConversationStatus.TRANSCRIBING,
+        # Phase 4: an explicitly user-triggered EXTRACT job (never automatic —
+        # see app.intelligence.router) moves a READY conversation into
+        # EXTRACTING and back to READY on completion/failure. VALIDATING/
+        # REVIEW_REQUIRED/READY_FOR_APPROVAL/APPROVED remain out of scope
+        # (Phase 5's review/approval workflow) — see
+        # docs/architecture/domain-model.md.
+        ConversationStatus.EXTRACTING,
+        ConversationStatus.DELETED,
+    },
+    ConversationStatus.EXTRACTING: {
+        ConversationStatus.READY,
+        ConversationStatus.FAILED,
         ConversationStatus.DELETED,
     },
     ConversationStatus.FAILED: {
         ConversationStatus.UPLOADED,  # retry a fresh upload after a failure
         ConversationStatus.NORMALIZING,
         ConversationStatus.TRANSCRIBING,
+        ConversationStatus.EXTRACTING,
         ConversationStatus.DELETED,
     },
     ConversationStatus.DELETED: set(),

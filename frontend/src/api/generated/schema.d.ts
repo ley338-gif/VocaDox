@@ -544,6 +544,98 @@ export interface paths {
         patch: operations["assign_speaker_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/process/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extract Facts Endpoint
+         * @description Explicit user action to start extraction — never triggered
+         *     automatically once a transcript is READY (spec: "explicit trigger,
+         *     not automatic"). Returns 202 immediately; the job runs async (see
+         *     app.processing.orchestrator.execute_extract) — poll
+         *     `GET /conversations/{id}/facts` or `/processing` for results.
+         */
+        post: operations["extract_facts_endpoint_api_v1_conversations__conversation_id__process_extract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Facts Endpoint */
+        get: operations["list_facts_endpoint_api_v1_conversations__conversation_id__facts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/facts/{fact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Fact Endpoint */
+        get: operations["get_fact_endpoint_api_v1_conversations__conversation_id__facts__fact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/facts/{fact_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Fact Evidence Endpoint */
+        get: operations["get_fact_evidence_endpoint_api_v1_conversations__conversation_id__facts__fact_id__evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/review-issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Review Issues Endpoint */
+        get: operations["list_review_issues_endpoint_api_v1_conversations__conversation_id__review_issues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/providers/speech": {
         parameters: {
             query?: never;
@@ -761,6 +853,80 @@ export interface components {
             installed: boolean;
             /** Detail */
             detail: string | null;
+        };
+        /** ExtractRequest */
+        ExtractRequest: Record<string, never>;
+        /** ExtractedFactResponse */
+        ExtractedFactResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Processing Run Id */
+            processing_run_id: string | null;
+            /** Category */
+            category: string;
+            /** Fact Type */
+            fact_type: string;
+            /** Structured Value */
+            structured_value: {
+                [key: string]: unknown;
+            };
+            /** Certainty */
+            certainty: string;
+            /** Confidence */
+            confidence: number | null;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** FactEvidenceResponse */
+        FactEvidenceResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Fact Id
+             * Format: uuid
+             */
+            fact_id: string;
+            /**
+             * Transcript Segment Id
+             * Format: uuid
+             */
+            transcript_segment_id: string;
+            /** Evidence Type */
+            evidence_type: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Segment Sequence */
+            segment_sequence?: number | null;
+            /** Segment Start Ms */
+            segment_start_ms?: number | null;
+            /** Segment End Ms */
+            segment_end_ms?: number | null;
+            /** Segment Text */
+            segment_text?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1080,6 +1246,41 @@ export interface components {
             database: boolean;
             /** Valkey */
             valkey: boolean;
+        };
+        /** ReviewIssueResponse */
+        ReviewIssueResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Issue Type */
+            issue_type: string;
+            /** Severity */
+            severity: string;
+            /** Uncertainty Category */
+            uncertainty_category: string | null;
+            /** Related Fact Ids */
+            related_fact_ids: string[];
+            /** Description */
+            description: string;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** SegmentCorrectionRequest */
         SegmentCorrectionRequest: {
@@ -2460,6 +2661,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetectedSpeakerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extract_facts_endpoint_api_v1_conversations__conversation_id__process_extract_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtractRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractedFactResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_facts_endpoint_api_v1_conversations__conversation_id__facts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractedFactResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fact_endpoint_api_v1_conversations__conversation_id__facts__fact_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractedFactResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fact_evidence_endpoint_api_v1_conversations__conversation_id__facts__fact_id__evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactEvidenceResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_review_issues_endpoint_api_v1_conversations__conversation_id__review_issues_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewIssueResponse"][];
                 };
             };
             /** @description Validation Error */

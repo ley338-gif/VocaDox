@@ -28,7 +28,11 @@ import uuid
 
 from app.platform.db import model_registry  # noqa: F401 - registers all domain models; see below
 from app.platform.logging import configure_logging
-from app.processing.queues import DIARIZATION_WORKER_JOB_TYPES, SPEECH_WORKER_JOB_TYPES
+from app.processing.queues import (
+    DIARIZATION_WORKER_JOB_TYPES,
+    EXTRACTION_WORKER_JOB_TYPES,
+    SPEECH_WORKER_JOB_TYPES,
+)
 from app.workers.processing_worker import run_worker
 
 # The import above is not decorative: unlike app.core.app_factory (which
@@ -51,7 +55,7 @@ def _worker_id(role: str) -> str:
 
 async def _main() -> None:
     parser = argparse.ArgumentParser(description="VocaDox processing worker")
-    parser.add_argument("--role", choices=["speech", "diarization"], required=True)
+    parser.add_argument("--role", choices=["speech", "diarization", "extraction"], required=True)
     args = parser.parse_args()
 
     from app.platform.config import get_settings
@@ -59,7 +63,12 @@ async def _main() -> None:
     settings = get_settings()
     configure_logging(level=settings.log_level, fmt=settings.log_format)
 
-    job_types = SPEECH_WORKER_JOB_TYPES if args.role == "speech" else DIARIZATION_WORKER_JOB_TYPES
+    job_types_by_role = {
+        "speech": SPEECH_WORKER_JOB_TYPES,
+        "diarization": DIARIZATION_WORKER_JOB_TYPES,
+        "extraction": EXTRACTION_WORKER_JOB_TYPES,
+    }
+    job_types = job_types_by_role[args.role]
     worker_id = _worker_id(args.role)
     logger.info("starting worker", extra={"worker_id": worker_id, "role": args.role})
     await run_worker(worker_id=worker_id, job_types=job_types)

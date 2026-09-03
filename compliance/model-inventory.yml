@@ -174,3 +174,39 @@ models:
     disk_size_mb: 2  # plda/ subfolder only (plda.npz + xvec_transform.npz)
     runtime_requirements: "pyannote.audio>=4.0,<5.0; loaded fully offline (HF_HUB_OFFLINE=1) from the shared HF cache — see app/providers/diarization.py's PyannoteDiarizationProvider. Constructed but never actually invoked by VocaDox's AgglomerativeClustering configuration — an upstream library inefficiency, not a VocaDox design choice."
     approval_status: approved
+
+  # Phase 4: fact extraction model, evaluated and selected per
+  # docs/architecture/adr/0024-llm-provider-selection.md. Distributed via
+  # Ollama's own model registry (`ollama pull qwen2.5:14b`), NOT downloaded
+  # by VocaDox from Hugging Face directly — the runtime (Ollama, MIT) and
+  # this model weight license were verified SEPARATELY, per this file's
+  # standing rule.
+  - name: Qwen2.5-14B-Instruct (Q4_K_M GGUF quantization, via Ollama)
+    purpose: Structured fact extraction (general facts / decisions / tasks), Phase 4 default extraction ModelProfile
+    provider: Alibaba Cloud (Qwen team)
+    version: "7cdf5a0187d5"  # Ollama local image id for the `qwen2.5:14b` tag, pinned — never a floating tag in production config
+    source: "https://huggingface.co/Qwen/Qwen2.5-14B-Instruct (weights); distributed to VocaDox via https://ollama.com/library/qwen2.5 (Ollama's model registry, GGUF conversion)"
+    license: Apache-2.0
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      None beyond standard Apache-2.0 attribution/notice requirements.
+      Verified from TWO independent primary sources, not general
+      knowledge: (1) the model card's own LICENSE file at
+      huggingface.co/Qwen/Qwen2.5-14B-Instruct/blob/main/LICENSE (header
+      "License: apache-2.0", full Apache 2.0 text), fetched 2026-09-03;
+      (2) the exact GGUF artifact actually pulled via `ollama pull
+      qwen2.5:14b` embeds the identical Apache License 2.0 text, retrieved
+      locally via `ollama show qwen2.5:14b` / `GET /api/show` (`license`
+      field) — confirming the specific bytes running in this deployment
+      carry the same license as the upstream model card, not merely an
+      assumption that Ollama's conversion preserved it. Not gated — no
+      Hugging Face account/token required via either distribution path.
+    sha256: null  # not yet computed for the locally-pulled GGUF blob — see Known Limitations, PHASE_4_VALIDATION_REPORT.md
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated: `docker compose exec ollama ollama pull qwen2.5:14b` (or run directly against a host-installed Ollama). Never downloaded automatically by VocaDox's own code — the worker-extraction service only ever calls the already-running Ollama server over HTTP; see docs/admin/llm-provider.md."
+    bundled_with_product: false
+    disk_size_mb: 9000
+    runtime_requirements: "Ollama >=0.5 (MIT, see container-inventory.yml) serving the model; ~10GB VRAM for GPU inference (Q4_K_M quantization) or CPU fallback (slow — see docs/admin/llm-provider.md for real measured tokens/sec on both paths)."
+    approval_status: approved

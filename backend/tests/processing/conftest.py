@@ -16,7 +16,12 @@ import pytest_asyncio
 from app.core.ai_providers import get_queue_backend
 from app.core.storage import get_storage_provider
 from app.platform.valkey.backends import QueueBackend
-from app.processing.queues import DIARIZATION_WORKER_JOB_TYPES, SPEECH_WORKER_JOB_TYPES
+from app.processing.queues import (
+    DIARIZATION_WORKER_JOB_TYPES,
+    EXTRACTION_WORKER_JOB_TYPES,
+    SPEECH_WORKER_JOB_TYPES,
+)
+from app.providers.llm import FakeLLMProvider
 from app.providers.storage import LocalFilesystemStorage
 from app.workers.processing_worker import ProcessingWorker
 from httpx import AsyncClient
@@ -85,6 +90,14 @@ async def run_all_jobs(
         queue=queue,
         storage=storage,
     )
+    extraction_worker = ProcessingWorker(
+        worker_id="test-extraction",
+        job_types=EXTRACTION_WORKER_JOB_TYPES,
+        sessionmaker=sessionmaker,
+        queue=queue,
+        storage=storage,
+        llm_provider=FakeLLMProvider(),
+    )
     from app.processing.models import OutboxStatus, ProcessingOutbox
     from sqlalchemy import select
 
@@ -111,6 +124,7 @@ async def run_all_jobs(
             break
         await speech_worker.run_forever(max_iterations=1)
         await diarization_worker.run_forever(max_iterations=1)
+        await extraction_worker.run_forever(max_iterations=1)
 
 
 async def create_conversation_with_source_audio(

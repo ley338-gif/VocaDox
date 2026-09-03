@@ -59,6 +59,11 @@ ai = [
     # empirical finding, including the pin change). MIT (verified:
     # https://raw.githubusercontent.com/pyannote/pyannote-audio/develop/LICENSE).
     "pyannote.audio>=4.0,<5.0",
+    # BSD-3-Clause (verified: https://pypi.org/pypi/httpx/json) — HTTP client used by
+    # OllamaLLMProvider (app/providers/llm.py) to talk to a local Ollama server. Also a `dev`
+    # dependency already (for TestClient); listed here too so the worker-extraction image gets
+    # it without pulling in the full `dev` group.
+    "httpx>=0.27,<1.0",
 ]
 dev = [
     "ruff>=0.6,<1.0",

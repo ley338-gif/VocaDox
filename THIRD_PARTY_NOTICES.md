@@ -101,6 +101,7 @@ transitive dependencies, none appear in a production runtime tree.
 | nginx:1.31.3-alpine3.24 | BSD-2-Clause (nginx license) | yes — frontend runtime image |
 | node:22-alpine3.24 | MIT (Node.js runtime); mixed OS-package licenses (Alpine base layer) | no — frontend build/dev stage only, discarded by the multi-stage build |
 | aquasec/trivy:0.56.2 | Apache-2.0 | no — vulnerability/SBOM scan tool only, never part of the deployed stack |
+| ollama/ollama:0.33.2 | MIT | yes (Phase 4) — local LLM inference server for fact extraction; see `docs/admin/llm-provider.md` and the open vulnerability disclosure in `compliance/container-inventory.yml` |
 
 ## Fonts and icons
 
@@ -125,10 +126,12 @@ image:
 
 ## AI models
 
-None bundled directly in any VocaDox image or repository — every model
-below is downloaded by an admin, on request, into a persistent volume
-(see `docs/admin/model-installation.md`). As of Phase 3.1,
-`compliance/model-inventory.yml` records 4 approved entries:
+None bundled directly in any VocaDox image or repository — every
+speech/diarization model is downloaded by an admin, on request, into a
+persistent volume (see `docs/admin/model-installation.md`); the Phase 4
+LLM model is pulled by an admin into the `ollama` service's volume (see
+`docs/admin/llm-provider.md`). As of Phase 4,
+`compliance/model-inventory.yml` records 6 approved entries:
 
 | Model | License | Gated? | Role |
 |---|---|---|---|
@@ -136,9 +139,8 @@ below is downloaded by an admin, on request, into a persistent volume
 | `pyannote/speaker-diarization-3.1` | MIT | Yes | Diarization (top-level pipeline) |
 | `pyannote/segmentation-3.0` | MIT | Yes | Diarization (segmentation sub-model) |
 | `pyannote/wespeaker-voxceleb-resnet34-LM` | CC-BY-4.0 | No | Diarization (speaker-embedding sub-model) |
-
-No LLM model is used anywhere in this codebase (Phase 4+ scope, not yet
-started).
+| `pyannote/speaker-diarization-community-1` (plda/ only) | CC-BY-4.0 | Yes | Diarization (unused-but-required PLDA transform) |
+| `Qwen2.5-14B-Instruct` (via Ollama, GGUF) | Apache-2.0 | No | Fact extraction (Phase 4) |
 
 ---
 
