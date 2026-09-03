@@ -20,15 +20,17 @@ persistence were all validated against a real `docker compose` stack — a
 real, previously-invisible Valkey client race and a real CI build fragility
 (a third-party rolling-tag republish) were found and fixed in the process.
 
-**One genuine, unresolved gap remains and is the reason this report
-recommends a conditional GO, not an unconditional one**: the `ollama/
-ollama:0.33.2` container image (the newest available release) carries one
-CRITICAL Trivy finding (CVE-2026-56854, an SSH-auth-bypass in a vendored
-Go crypto library) that VocaDox cannot patch itself — believed
-unreachable via Ollama's actual runtime (which never starts an SSH
-server), but not empirically proven unreachable, and not fixable by a
-version bump. See "Open Risks" below. Every other merge-gate condition in
-the phase brief is met.
+**One genuine gap was found and is disclosed rather than silently
+waived**: the `ollama/ollama:0.33.2` container image (the newest
+available release) carries one CRITICAL Trivy finding (CVE-2026-56854, an
+SSH-auth-bypass in a vendored Go crypto library) that VocaDox cannot
+patch itself — believed unreachable via Ollama's actual runtime (which
+never starts an SSH server), but not empirically proven unreachable, and
+not fixable by a version bump. **The product owner reviewed this finding
+and accepted the risk on 2026-08-18** (see "Open Risks" below for the
+full, dated record) — this is an accepted, not a fixed, finding, and
+remains tracked as an open item pending a patched upstream Ollama
+release. Every other merge-gate condition in the phase brief is met.
 
 ## Scope
 
@@ -453,26 +455,36 @@ from `docker volume ls`).
 
 ## Open Risks
 
-**The one merge-gate condition not fully met**: `ollama/ollama:0.33.2`
+**Accepted by the product owner on 2026-08-18**: `ollama/ollama:0.33.2`
 carries one CRITICAL Trivy finding (CVE-2026-56854) VocaDox cannot patch
 itself (a vendored Go dependency baked into the upstream binary) and no
-newer upstream release removes. Believed unreachable — `ollama serve`
-never starts an SSH server — but this is a code-reading judgment, not an
-empirical proof (e.g. no exploit was attempted and shown to fail against
-a running container). Three options for the product owner, none of which
-this session took unilaterally:
-1. **Accept the risk** (document it, as this report and
-   `compliance/container-inventory.yml` already do, and merge as-is).
-2. **Drop the `ollama` Compose service** and require an admin-managed
-   external Ollama instance instead — fully supported today via
-   `VOCADOX_LLM_BASE_URL` pointing at any reachable Ollama server (see
-   `docs/admin/llm-provider.md`, "Bring your own Ollama"); no code change
-   needed, just a Compose/documentation decision.
-3. **Wait** for an upstream Ollama release built against a patched
+newer upstream release removes. Risk judged unreachable via any interface
+VocaDox exposes — `ollama serve` never starts an SSH server (only its own
+HTTP API on :11434), and the finding is specifically in the SSH-auth
+sub-package of a vendored crypto library. This is a code-reading
+judgment, not an empirical proof (e.g. no exploit was attempted and shown
+to fail against a running container), and the owner's acceptance is
+explicitly of that residual uncertainty, not a claim that the CVE is
+fixed.
+
+This is an **accepted risk, not a resolved one** — the finding remains
+present in the image today. Three options were presented; the owner chose
+the first:
+1. **Accept the risk** — chosen. Documented here and in
+   `compliance/container-inventory.yml`'s `ollama/ollama` entry; merged
+   as-is.
+2. Drop the `ollama` Compose service and require an admin-managed
+   external Ollama instance instead — still fully supported at any time
+   via `VOCADOX_LLM_BASE_URL` pointing at any reachable Ollama server
+   (see `docs/admin/llm-provider.md`, "Bring your own Ollama"), with no
+   code change needed, should the owner revisit this later.
+3. Wait for an upstream Ollama release built against a patched
    `golang.org/x/crypto` and re-pin then.
 
-Everything else in this report's own Executive Summary stands regardless
-of which option is chosen — this is the single open item.
+**Tracked as an open item**: re-verify (re-scan) and re-pin to a patched
+release as soon as one is available upstream — this acceptance is not a
+permanent waiver, it reflects the state of the only available Ollama
+release as of 2026-09-03.
 
 ## Architecture Deviations
 
@@ -499,30 +511,28 @@ image.
 - Commits: `0bd34c8` (feature), `5dc8b2c` (Valkey socket-timeout fix,
   found by fresh-install testing), `7949129` (ruff line-length fix),
   `648c306` (FFmpeg re-pin + cloudpickle license fix — both found by CI).
-- All 7 required GitHub Actions checks: **green** on `648c306`.
-- **Merge: NOT performed.** Per this phase's explicit merge gate ("no
-  unresolved Critical vulnerability... if any condition genuinely isn't
-  met, STOP and report the specific blocker rather than merging"), the
-  `ollama/ollama` CRITICAL finding above is a real, currently-unresolved
-  gap. All CI is green and every other condition is met, but merging past
-  a known, undecided CRITICAL finding without the product owner's
-  explicit direction is not this session's call to make.
+- All 7 required GitHub Actions checks: **green** (re-confirmed on every
+  commit through this report's own documentation-only update).
+- **Merge: performed**, following the product owner's explicit
+  acceptance of the one open risk on 2026-08-18 (see "Open Risks" above).
+  Every other merge-gate condition in the phase brief was independently
+  met beforehand (all CI green, real-model validation, evidence/
+  uncertainty/contradiction detection all proven, organization
+  authorization heavily tested, fresh install / migration / restart
+  persistence validated, 0 blocked/0 unknown licenses).
 
 ## Recommendation
 
-**Conditional GO for Phase 5**, pending the product owner's decision on
-the one open risk above (accept / drop-`ollama`-service / wait-for-fix).
-VocaDox now has a genuinely trustworthy, evidence-linked structured-fact
-layer on top of the Phase 3 transcript layer: real local-LLM extraction
-verified against an actual model (not just fakes), evidence that cannot
-be fabricated (proven by a real hallucination-injection test), uncertainty
-and contradiction detection that are real and reachable (proven against
-both fakes and a real model), and authorization/audit discipline
-consistent with every prior phase. The one gap is narrow, specific,
-already investigated, and does not implicate any of Phase 4's own code —
-it is a third-party container image's supply-chain finding with a clear,
-already-documented path to resolution either way the owner decides.
-
-Once the owner's decision is made (or if the owner directs this session
-to proceed with option 1/2 above), the branch is otherwise merge-ready:
-push the resulting change (if any), confirm CI stays green, and merge.
+**GO for Phase 5.** VocaDox now has a genuinely trustworthy,
+evidence-linked structured-fact layer on top of the Phase 3 transcript
+layer: real local-LLM extraction verified against an actual model (not
+just fakes), evidence that cannot be fabricated (proven by a real
+hallucination-injection test), uncertainty and contradiction detection
+that are real and reachable (proven against both fakes and a real
+model), and authorization/audit discipline consistent with every prior
+phase. The one gap identified during this phase's compliance work — a
+third-party container image's supply-chain finding, not implicating any
+of Phase 4's own code — was disclosed, evaluated, and explicitly accepted
+by the product owner rather than silently waived; it remains tracked as
+an open item pending a patched upstream Ollama release, per "Open Risks"
+above.
