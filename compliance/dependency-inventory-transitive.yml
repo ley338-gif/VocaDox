@@ -2859,7 +2859,7 @@ dependencies:
     this script).
 - name: huggingface_hub
   ecosystem: pypi
-  version: 1.29.0
+  version: 1.30.0
   scope: worker
   direct: false
   license: Apache-2.0
@@ -3401,7 +3401,7 @@ dependencies:
     this script).
 - name: tokenizers
   ecosystem: pypi
-  version: 0.23.1
+  version: 0.23.2
   scope: worker
   direct: false
   license: Apache-2.0
