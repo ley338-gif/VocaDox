@@ -139,6 +139,11 @@ PACKAGE_LICENSE_OVERRIDES: dict[tuple[str, str], str] = {
     ("pypi", "sympy"): "BSD-3-Clause",
     ("pypi", "threadpoolctl"): "BSD-3-Clause",  # PyPI license field states "BSD-3-Clause"
     ("pypi", "torchaudio"): "BSD-2-Clause",  # verified via github.com/pytorch/audio LICENSE — 2-clause, unlike torch's own 3-clause
+    ("pypi", "cloudpickle"): "BSD-3-Clause",  # Phase 4: pip-licenses reports bare "BSD" (OSI trove
+    # classifier only); PyPI JSON's `info.license` field for cloudpickle 3.1.2 states
+    # "BSD-3-Clause" explicitly (verified live against pypi.org/pypi/cloudpickle/json,
+    # 2026-09-03) — newly surfaced as a transitive dep once httpx (Phase 4's Ollama HTTP
+    # client) joined the [ai] extra, changing that extra's resolved dependency set.
     # pyannote.audio 4.x's own transitive tree (matplotlib + torchcodec +
     # pyannoteai-sdk), verified 2026-08-18 after the 3.x -> 4.x pin change
     # (see ADR-0017, "Version pin revised after real testing").

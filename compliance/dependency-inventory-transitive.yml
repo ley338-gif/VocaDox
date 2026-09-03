@@ -7,7 +7,7 @@ _note: "Full resolved dependency tree (direct + transitive) for both ecosystems.
   \ it ships in the worker-speech/worker-diarization images only, never in the api/frontend images (see\
   \ backend/worker.Dockerfile)."
 summary:
-  approved: 494
+  approved: 495
   review_required: 3
   blocked: 0
   unknown: 0
@@ -2606,7 +2606,7 @@ dependencies:
   approval_status: approved
 - name: anyio
   ecosystem: pypi
-  version: 4.14.2
+  version: 4.15.0
   scope: runtime
   direct: false
   license: MIT
@@ -2620,7 +2620,7 @@ dependencies:
   approval_status: approved
 - name: argon2-cffi-bindings
   ecosystem: pypi
-  version: 25.1.0
+  version: 26.1.0
   scope: runtime
   direct: false
   license: MIT
@@ -2683,11 +2683,20 @@ dependencies:
   approval_status: approved
 - name: click
   ecosystem: pypi
-  version: 8.4.2
+  version: 8.5.0
   scope: runtime
   direct: false
   license: BSD-3-Clause
   approval_status: approved
+- name: cloudpickle
+  ecosystem: pypi
+  version: 3.1.2
+  scope: worker
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: colorlog
   ecosystem: pypi
   version: 6.12.0
@@ -2706,7 +2715,7 @@ dependencies:
     this script).
 - name: ctranslate2
   ecosystem: pypi
-  version: 4.8.1
+  version: 4.8.2
   scope: worker
   direct: false
   license: MIT
@@ -2757,7 +2766,7 @@ dependencies:
   approval_status: approved
 - name: filelock
   ecosystem: pypi
-  version: 3.32.3
+  version: 3.32.5
   scope: dev
   direct: false
   license: MIT
@@ -2771,7 +2780,7 @@ dependencies:
   approval_status: approved
 - name: fonttools
   ecosystem: pypi
-  version: 4.63.0
+  version: 4.64.0
   scope: worker
   direct: false
   license: MIT
@@ -2792,7 +2801,7 @@ dependencies:
   approval_status: approved
 - name: googleapis-common-protos
   ecosystem: pypi
-  version: 1.75.1
+  version: 1.75.2
   scope: worker
   direct: false
   license: Apache-2.0
@@ -2806,7 +2815,7 @@ dependencies:
   approval_status: approved
 - name: grpcio
   ecosystem: pypi
-  version: 1.83.0
+  version: 1.83.1
   scope: worker
   direct: false
   license: Apache-2.0
@@ -2850,7 +2859,7 @@ dependencies:
     this script).
 - name: huggingface_hub
   ecosystem: pypi
-  version: 1.28.0
+  version: 1.29.0
   scope: worker
   direct: false
   license: Apache-2.0
@@ -2871,7 +2880,7 @@ dependencies:
   approval_status: approved
 - name: joblib
   ecosystem: pypi
-  version: 1.5.3
+  version: 1.6.0
   scope: worker
   direct: false
   license: BSD-3-Clause
@@ -2885,7 +2894,7 @@ dependencies:
   approval_status: approved
 - name: kiwisolver
   ecosystem: pypi
-  version: 1.5.0
+  version: 1.5.1
   scope: worker
   direct: false
   license: BSD-3-Clause
@@ -2952,7 +2961,7 @@ dependencies:
     this script).
 - name: msgpack
   ecosystem: pypi
-  version: 1.2.1
+  version: 1.2.2
   scope: dev
   direct: false
   license: Apache-2.0
@@ -2980,7 +2989,7 @@ dependencies:
   approval_status: approved
 - name: narwhals
   ecosystem: pypi
-  version: 2.24.0
+  version: 2.25.0
   scope: worker
   direct: false
   license: MIT
@@ -3129,7 +3138,7 @@ dependencies:
   approval_status: approved
 - name: platformdirs
   ecosystem: pypi
-  version: 4.11.3
+  version: 4.11.7
   scope: dev
   direct: false
   license: MIT
@@ -3157,7 +3166,7 @@ dependencies:
   approval_status: approved
 - name: protobuf
   ecosystem: pypi
-  version: 7.35.1
+  version: 7.36.1
   scope: worker
   direct: false
   license: BSD-3-Clause
@@ -3232,7 +3241,7 @@ dependencies:
   approval_status: approved
 - name: pydantic
   ecosystem: pypi
-  version: 2.13.4
+  version: 2.13.5
   scope: runtime
   direct: true
   license: MIT
@@ -3246,7 +3255,7 @@ dependencies:
   approval_status: approved
 - name: pydantic_core
   ecosystem: pypi
-  version: 2.46.4
+  version: 2.46.5
   scope: runtime
   direct: false
   license: MIT
@@ -3323,7 +3332,7 @@ dependencies:
   approval_status: approved
 - name: ruff
   ecosystem: pypi
-  version: 0.16.3
+  version: 0.16.5
   scope: dev
   direct: true
   license: MIT
@@ -3413,7 +3422,7 @@ dependencies:
   approval_status: approved
 - name: torch
   ecosystem: pypi
-  version: 2.13.0+cpu
+  version: 2.14.0+cpu
   scope: worker
   direct: false
   license: Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0
@@ -3488,7 +3497,7 @@ dependencies:
   approval_status: approved
 - name: uvicorn
   ecosystem: pypi
-  version: 0.52.3
+  version: 0.52.4
   scope: runtime
   direct: true
   license: BSD-3-Clause
@@ -3516,7 +3525,7 @@ dependencies:
   approval_status: approved
 - name: websockets
   ecosystem: pypi
-  version: 17.0.1
+  version: '17.1'
   scope: runtime
   direct: false
   license: BSD-3-Clause

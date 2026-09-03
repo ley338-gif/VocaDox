@@ -46,8 +46,17 @@ RUN apt-get update \
 # `--enable-nonfree`, `libx264`/`libx265`/`libxavs2`/`libxvid` all still
 # `--disable`d) before trusting the new hash — never bumped blindly just
 # to unblock a build.
+#
+# Phase 4 CI hit this exact rolling-tag risk a second time (BtbN
+# republished new bytes yet again, dated 2026-09-02, breaking the Docker
+# build job with an unrelated-looking sha256 mismatch on an otherwise
+# green PR) — re-verified the same way before bumping again: downloaded
+# both archives fresh, confirmed `ffmpeg -version`'s configuration string
+# still shows `--enable-version3`, no `--enable-gpl`/`--enable-nonfree`,
+# `libx264`/`libx265`/`libxavs2`/`libxvid` still `--disable`d, and
+# LICENSE.txt is still LGPL-3.0 text, before trusting the new hash.
 ARG FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl.tar.xz
-ARG FFMPEG_SHA256=9f5f7d49ef9e7c43834a27e298f64db32655843655b27ec08b6b0067124c36df
+ARG FFMPEG_SHA256=5523b96d2aaa918597dc0e43c5e2e18a6a576fb4ee7c506c117ce3447351d6d2
 RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
     && echo "${FFMPEG_SHA256}  /tmp/ffmpeg.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg-extract \
@@ -73,9 +82,11 @@ RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
 # shared library on the system, because none had ever been installed.
 # Same BtbN source, same LGPL-only stance as above (never Debian's own
 # GPL-configured `ffmpeg`/libav* packages) — just the "shared" build
-# variant instead of "static", pinned by sha256 the same way.
+# variant instead of "static", pinned by sha256 the same way. Re-bumped
+# alongside the static archive above (Phase 4 CI, same BtbN republish) —
+# LICENSE.txt re-verified as LGPL-3.0 text before trusting the new hash.
 ARG FFMPEG_SHARED_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl-shared.tar.xz
-ARG FFMPEG_SHARED_SHA256=fb97c54d9a17d6e140074919625b6b0496d7d0b0719300a92efad323aa21f814
+ARG FFMPEG_SHARED_SHA256=03ce220a9c1458153771da538abbb699ba36a7eed911ea9067a01d66eb0b336d
 RUN curl -sL -o /tmp/ffmpeg-shared.tar.xz "$FFMPEG_SHARED_URL" \
     && echo "${FFMPEG_SHARED_SHA256}  /tmp/ffmpeg-shared.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg-shared-extract \
