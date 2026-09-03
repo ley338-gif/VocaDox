@@ -127,6 +127,33 @@ class Settings(BaseSettings):
         "gated model (e.g. pyannote's pipeline) once, at admin-initiated install time. Never "
         "read by the API or worker request path, never logged, never exposed via any endpoint.",
     )
+    # -- LLM / fact extraction (Phase 4) --------------------------------------
+    llm_provider: str = Field(
+        default="fake",
+        description="'fake' (tests/dev, always available) or 'ollama' (real, requires a "
+        "reachable local Ollama server with the configured model pulled — see "
+        "docs/admin/llm-provider.md). Never defaults to a real provider so a fresh checkout "
+        "without Ollama running degrades safely.",
+    )
+    llm_base_url: str = Field(
+        default="http://ollama:11434",
+        description="Base URL of the local Ollama server. Never a cloud/hosted endpoint — "
+        "conversation content must never leave the deployment (spec: local-first LLM "
+        "inference). Defaults to the Docker Compose service name; override with "
+        "http://localhost:11434 for a host-run Ollama outside Compose.",
+    )
+    llm_model: str = Field(
+        default="qwen2.5:14b",
+        description="Ollama model tag for extraction. Apache-2.0 licensed (verified against "
+        "the model's own Hugging Face license file — see compliance/model-inventory.yml and "
+        "docs/architecture/adr/0024-llm-provider-selection.md). Never read by worker code "
+        "directly for the actual extraction run — see app.profiles (ModelProfile); this "
+        "setting only seeds the default profile row.",
+    )
+    llm_context_length: int = Field(default=32768)
+    llm_max_tokens: int = Field(default=2048)
+    llm_timeout_seconds: float = Field(default=300.0)
+
     normalization_target_sample_rate_hz: int = Field(default=16000)
     normalization_subprocess_timeout_seconds: int = Field(default=600)
     normalization_max_duration_seconds: int = Field(

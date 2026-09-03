@@ -21,6 +21,7 @@ import {
 } from "../api/conversations";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
+import { FactsPanel } from "../components/FactsPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
 import { TranscriptPanel } from "../components/TranscriptPanel";
 import { Badge } from "../design-system/Badge";
@@ -28,7 +29,7 @@ import { Button } from "../design-system/Button";
 import { Select, TextInput } from "../design-system/FormControls";
 import styles from "./ConversationDetailPage.module.css";
 
-type Tab = "overview" | "audio" | "transcript" | "participants" | "notes" | "activity";
+type Tab = "overview" | "audio" | "transcript" | "facts" | "participants" | "notes" | "activity";
 
 export function ConversationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -160,7 +161,7 @@ export function ConversationDetailPage() {
       </div>
 
       <div className={styles.tabs} role="tablist">
-        {(["overview", "audio", "transcript", "participants", "notes", "activity"] as Tab[]).map((t) => (
+        {(["overview", "audio", "transcript", "facts", "participants", "notes", "activity"] as Tab[]).map((t) => (
           <button
             key={t}
             role="tab"
@@ -261,6 +262,22 @@ export function ConversationDetailPage() {
                 audioPlayerRef={audioPlayerRef}
                 activeMs={activeMs}
               />
+            </div>
+          )}
+
+          {tab === "facts" && (
+            <div>
+              {sourceMedia && (
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <AudioPlayer
+                    ref={audioPlayerRef}
+                    src={mediaContentUrl(conversationId, sourceMedia.id)}
+                    sourceLabel="Conversation audio"
+                    onTimeUpdateMs={setActiveMs}
+                  />
+                </div>
+              )}
+              <FactsPanel conversationId={conversationId} audioPlayerRef={audioPlayerRef} />
             </div>
           )}
 

@@ -22,10 +22,17 @@ QUEUE_NAMES: dict[JobType, str] = {
     JobType.TRANSCRIBE: "vocadox:processing:transcribe",
     JobType.DIARIZE: "vocadox:processing:diarize",
     JobType.ALIGN: "vocadox:processing:align",
+    JobType.EXTRACT: "vocadox:processing:extract",
 }
 
 SPEECH_WORKER_JOB_TYPES = [JobType.NORMALIZE, JobType.TRANSCRIBE]
 DIARIZATION_WORKER_JOB_TYPES = [JobType.DIARIZE, JobType.ALIGN]
+# Phase 4: a dedicated worker service (`worker-extraction`) — CPU/GPU
+# needs for LLM inference are separate from speech/diarization's, and
+# extraction is never chained automatically from ALIGN (explicit trigger
+# only), so it gets its own queue/topology entry rather than riding along
+# with an existing worker.
+EXTRACTION_WORKER_JOB_TYPES = [JobType.EXTRACT]
 
 
 def queue_name_for(job_type: JobType) -> str:

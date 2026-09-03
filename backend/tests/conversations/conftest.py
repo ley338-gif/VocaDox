@@ -33,6 +33,7 @@ from app.identity.service import (
 from app.organizations.models import Organization, OrganizationMembership
 from app.platform.db import model_registry  # noqa: F401
 from app.platform.db.session import Base, get_session
+from app.profiles.seed import apply_seed as apply_model_profile_seed
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -87,6 +88,7 @@ async def seeded(app_env):
     ids: dict[str, str] = {}
     async with sessionmaker() as session:
         await apply_seed(session)
+        await apply_model_profile_seed(session)  # Phase 4: default extraction ModelProfile
 
         org_a = Organization(name="Org A", slug="org-a")
         org_b = Organization(name="Org B", slug="org-b")

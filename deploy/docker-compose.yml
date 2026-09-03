@@ -193,6 +193,62 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
+  # Phase 4: local LLM inference server for fact extraction (see
+  # docs/admin/llm-provider.md and
+  # docs/architecture/adr/0024-llm-provider-selection.md). Never a
+  # cloud/hosted LLM endpoint — conversation content stays inside this
+  # compose network. Not pre-loaded with any model: an admin pulls one
+  # explicitly (`docker compose exec ollama ollama pull qwen2.5:14b`),
+  # matching the Phase 3 "no silent multi-GB downloads" policy for
+  # speech/diarization models. Only this container ever gets GPU access
+  # for LLM inference — worker-extraction talks to it over plain HTTP and
+  # needs no GPU itself.
+  ollama:
+    image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - vocadox_ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  worker-extraction:
+    build:
+      context: ../backend
+      dockerfile: worker.Dockerfile
+    command: ["--role", "extraction"]
+    environment:
+      VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
+      VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
+      VOCADOX_LOG_FORMAT: ${VOCADOX_LOG_FORMAT:-json}
+      VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
+      VOCADOX_VALKEY_URL: ${VOCADOX_VALKEY_URL:-valkey://valkey:6379/0}
+      # "fake" by default, same policy as speech/diarization — set to
+      # "ollama" only once a model has actually been pulled into the
+      # `ollama` service (see docs/admin/llm-provider.md).
+      VOCADOX_LLM_PROVIDER: ${VOCADOX_LLM_PROVIDER:-fake}
+      VOCADOX_LLM_BASE_URL: ${VOCADOX_LLM_BASE_URL:-http://ollama:11434}
+      VOCADOX_LLM_MODEL: ${VOCADOX_LLM_MODEL:-qwen2.5:14b}
+    volumes:
+      - vocadox_backend_data:/app/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
   # Phase 3.1: the administrator-facing model-installation command. Not
   # started by a plain `docker compose up` (the `tools` profile keeps it
   # out of the default service set — nothing "up" needs it running) —
@@ -252,3 +308,9 @@ volumes:
   # re-downloaded on `docker compose restart`/`up` (models persist here
   # across container recreation, only `down -v` clears them).
   vocadox_models_data:
+  # Ollama's own model-weight storage (Phase 4) — separate from
+  # vocadox_models_data (the Phase 3 speech/diarization model volume) since
+  # Ollama manages its own storage layout under /root/.ollama. Same
+  # warning applies: never re-downloaded on `docker compose restart`/`up`,
+  # only `down -v` clears it (see docs/admin/llm-provider.md).
+  vocadox_ollama_data:

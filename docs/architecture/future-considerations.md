@@ -73,6 +73,51 @@ lost and aren't quietly decided by accident later.
   it's now implemented and unprotected against credential-stuffing/brute
   force.
 
+- **Embedding/similarity-based contradiction detection**: Phase 4's
+  contradiction rule (ADR-0026) only compares `general_fact` items with an
+  exact-after-normalization `(subject, attribute)` match. Two facts
+  referring to "the doctor" vs. "Dr. Weber", or "Blutdruckmedikament" vs.
+  "Ramipril", won't be linked even if they genuinely conflict. A future
+  phase could add embedding-similarity-based subject/attribute matching,
+  but only once a review workflow exists that can present a
+  graded-confidence signal to a human rather than a binary yes/no.
+
+- **Full Processing Profiles system** (spec §17/§18): Phase 4 introduced
+  only a minimal `ModelProfile` (id/name/provider/model_identifier/
+  purpose/context_length/temperature/max_tokens/structured_output/
+  version/enabled) so the extraction model isn't a hardcoded string. The
+  full system — Speech Profile + Diarization Profile + Extraction Model +
+  Document Model + Template + Prompt Version + Language + Retention
+  Policy combined into named, admin-manageable presets like "Medical
+  Consultation" — is explicitly Phase 6 scope.
+
+- **Prompt version lifecycle management**: Phase 4's prompts
+  (`app.intelligence.prompts`) are plain Python constants, not versioned
+  database rows. A `prompts`/`prompt_versions` domain (spec's target
+  entity list) belongs to a later phase once document generation exists
+  and prompt changes need auditable history/rollback.
+
+- **Fourth+ extraction category / domain-specific schemas** (e.g. a
+  dedicated Medication schema with `dose`/`frequency`/`route` fields): the
+  Phase 4 `general_fact` triple already covers the spec's own Ramipril
+  example without a domain-specific schema. A fixed medical schema should
+  arrive via a Template (Phase 6), not be added to the core.
+
+- **Review Wizard UX / approval workflow**: Phase 4's `review_issues` are
+  read-only (list endpoint + minimal frontend view). The full Phase 5
+  workflow — "5 Punkte gefunden, 3/5 reviewed", [Richtig]/[Korrigieren]/
+  [Entfernen] actions, resolution tracking, approval gating before a
+  document can be finalized — is not implemented; `ReviewIssueStatus` only
+  has `OPEN`/`ACKNOWLEDGED` today as a placeholder for that later work.
+
+- **Container vulnerability scan coverage for `ollama/ollama`**: unlike
+  the Phase 0-audited backend/frontend images, the `ollama` image's Trivy
+  scan (this phase) found findings that could not be remediated by
+  VocaDox itself (vendored Go dependencies baked into an upstream binary,
+  including one CRITICAL — see `compliance/container-inventory.yml`).
+  Re-scan on every Ollama version bump going forward, and track whether
+  upstream ships a rebuild against patched dependencies.
+
 If you're implementing a later phase and considering adding something that
 feels like it belongs here instead of in your phase's actual scope, add it
 to this list rather than building it opportunistically.

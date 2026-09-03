@@ -17,3 +17,14 @@ MADR-style (Status / Context / Decision / Consequences), numbered sequentially. 
 - [0013](0013-media-storage-layout.md) — Media storage layout: namespaced opaque keys, never client paths
 - [0014](0014-media-normalization-and-metadata.md) — Media normalization stays a NoOp; mutagen rejected for metadata
 - [0015](0015-retention-and-deletion-semantics.md) — Retention foundation and soft-delete vs. physical deletion
+- [0016](0016-speech-provider-selection.md) — Speech-to-text provider and model selection
+- [0017](0017-diarization-provider-selection.md) — Diarization provider and model selection
+- [0018](0018-model-installation-strategy.md) — Model installation strategy: downloaded-at-install-time, not bundled
+- [0019](0019-ffmpeg-normalization.md) — Media normalization via a real transcoding engine (FFmpeg, LGPL build)
+- [0020](0020-worker-topology.md) — Worker topology: two role-parameterized services, one image
+- [0021](0021-word-timing-storage.md) — Word-level timing storage: JSON column, not a row-per-word table
+- [0022](0022-alignment-algorithm.md) — Deterministic word-overlap alignment algorithm
+- [0023](0023-provider-vs-platform-readiness.md) — Provider readiness is separate from platform readiness
+- [0024](0024-llm-provider-selection.md) — LLM provider and extraction model selection
+- [0025](0025-extraction-schema-design.md) — Extraction category/schema design
+- [0026](0026-contradiction-detection.md) — Contradiction detection approach

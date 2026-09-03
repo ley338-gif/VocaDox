@@ -1,14 +1,21 @@
 # Domain model (target architecture)
 
-**Status: identity/organizations/audit (Phase 1) and conversations/media
-(Phase 2) are now implemented — everything else below is still
-documentation-only target state.** The `identity`, `organizations`, and
-`audit` sections describe what exists as of
+**Status: identity/organizations/audit (Phase 1), conversations/media
+(Phase 2), transcription/diarization (Phase 3), and intelligence/evidence/
+review/profiles-foundation (Phase 4) are now implemented — everything
+else below is still documentation-only target state.** The `identity`,
+`organizations`, and `audit` sections describe what exists as of
 `backend/alembic/versions/0002_identity_rbac.py`; `conversations` and
 `media` describe what exists as of
-`backend/alembic/versions/0003_conversation_capture.py` (see
+`backend/alembic/versions/0003_conversation_capture.py`;
+`transcription`/`diarization` as of
+`backend/alembic/versions/0004_speech_diarization.py`; `intelligence`/
+`evidence`/`review`/the `model_profiles` foundation as of
+`backend/alembic/versions/0006_intelligence_evidence.py` (see
 `docs/architecture/conversations.md`, `docs/architecture/media-storage.md`,
-`docs/architecture/media-ingestion.md` for the full detail — this document
+`docs/architecture/media-ingestion.md`,
+`docs/architecture/intelligence-pipeline.md`,
+`docs/architecture/evidence-model.md` for the full detail — this document
 stays the high-level index). Every other domain remains an empty
 placeholder package (spec §65: the rest of the schema ships in later
 phases) and this document is still the agreed blueprint for them.
@@ -50,13 +57,23 @@ Grouped by the domain package that will own them (see
   `docs/architecture/media-ingestion.md`. No AI/transcription/diarization
   of any kind exists yet.
 - **transcription / diarization**: `speakers`, `transcript_segments`
-- **intelligence / evidence**: `extracted_facts`, `fact_evidence`
-- **review**: `review_issues`
+- **intelligence / evidence** (Phase 4 — implemented): `extracted_facts`,
+  `fact_evidence`. See `docs/architecture/intelligence-pipeline.md` and
+  `docs/architecture/evidence-model.md` for the full detail.
+- **review** (Phase 4 — implemented, read-only): `review_issues`. Not the
+  full Phase 5 Review Wizard — see
+  `docs/architecture/future-considerations.md`.
 - **documents**: `documents`, `document_revisions`
 - **templates**: `templates`, `template_versions`, `prompts`,
   `prompt_versions`
-- **profiles**: `model_profiles`, `model_profile_versions`,
-  `processing_profiles`, `processing_profile_versions`
+- **profiles** (Phase 4 — `model_profiles` implemented as a minimal
+  foundation only; everything else below still target-only): full target
+  list is `model_profiles`, `model_profile_versions`,
+  `processing_profiles`, `processing_profile_versions` — Phase 4's
+  `model_profiles` has only id/name/provider/model_identifier/purpose/
+  context_length/temperature/max_tokens/structured_output/version/enabled,
+  no versioning table and no processing-profile bundling yet. See
+  `docs/architecture/future-considerations.md`.
 - **workers**: `processing_runs`, `processing_jobs`
 - **administration**: `dictionaries`, `dictionary_entries`
 - **integrations**: `service_accounts`, `webhooks`, `webhook_deliveries`

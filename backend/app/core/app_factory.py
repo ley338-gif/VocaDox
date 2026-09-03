@@ -13,6 +13,7 @@ from app.administration.router import router as administration_router
 from app.conversations.router import router as conversations_router
 from app.diarization.router import router as diarization_router
 from app.identity.router import router as identity_router
+from app.intelligence.router import router as intelligence_router
 from app.organizations.router import router as organizations_router
 from app.platform.config import get_settings
 from app.platform.db import model_registry  # noqa: F401 - registers all domain models
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     app.include_router(organizations_router, prefix=settings.api_prefix)
     app.include_router(transcription_router, prefix=settings.api_prefix)
     app.include_router(diarization_router, prefix=settings.api_prefix)
+    app.include_router(intelligence_router, prefix=settings.api_prefix)
     app.include_router(administration_router, prefix=settings.api_prefix)
 
     return app

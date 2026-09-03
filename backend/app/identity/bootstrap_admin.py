@@ -41,6 +41,7 @@ from app.identity.service import (
 )
 from app.platform.db import model_registry  # noqa: F401 - registers all domain models
 from app.platform.db.session import get_sessionmaker
+from app.profiles.seed import apply_seed as apply_model_profile_seed
 
 SYSTEM_ADMIN_ROLE = "System Admin"
 BOOTSTRAP_GROUP_NAME = "Administrators"
@@ -57,6 +58,7 @@ async def bootstrap_admin(
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
         await apply_seed(session)
+        await apply_model_profile_seed(session)  # Phase 4: default extraction ModelProfile
         await session.commit()
 
         already_has_admin = await any_user_has_role(session, SYSTEM_ADMIN_ROLE)

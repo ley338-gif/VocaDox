@@ -17,9 +17,27 @@ class ValkeyBackend:
     def __init__(self, client: Valkey) -> None:
         self._client = client
 
+    # Real bug found by Phase 4 fresh-install testing: valkey-py's async
+    # client defaults `socket_timeout` to 5 seconds. `dequeue`'s BLPOP is
+    # a server-side blocking call with its own `timeout_seconds` — when
+    # that value reaches (or exceeds) the client's socket_timeout, the
+    # client's socket-level read can time out a hair before the server's
+    # BLPOP actually returns (empty), surfacing as a spurious
+    # `valkey.exceptions.TimeoutError` on every idle poll instead of a
+    # clean `None`. This was invisible in Phase 3 because both existing
+    # workers poll >=2 job types, so `dequeue_next`'s per-queue timeout
+    # (`timeout_seconds // len(job_types)`) always landed at 2s — safely
+    # under the 5s default. Phase 4's `worker-extraction` polls exactly
+    # one job type (EXTRACTION_WORKER_JOB_TYPES), so its per-queue timeout
+    # is the full 5s, exactly racing the client default. Fixed at the
+    # client level (a generous fixed margin) rather than by constraining
+    # future job-type-count combinations to "stay under 5s" by
+    # convention.
+    _SOCKET_TIMEOUT_SECONDS = 30
+
     @classmethod
     def from_url(cls, url: str) -> ValkeyBackend:
-        return cls(Valkey.from_url(url))
+        return cls(Valkey.from_url(url, socket_timeout=cls._SOCKET_TIMEOUT_SECONDS))
 
     # -- CacheBackend -----------------------------------------------------
     async def get(self, key: str) -> str | None:

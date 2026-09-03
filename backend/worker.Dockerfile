@@ -1,9 +1,13 @@
-# AI worker image (worker-speech / worker-diarization) — separate from
-# backend/Dockerfile (the api/frontend-facing image) because this one
-# installs the [ai] extra (faster-whisper, pyannote.audio, torch,
-# torchaudio, ...) and a real FFmpeg binary, both multi-hundred-MB. The
-# api/frontend images never get GPU device access or these packages (spec:
-# "GPU isolation" — see deploy/docker-compose.yml).
+# AI worker image (worker-speech / worker-diarization / worker-extraction)
+# — separate from backend/Dockerfile (the api/frontend-facing image)
+# because this one installs the [ai] extra (faster-whisper,
+# pyannote.audio, torch, torchaudio, httpx, ...) and a real FFmpeg binary,
+# both multi-hundred-MB. The api/frontend images never get GPU device
+# access or these packages (spec: "GPU isolation" — see
+# deploy/docker-compose.yml). Phase 4's worker-extraction role reuses this
+# same image (it only needs httpx to call the separate `ollama` container
+# over HTTP — no local model weights or GPU access of its own) rather than
+# introducing a fourth, near-identical image.
 #
 # Base image: same pinned python:3.11-slim-trixie as backend/Dockerfile —
 # see that file's comments for the trixie-over-bookworm CVE rationale,
@@ -27,23 +31,32 @@ RUN apt-get update \
 # ffmpeg's own LGPL-3.0 license, confirmed via the build's own
 # LICENSE.txt and `ffmpeg -version`'s configuration string showing no
 # --enable-gpl/--enable-nonfree and libx264/libx265/libxavs2/libxvid all
-# --disable'd). The `latest` release tag is a continuously-updated rolling
-# build, so this Dockerfile pins by content hash (sha256) rather than by
-# tag/commit — if upstream ever republishes different bytes under the same
-# tag, this build fails closed (checksum mismatch) instead of silently
-# accepting a different, unaudited binary.
-# Phase 3.1: this pin was bumped after `docker compose build` genuinely
-# failed closed exactly as designed — BtbN's `latest` tag had republished
-# different bytes under the same tag since Phase 3 (a real occurrence of
-# the rolling-tag risk this Dockerfile's original comment warned about,
-# not a hypothetical). Re-verified before bumping: re-downloaded, hashed,
-# and re-inspected `ffmpeg -version`'s configuration string for the same
-# LGPL-only markers (`--enable-version3`, no `--enable-gpl`/
-# `--enable-nonfree`, `libx264`/`libx265`/`libxavs2`/`libxvid` all still
-# `--disable`d) before trusting the new hash — never bumped blindly just
-# to unblock a build.
-ARG FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl.tar.xz
-ARG FFMPEG_SHA256=9f5f7d49ef9e7c43834a27e298f64db32655843655b27ec08b6b0067124c36df
+# --disable'd).
+#
+# Pin history / the `latest`-tag rolling-build problem: earlier revisions
+# of this Dockerfile pinned against BtbN's `latest` release tag by content
+# hash (sha256), on the theory that a republish under the same tag would
+# fail closed (checksum mismatch) rather than silently accept different,
+# unaudited bytes. In practice this "failed closed" not once but on THREE
+# separate real occasions within Phase 3.1/Phase 4 alone — `latest` is
+# rebuilt and republished under the identical tag multiple times per day,
+# so any hash pinned against it goes stale within hours, not months,
+# turning "defense in depth" into "this build breaks CI on a schedule
+# nobody controls." Phase 4 switched to pinning against one of BtbN's
+# **dated, immutable** release tags instead
+# (`autobuild-YYYY-MM-DD-HH-MM`) — GitHub Releases assets under a specific
+# tag are not silently replaced the way `latest`'s are, so this stops
+# recurring rather than needing to be re-verified-and-rebumped again next
+# time `latest` happens to rebuild. The sha256 pin is kept as defense in
+# depth regardless (a compromised/tampered asset under the dated tag would
+# still fail closed), it's just no longer racing a tag that changes
+# underneath it. Re-verified before switching: downloaded fresh, confirmed
+# `ffmpeg -version`'s configuration string still shows
+# `--enable-version3`, no `--enable-gpl`/`--enable-nonfree`,
+# `libx264`/`libx265`/`libxavs2`/`libxvid` still `--disable`d, and
+# LICENSE.txt is still LGPL-3.0 text.
+ARG FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-03-13-17/ffmpeg-N-126390-g9fc8c785e2-linux64-lgpl.tar.xz
+ARG FFMPEG_SHA256=b0b27bf2212cbe74b52568d13e200215d5f01f10f95d106da06a89578619ecb3
 RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
     && echo "${FFMPEG_SHA256}  /tmp/ffmpeg.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg-extract \
@@ -69,9 +82,13 @@ RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
 # shared library on the system, because none had ever been installed.
 # Same BtbN source, same LGPL-only stance as above (never Debian's own
 # GPL-configured `ffmpeg`/libav* packages) — just the "shared" build
-# variant instead of "static", pinned by sha256 the same way.
-ARG FFMPEG_SHARED_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl-shared.tar.xz
-ARG FFMPEG_SHARED_SHA256=fb97c54d9a17d6e140074919625b6b0496d7d0b0719300a92efad323aa21f814
+# variant instead of "static". Pinned against the SAME dated, immutable
+# release tag as the static archive above, for the same reason (stop
+# racing BtbN's `latest` tag's multiple-times-per-day rebuilds) —
+# LICENSE.txt re-verified as LGPL-3.0 text on this exact asset before
+# trusting the hash.
+ARG FFMPEG_SHARED_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-03-13-17/ffmpeg-N-126390-g9fc8c785e2-linux64-lgpl-shared.tar.xz
+ARG FFMPEG_SHARED_SHA256=cd140dd666d191533ce4b3c0882ffce0001cb5e1d56e1ea85536b58ea28a2dbf
 RUN curl -sL -o /tmp/ffmpeg-shared.tar.xz "$FFMPEG_SHARED_URL" \
     && echo "${FFMPEG_SHARED_SHA256}  /tmp/ffmpeg-shared.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg-shared-extract \

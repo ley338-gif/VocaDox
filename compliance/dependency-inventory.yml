@@ -237,7 +237,22 @@ dependencies:
     license: BSD-3-Clause
     license_source_url: https://pypi.org/pypi/httpx/json
     approval_status: approved
-    notes: "info.license = BSD-3-Clause (PyPI JSON, version 0.28.1)."
+    notes: >
+      info.license = BSD-3-Clause (PyPI JSON, version 0.28.1). Originally a
+      `[dev]`-only test dependency (httpx.AsyncClient/TestClient); Phase 4
+      also lists it under the backend `[ai]` extra so the
+      worker-extraction image gets it — it is the HTTP client
+      OllamaLLMProvider (app/providers/llm.py) uses to talk to a local
+      Ollama server. Never installed in the api/frontend images beyond
+      what `[dev]` already required for tests.
+
+  # Phase 4 note: Ollama itself (the local LLM inference server) is a
+  # separate container image, not a Python dependency — see
+  # container-inventory.yml and
+  # docs/architecture/adr/0024-llm-provider-selection.md for the full
+  # runtime/model evaluation. CI's mandatory test suite always runs
+  # against FakeLLMProvider; httpx above is the only new pypi package
+  # Phase 4 adds.
 
   # ---------------------------------------------------------------------
   # Node (npm)

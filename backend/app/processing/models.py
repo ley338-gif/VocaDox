@@ -33,6 +33,7 @@ class RunType(StrEnum):
     SPEECH_TO_TEXT = "speech_to_text"
     DIARIZATION = "diarization"
     ALIGNMENT = "alignment"
+    EXTRACTION = "extraction"  # Phase 4: LLM fact extraction
 
 
 class JobType(StrEnum):
@@ -40,8 +41,7 @@ class JobType(StrEnum):
     TRANSCRIBE = "transcribe"
     DIARIZE = "diarize"
     ALIGN = "align"
-    # No LLM job types exist yet (Phase 4+). Documented here only so the
-    # enum's eventual growth path is visible in one place.
+    EXTRACT = "extract"  # Phase 4: LLM fact extraction, explicit-trigger only (never auto-chained)
 
 
 class ProcessingStatus(StrEnum):

@@ -34,6 +34,7 @@ from app.platform.version import APPLICATION_VERSION
 from app.processing.models import JobType, ProcessingJob, ProcessingRun, RunStatus, RunType
 from app.processing.service import create_and_enqueue_job, get_active_job
 from app.providers.diarization import DiarizationProvider
+from app.providers.llm import LLMProvider
 from app.providers.speech_to_text import SpeechToTextProvider
 from app.providers.storage import StorageProvider
 from app.transcription.alignment import align_transcript
@@ -589,3 +590,132 @@ async def maybe_trigger_align(
         created_by_user_id=job.created_by_user_id,
         job_metadata=job.job_metadata,
     )
+
+
+# -- Phase 4: extraction (explicit-trigger only, never auto-chained from
+# ALIGN — spec: "explicit trigger, not automatic") -------------------------
+
+
+async def start_extraction(
+    session: AsyncSession,
+    queue: QueueBackend,
+    *,
+    conversation: Conversation,
+    source_media: MediaAsset,
+    requested_by: User,
+) -> ProcessingJob:
+    """API entry point for `POST /conversations/{id}/process/extract`. A
+    conversation must be READY (a completed, active Transcript must
+    exist) — extraction never runs against a transcript still being
+    produced. Always creates a fresh job (re-extraction simply creates new
+    ExtractedFact rows via a new ProcessingRun; nothing is deleted, matching
+    the Phase 3 "processing history is never destroyed" precedent)."""
+    transcript = await get_active_ready_transcript(session, source_media_id=source_media.id)
+    if transcript is None:
+        raise ValueError("conversation has no active, ready transcript to extract facts from")
+
+    job = await create_and_enqueue_job(
+        session,
+        queue,
+        conversation_id=conversation.id,
+        source_media_id=source_media.id,
+        job_type=JobType.EXTRACT,
+        created_by_user_id=requested_by.id,
+        job_metadata={"transcript_id": str(transcript.id)},
+    )
+    await _transition_conversation(session, conversation, ConversationStatus.EXTRACTING)
+
+    await record_event(
+        session,
+        event_type="extraction.started",
+        user_id=requested_by.id,
+        event_metadata={
+            "conversation_id": str(conversation.id),
+            "transcript_id": str(transcript.id),
+            "job_id": str(job.id),
+        },
+    )
+    return job
+
+
+async def execute_extract(
+    session: AsyncSession,
+    llm_provider: LLMProvider,
+    job: ProcessingJob,
+) -> uuid.UUID:
+    from app.intelligence.service import run_extraction
+    from app.profiles.models import ModelProfilePurpose
+    from app.profiles.service import get_active_profile
+    from app.providers.llm import LLMModelUnavailableError
+
+    metadata = job.job_metadata or {}
+    transcript_id = metadata.get("transcript_id")
+    transcript = (
+        await session.get(Transcript, uuid.UUID(transcript_id)) if transcript_id else None
+    )
+    if transcript is None:
+        transcript = await get_active_ready_transcript(
+            session, source_media_id=job.source_media_id
+        )
+    if transcript is None:
+        raise ValueError("no active, ready transcript to extract from")
+
+    profile = await get_active_profile(session, purpose=ModelProfilePurpose.EXTRACTION)
+    if profile is None:
+        raise LLMModelUnavailableError(
+            "no enabled extraction ModelProfile configured — run `python -m app.profiles.seed`"
+        )
+
+    status = llm_provider.status()
+    run = ProcessingRun(
+        conversation_id=job.conversation_id,
+        source_media_id=job.source_media_id,
+        run_type=RunType.EXTRACTION.value,
+        status=RunStatus.RUNNING.value,
+        provider=status.provider,
+        model=status.model,
+        model_revision=status.model_revision,
+        application_version=APPLICATION_VERSION,
+        configuration_snapshot={
+            "model_profile_id": str(profile.id),
+            "temperature": profile.temperature,
+        },
+    )
+    session.add(run)
+    await session.flush()
+
+    outcome = await run_extraction(
+        session,
+        conversation_id=job.conversation_id,
+        transcript=transcript,
+        processing_run_id=run.id,
+        provider=llm_provider,
+        profile=profile,
+    )
+
+    run.status = RunStatus.SUCCEEDED.value
+    run.completed_at = datetime.now(UTC)
+    run.raw_output = {
+        "facts_created": outcome.facts_created,
+        "review_issues_created": outcome.review_issues_created,
+        "facts_by_category": outcome.facts_by_category,
+    }
+    await session.flush()
+
+    conversation = await session.get(Conversation, job.conversation_id)
+    if conversation is not None:
+        await _transition_conversation(session, conversation, ConversationStatus.READY)
+
+    # event_metadata carries only counts/ids, never fact content or
+    # transcript text (spec §63).
+    await record_event(
+        session,
+        event_type="extraction.completed",
+        event_metadata={
+            "processing_run_id": str(run.id),
+            "conversation_id": str(job.conversation_id),
+            "facts_created": outcome.facts_created,
+            "review_issues_created": outcome.review_issues_created,
+        },
+    )
+    return run.id

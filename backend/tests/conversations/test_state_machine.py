@@ -41,18 +41,32 @@ def test_deleted_is_terminal() -> None:
     assert not is_valid_transition(ConversationStatus.DELETED, ConversationStatus.RECORDING)
 
 
-def test_phase3_processing_states_now_exist_but_phase4_states_still_do_not() -> None:
-    # TRANSCRIBING/DIARIZING/ALIGNING became real in Phase 3 (see
-    # app.processing) — this now asserts the *opposite* of the old Phase 2
-    # guard for those three, while continuing to guard against Phase 4+
-    # states (EXTRACTING/COMPOSING/APPROVED) being added before their own
-    # phase is approved.
+def test_phase4_extracting_now_exists_but_phase5_states_still_do_not() -> None:
+    # TRANSCRIBING/DIARIZING/ALIGNING became real in Phase 3; EXTRACTING
+    # became real in Phase 4 (see app.intelligence) — this now asserts the
+    # *opposite* of the old Phase 3 guard for EXTRACTING, while continuing
+    # to guard against Phase 5+ states (COMPOSING/APPROVED and friends)
+    # being added before their own phase is approved.
     assert hasattr(ConversationStatus, "TRANSCRIBING")
     assert hasattr(ConversationStatus, "DIARIZING")
     assert hasattr(ConversationStatus, "ALIGNING")
-    assert not hasattr(ConversationStatus, "EXTRACTING")
+    assert hasattr(ConversationStatus, "EXTRACTING")
     assert not hasattr(ConversationStatus, "COMPOSING")
     assert not hasattr(ConversationStatus, "APPROVED")
+    assert not hasattr(ConversationStatus, "VALIDATING")
+    assert not hasattr(ConversationStatus, "REVIEW_REQUIRED")
+    assert not hasattr(ConversationStatus, "READY_FOR_APPROVAL")
+
+
+def test_ready_to_extracting_is_valid_and_back() -> None:
+    assert (
+        transition(ConversationStatus.READY, ConversationStatus.EXTRACTING)
+        == ConversationStatus.EXTRACTING
+    )
+    assert (
+        transition(ConversationStatus.EXTRACTING, ConversationStatus.READY)
+        == ConversationStatus.READY
+    )
 
 
 def test_failed_can_retry_to_uploaded() -> None:
