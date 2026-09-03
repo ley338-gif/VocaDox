@@ -38,10 +38,16 @@ def upgrade() -> None:
         sa.Column("version", sa.String(length=64), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -60,10 +66,16 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Float(), nullable=True),
         sa.Column("status", sa.String(length=16), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
@@ -84,7 +96,10 @@ def upgrade() -> None:
         sa.Column("transcript_segment_id", sa.Uuid(), nullable=False),
         sa.Column("evidence_type", sa.String(length=32), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["fact_id"], ["extracted_facts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
@@ -109,10 +124,16 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=16), nullable=False),
         sa.Column("issue_metadata", sa.JSON(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
