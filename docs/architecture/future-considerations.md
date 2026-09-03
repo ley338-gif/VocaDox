@@ -118,6 +118,41 @@ lost and aren't quietly decided by accident later.
   Re-scan on every Ollama version bump going forward, and track whether
   upstream ships a rebuild against patched dependencies.
 
+- **Full pluggable Template Engine / template versions** (spec §6's target
+  architecture): Phase 5's document composition uses one fixed, built-in
+  template (group facts by category into three sections) — deliberately
+  not the versioned, admin-editable `templates`/`template_versions` system
+  the spec envisions. That belongs to Phase 6 alongside Processing
+  Profiles bundling.
+
+- **PDF/DOCX export**: Phase 5's export is deliberately plain text and
+  JSON only — no new dependency was added to avoid an unresearched
+  license/security decision under this phase's time budget. A future
+  phase should do a real primary-source license/maintenance evaluation of
+  a PDF/DOCX library (e.g. reportlab, python-docx, WeasyPrint) before
+  adding either format, following the exact same primary-source-license
+  discipline Phase 3/4 applied to speech/diarization/LLM dependencies.
+
+- **Cross-conversation Timeline / longitudinal comparison** (spec's Phase
+  9 scope): Phase 5's "Timeline" tab is intentionally scoped to one
+  conversation's own markers/notes/processing history — comparing a
+  patient/client's documents across multiple conversations over time is
+  explicitly out of scope here.
+
+- **CI coverage for `RunType.COMPOSITION`'s "no provider" precedent**: see
+  ADR-0027 — composition is the first `ProcessingRun` stage with no real
+  provider behind it. If a future phase adds a second such
+  provider-less/synchronous stage, consider whether the
+  `ProcessingJob`/worker pattern's "never inline in a request handler"
+  docstring rule should be revised to state this exception explicitly
+  rather than relying on each such decision re-deriving it via its own ADR.
+
+- **Multi-fact contradiction resolution UX**: Phase 5's Review Wizard
+  resolves a `POTENTIAL_CONTRADICTION` issue (which references two facts)
+  by acting on exactly one targeted fact per PATCH call — a future phase
+  could offer a richer "which of these two is correct" side-by-side
+  comparison UI instead of the current pick-one-fact-id-explicitly flow.
+
 If you're implementing a later phase and considering adding something that
 feels like it belongs here instead of in your phase's actual scope, add it
 to this list rather than building it opportunistically.

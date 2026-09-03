@@ -19,17 +19,31 @@ import {
   mediaContentUrl,
   uploadMedia,
 } from "../api/conversations";
+import { getProcessingStatus } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
+import { DocumentPanel } from "../components/DocumentPanel";
 import { FactsPanel } from "../components/FactsPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
+import { ReviewWizard } from "../components/ReviewWizard";
 import { TranscriptPanel } from "../components/TranscriptPanel";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Select, TextInput } from "../design-system/FormControls";
 import styles from "./ConversationDetailPage.module.css";
 
-type Tab = "overview" | "audio" | "transcript" | "facts" | "participants" | "notes" | "activity";
+type Tab =
+  | "overview"
+  | "document"
+  | "review"
+  | "audio"
+  | "transcript"
+  | "facts"
+  | "timeline"
+  | "details"
+  | "participants"
+  | "notes"
+  | "activity";
 
 export function ConversationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +82,11 @@ export function ConversationDetailPage() {
     queryKey: ["conversation-notes", conversationId],
     queryFn: () => listNotes(conversationId),
     enabled: Boolean(conversationId),
+  });
+  const processingQuery = useQuery({
+    queryKey: ["conversation-processing", conversationId],
+    queryFn: () => getProcessingStatus(conversationId),
+    enabled: Boolean(conversationId) && (tab === "timeline" || tab === "details"),
   });
 
   const [participantName, setParticipantName] = useState("");
@@ -161,7 +180,21 @@ export function ConversationDetailPage() {
       </div>
 
       <div className={styles.tabs} role="tablist">
-        {(["overview", "audio", "transcript", "facts", "participants", "notes", "activity"] as Tab[]).map((t) => (
+        {(
+          [
+            "overview",
+            "document",
+            "review",
+            "audio",
+            "transcript",
+            "facts",
+            "timeline",
+            "details",
+            "participants",
+            "notes",
+            "activity",
+          ] as Tab[]
+        ).map((t) => (
           <button
             key={t}
             role="tab"
@@ -278,6 +311,86 @@ export function ConversationDetailPage() {
                 </div>
               )}
               <FactsPanel conversationId={conversationId} audioPlayerRef={audioPlayerRef} />
+            </div>
+          )}
+
+          {tab === "document" && (
+            <div>
+              <DocumentPanel conversationId={conversationId} />
+            </div>
+          )}
+
+          {tab === "review" && (
+            <div>
+              {sourceMedia && (
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <AudioPlayer
+                    ref={audioPlayerRef}
+                    src={mediaContentUrl(conversationId, sourceMedia.id)}
+                    sourceLabel="Conversation audio"
+                    onTimeUpdateMs={setActiveMs}
+                  />
+                </div>
+              )}
+              <ReviewWizard conversationId={conversationId} audioPlayerRef={audioPlayerRef} />
+            </div>
+          )}
+
+          {tab === "timeline" && (
+            <div className={styles.sideCard}>
+              <p style={{ color: "var(--text-muted)" }}>
+                Chronological processing/event timeline for this conversation only — cross-
+                conversation longitudinal comparison is a later phase.
+              </p>
+              <ul className={styles.list}>
+                {[
+                  { at: conversation.created_at, label: "Conversation created" },
+                  ...(markersQuery.data ?? []).map((m) => ({
+                    at: m.created_at,
+                    label: `Marker at ${Math.round(m.timestamp_ms / 1000)}s${m.label ? ` — ${m.label}` : ""}`,
+                  })),
+                  ...(notesQuery.data ?? []).map((n) => ({ at: n.created_at, label: `Note: ${n.content}` })),
+                  ...(processingQuery.data?.jobs ?? []).map((j) => ({
+                    at: j.completed_at ?? j.started_at ?? j.queued_at,
+                    label: `${j.job_type} — ${j.status}${j.failure_class ? ` (${j.failure_class})` : ""}`,
+                  })),
+                ]
+                  .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+                  .map((event, idx) => (
+                    <li key={idx} className={styles.listItem}>
+                      <span>{event.label}</span>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        {new Date(event.at).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          {tab === "details" && (
+            <div className={styles.sideCard}>
+              <p style={{ color: "var(--text-muted)" }}>
+                Processing provenance for this conversation — see the Facts/Document tabs for what
+                each processing run actually produced.
+              </p>
+              {processingQuery.isLoading && <p>Loading processing history…</p>}
+              <ul className={styles.list}>
+                {processingQuery.data?.jobs.map((job) => (
+                  <li key={job.id} className={styles.listItem}>
+                    <span>
+                      {job.job_type} — {job.status} (attempt {job.attempt}/{job.max_attempts})
+                    </span>
+                    <span style={{ color: "var(--text-muted)" }}>
+                      {job.completed_at
+                        ? new Date(job.completed_at).toLocaleString()
+                        : job.started_at
+                          ? `started ${new Date(job.started_at).toLocaleString()}`
+                          : `queued ${new Date(job.queued_at).toLocaleString()}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

@@ -52,7 +52,12 @@ PERMISSIONS: dict[str, str] = {
     "fact:extract": "Trigger LLM fact extraction for a conversation's transcript.",
     "evidence:read": "View the evidence (transcript segments) linked to an extracted fact.",
     "review-issue:read": "View review issues (uncertainty/contradiction flags) for a conversation.",
+    "review-issue:resolve": (
+        "Resolve a review issue via the Review Wizard (confirm/correct/remove)."
+    ),
     "document:review": "Review generated documents.",
+    "document:read": "View a conversation's composed document and revision history.",
+    "document:edit": "Compose a document and apply fact corrections during review.",
     "document:approve": "Approve/finalize generated documents.",
     "template:write": "Create/edit documentation templates.",
     "profile:write": "Create/edit processing profiles.",
@@ -97,6 +102,9 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "fact:extract",
             "evidence:read",
             "review-issue:read",
+            "review-issue:resolve",
+            "document:read",
+            "document:edit",
         ],
     ),
     "Template Manager": (
@@ -118,6 +126,9 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "fact:read",
             "evidence:read",
             "review-issue:read",
+            "review-issue:resolve",
+            "document:read",
+            "document:edit",
         ],
     ),
     "User": (
@@ -147,6 +158,9 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "fact:extract",
             "evidence:read",
             "review-issue:read",
+            "review-issue:resolve",
+            "document:read",
+            "document:edit",
         ],
     ),
     "Auditor": (
@@ -161,6 +175,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "fact:read",
             "evidence:read",
             "review-issue:read",
+            "document:read",
         ],
     ),
     "API Service Account": (

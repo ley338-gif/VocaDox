@@ -32,6 +32,8 @@ export type Certainty = "stated" | "unclear" | "incomplete" | "not_mentioned";
 export type ReviewIssueType = "uncertainty" | "potential_contradiction";
 export type ReviewIssueSeverity = "low" | "medium" | "high" | "critical";
 
+export type FactReviewStatus = "pending" | "confirmed" | "corrected" | "removed";
+
 export interface ExtractedFact {
   id: string;
   conversation_id: string;
@@ -42,6 +44,10 @@ export interface ExtractedFact {
   certainty: Certainty;
   confidence: number | null;
   status: FactStatus;
+  review_status: FactReviewStatus;
+  corrected_structured_value: Record<string, unknown> | null;
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -66,7 +72,11 @@ export interface ReviewIssue {
   uncertainty_category: string | null;
   related_fact_ids: string[];
   description: string;
-  status: string;
+  status: "open" | "acknowledged" | "resolved";
+  resolved_status: "confirmed" | "corrected" | "removed" | null;
+  resolved_fact_id: string | null;
+  resolved_by_user_id: string | null;
+  resolved_at: string | null;
   created_at: string;
   updated_at: string;
 }

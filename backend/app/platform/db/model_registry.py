@@ -15,6 +15,12 @@ from app.audit import models as _audit_models  # noqa: F401
 # query touches either relationship.
 from app.conversations import models as _conversations_models  # noqa: F401,E402
 from app.diarization import models as _diarization_models  # noqa: F401,E402
+
+# Phase 5: documents FK-references conversations.id and document_revisions.id
+# (circular by design — Document.current_revision_id -> DocumentRevision,
+# DocumentRevision.document_id -> Document — both declared in the same
+# module so SQLAlchemy resolves the forward reference without help).
+from app.documents import models as _documents_models  # noqa: F401,E402
 from app.evidence import models as _evidence_models  # noqa: F401,E402
 from app.identity import models as _identity_models  # noqa: F401
 

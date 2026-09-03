@@ -1,24 +1,28 @@
 # Domain model (target architecture)
 
 **Status: identity/organizations/audit (Phase 1), conversations/media
-(Phase 2), transcription/diarization (Phase 3), and intelligence/evidence/
-review/profiles-foundation (Phase 4) are now implemented — everything
-else below is still documentation-only target state.** The `identity`,
-`organizations`, and `audit` sections describe what exists as of
+(Phase 2), transcription/diarization (Phase 3), intelligence/evidence/
+review/profiles-foundation (Phase 4), and documents/review-wizard/
+approval (Phase 5) are now implemented — everything else below is still
+documentation-only target state.** The `identity`, `organizations`, and
+`audit` sections describe what exists as of
 `backend/alembic/versions/0002_identity_rbac.py`; `conversations` and
 `media` describe what exists as of
 `backend/alembic/versions/0003_conversation_capture.py`;
 `transcription`/`diarization` as of
 `backend/alembic/versions/0004_speech_diarization.py`; `intelligence`/
 `evidence`/`review`/the `model_profiles` foundation as of
-`backend/alembic/versions/0006_intelligence_evidence.py` (see
+`backend/alembic/versions/0006_intelligence_evidence.py`; `documents` (plus
+extensions to `intelligence`/`review`) as of
+`backend/alembic/versions/0007_documents_review.py` (see
 `docs/architecture/conversations.md`, `docs/architecture/media-storage.md`,
 `docs/architecture/media-ingestion.md`,
 `docs/architecture/intelligence-pipeline.md`,
-`docs/architecture/evidence-model.md` for the full detail — this document
-stays the high-level index). Every other domain remains an empty
-placeholder package (spec §65: the rest of the schema ships in later
-phases) and this document is still the agreed blueprint for them.
+`docs/architecture/evidence-model.md`, `docs/architecture/documents.md`
+for the full detail — this document stays the high-level index). Every
+other domain remains an empty placeholder package (spec §65: the rest of
+the schema ships in later phases) and this document is still the agreed
+blueprint for them.
 
 ## Target entity list (spec §65)
 
@@ -60,10 +64,15 @@ Grouped by the domain package that will own them (see
 - **intelligence / evidence** (Phase 4 — implemented): `extracted_facts`,
   `fact_evidence`. See `docs/architecture/intelligence-pipeline.md` and
   `docs/architecture/evidence-model.md` for the full detail.
-- **review** (Phase 4 — implemented, read-only): `review_issues`. Not the
-  full Phase 5 Review Wizard — see
-  `docs/architecture/future-considerations.md`.
-- **documents**: `documents`, `document_revisions`
+- **review** (Phase 4 read-only surface; Phase 5 Review Wizard —
+  implemented): `review_issues`, now with real resolution fields
+  (`resolved_status`/`resolved_fact_id`/`resolved_by_user_id`/
+  `resolved_at`) written by `PATCH /conversations/{id}/review-issues/
+  {issue_id}`. See `docs/architecture/documents.md`.
+- **documents** (Phase 5 — implemented): `documents`, `document_revisions`.
+  Composition/revisions/approval workflow — see
+  `docs/architecture/documents.md`. The full Template Engine
+  (`templates`/`template_versions`) remains Phase 6.
 - **templates**: `templates`, `template_versions`, `prompts`,
   `prompt_versions`
 - **profiles** (Phase 4 — `model_profiles` implemented as a minimal

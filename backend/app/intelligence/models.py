@@ -48,6 +48,21 @@ class FactStatus(StrEnum):
     SUPERSEDED = "superseded"  # a later extraction run replaced it (re-extraction)
 
 
+class FactReviewStatus(StrEnum):
+    """Phase 5: a human's decision on this fact during the Review Wizard
+    (spec §28) — never set by the extraction pipeline itself. Mirrors the
+    non-destructive correction pattern Phase 3 established for transcript
+    segments (`SegmentReviewStatus` / `original_text` vs `corrected_text`):
+    the LLM's original `structured_value` is NEVER overwritten; a
+    correction only ever populates `corrected_structured_value` alongside
+    it, with the change recorded in `FactCorrection`."""
+
+    PENDING = "pending"  # not yet reviewed by a human
+    CONFIRMED = "confirmed"  # a human reviewed it and it's correct as-is
+    CORRECTED = "corrected"  # a human corrected structured_value (see corrected_structured_value)
+    REMOVED = "removed"  # a human decided this fact should not appear in the document
+
+
 class Certainty(StrEnum):
     """What the LLM itself reported about a field/fact — mirrors
     app.intelligence.schemas.Certainty exactly; kept as a separate enum
@@ -88,9 +103,46 @@ class ExtractedFact(Base):
         String(16), nullable=False, default=FactStatus.UNVERIFIED.value, index=True
     )
 
+    # Phase 5 Review Wizard fields. `structured_value` above is NEVER
+    # overwritten by a correction (matches Phase 3's original_text/
+    # corrected_text pattern) — see FactReviewStatus's docstring and
+    # app.documents.service for where these are actually written.
+    review_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=FactReviewStatus.PENDING.value, index=True
+    )
+    corrected_structured_value: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    reviewed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class FactCorrection(Base):
+    """Audit trail for one correction event on a fact — "record
+    user/timestamp/previous-value" (spec), one row per correction, never
+    overwritten. Mirrors app.transcription.models.TranscriptSegmentCorrection
+    exactly."""
+
+    __tablename__ = "fact_corrections"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    fact_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("extracted_facts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    previous_structured_value: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    new_structured_value: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    corrected_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

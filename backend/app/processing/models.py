@@ -34,6 +34,13 @@ class RunType(StrEnum):
     DIARIZATION = "diarization"
     ALIGNMENT = "alignment"
     EXTRACTION = "extraction"  # Phase 4: LLM fact extraction
+    # Phase 5: deterministic document composition. Unlike every RunType
+    # above, this stage calls no external provider — see
+    # app.documents.service's module docstring / ADR-0027 for why it runs
+    # synchronously in the request handler rather than via a
+    # ProcessingJob/worker, while still recording a ProcessingRun here for
+    # the same provenance guarantee every other stage gets.
+    COMPOSITION = "composition"
 
 
 class JobType(StrEnum):
