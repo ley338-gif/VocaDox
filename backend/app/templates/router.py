@@ -230,6 +230,15 @@ async def create_prompt_endpoint(
     return PromptResponse.model_validate(prompt)
 
 
+@prompts_router.get("/{prompt_id}", response_model=PromptResponse)
+async def get_prompt_endpoint(
+    prompt_id: uuid.UUID,
+    _user: User = Depends(_require_template_read),
+    db: AsyncSession = Depends(get_session),
+) -> PromptResponse:
+    return PromptResponse.model_validate(await _get_prompt_or_404(db, prompt_id))
+
+
 @prompts_router.get("/{prompt_id}/versions", response_model=list[PromptVersionResponse])
 async def list_prompt_versions_endpoint(
     prompt_id: uuid.UUID,
