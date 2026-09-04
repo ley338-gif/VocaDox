@@ -72,3 +72,41 @@ export function publishTemplateVersion(
     headers: { "X-CSRF-Token": csrfToken },
   });
 }
+
+// -- Prompts (spec §43: DRAFT -> TEST -> PUBLISHED -> RETIRED) --------------
+
+export interface Prompt {
+  id: string;
+  key: string;
+  name: string;
+  purpose: string;
+  current_published_version_id: string | null;
+}
+
+export interface PromptVersion {
+  id: string;
+  prompt_id: string;
+  version_number: number;
+  status: "draft" | "test" | "published" | "retired";
+  system_prompt: string;
+  category_instructions: Record<string, string> | null;
+}
+
+export function listPrompts(): Promise<Prompt[]> {
+  return request("/prompts");
+}
+
+export function listPromptVersions(promptId: string): Promise<PromptVersion[]> {
+  return request(`/prompts/${promptId}/versions`);
+}
+
+export function publishPromptVersion(
+  promptId: string,
+  versionId: string,
+  csrfToken: string
+): Promise<PromptVersion> {
+  return request(`/prompts/${promptId}/versions/${versionId}/publish`, {
+    method: "POST",
+    headers: { "X-CSRF-Token": csrfToken },
+  });
+}
