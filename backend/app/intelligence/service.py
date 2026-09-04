@@ -16,6 +16,7 @@ import pydantic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.service import record_event
 from app.evidence.models import EvidenceType, FactEvidence
 from app.intelligence.contradictions import FactForContradictionCheck, detect_contradictions
 from app.intelligence.models import Certainty, ExtractedFact, FactCategory, FactStatus
@@ -298,8 +299,22 @@ async def run_extraction(
 
     await session.flush()
 
+    total_review_issues = uncertainty_issues_created + contradiction_issues_created
+    if total_review_issues > 0:
+        # Phase 10 (spec §55): the one genuine "review.required" trigger
+        # point in the codebase — a real ReviewIssue row was just created,
+        # not a synthetic mapping. IDs/counts only, never fact content.
+        await record_event(
+            session,
+            event_type="review.required",
+            event_metadata={
+                "conversation_id": str(conversation_id),
+                "review_issues_created": total_review_issues,
+            },
+        )
+
     return ExtractionOutcome(
         facts_created=len(created_facts),
-        review_issues_created=uncertainty_issues_created + contradiction_issues_created,
+        review_issues_created=total_review_issues,
         facts_by_category=facts_by_category,
     )

@@ -23,7 +23,16 @@ async def record_event(
 ) -> AuditEvent:
     """Persist one audit event. Never pass raw request bodies, passwords,
     tokens, or conversation content in `event_metadata` — see the module
-    docstring on `app.audit.models`."""
+    docstring on `app.audit.models`.
+
+    Phase 10 (spec §55): this is the single hook point for Webhooks —
+    after persisting the event, `app.integrations.service` is given a
+    chance to fan it out to any matching, active webhook. No new
+    event-detection logic exists anywhere else; a webhook only ever fires
+    from an event type that already had a real `record_event(...)` call
+    site before this phase (or the one added alongside it,
+    `review.required`). The import is local to avoid a module-level
+    import cycle risk between the audit and integrations domains."""
     event = AuditEvent(
         event_type=event_type,
         user_id=user_id,
@@ -34,6 +43,13 @@ async def record_event(
     )
     session.add(event)
     await session.flush()
+
+    from app.integrations.service import maybe_dispatch_webhooks
+
+    await maybe_dispatch_webhooks(
+        session, event_type=event_type, event_metadata=event_metadata, audit_event_id=event.id
+    )
+
     return event
 
 
