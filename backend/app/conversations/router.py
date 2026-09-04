@@ -402,7 +402,7 @@ async def finalize_recording_endpoint(
     except UploadValidationError as exc:
         await db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.reason
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.reason
         ) from exc
 
     try:
@@ -467,7 +467,7 @@ async def upload_media_endpoint(
     except UploadValidationError as exc:
         await db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.reason
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.reason
         ) from exc
 
     try:
@@ -839,7 +839,7 @@ async def update_marker_endpoint(
         and changed["timestamp_ms"] < 0
     ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid timestamp"
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid timestamp"
         )
     for field, value in changed.items():
         setattr(marker, field, value)

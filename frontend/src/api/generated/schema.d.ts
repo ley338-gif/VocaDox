@@ -1146,10 +1146,7 @@ export interface components {
         };
         /** Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post */
         Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: string;
         };
         /** ComposeRequest */
@@ -2522,6 +2519,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /** WordSchema */
         WordSchema: {
