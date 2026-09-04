@@ -172,3 +172,34 @@ This chain (Source → Facts → Document, all provenance-linked) is the
 non-negotiable core of "evidence-based" in the product name, and every
 future domain's schema must preserve it — a Fact without `fact_evidence`,
 or a Document statement that can't be traced to a Fact, is a modeling bug.
+
+## Phase 9: Longitudinal Documentation (spec §39/§40/§41)
+
+Timeline/external-reference grouping, comparison, and Follow-ups/Tasks are
+built on two entities that already existed before this phase — no new
+grouping key or parallel fact type was invented:
+
+- **Grouping key**: `conversations.external_reference` (Phase 2). Multiple
+  `Conversation`s sharing the same `(organization_id, external_reference)`
+  compound key form one Timeline. `external_reference` alone is never a
+  valid scoping key — two organizations can coincidentally use the same
+  reference string (e.g. both numbering cases "1", "2", "3", ...), so
+  every Timeline/Comparison query in `app.longitudinal.service` filters on
+  the compound key, never on `external_reference` in isolation.
+- **Comparison** (`app.longitudinal.comparison`): a real, deterministic,
+  structural comparison over `extracted_fact` rows of `category
+  ="general_fact"` across a Timeline's conversations, oldest-first —
+  never an LLM asked to summarize "what changed" (spec §40's explicit
+  "Keine unbelegte Interpretation von Aenderungen"). It reuses
+  `app.intelligence.contradictions.detect_contradictions` verbatim for
+  same-conversation contradictions (-> `CONTRADICTED`) and adds a
+  cross-conversation temporal diff for the same normalized
+  (subject, attribute) pair (-> `NEW`/`CHANGED`/`NOT_MENTIONED`). Every
+  result carries the fact id(s) of both sides being compared.
+- **Follow-ups/Tasks** (`app.longitudinal.models.FollowUpTask`): a
+  generic, domain-neutral action item. `AI_EXTRACTED` rows are
+  idempotently synced from Phase 4's existing `extracted_facts(category=
+  "task")` rows (no parallel fact type) and always carry `source_fact_id`
+  back to the originating fact; `USER_CREATED` rows are added directly by
+  a human, `source_fact_id` is NULL. No notification/reminder/email system
+  exists here (Phase 10 territory).

@@ -1652,6 +1652,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Related Conversations Endpoint */
+        get: operations["get_related_conversations_endpoint_api_v1_conversations__conversation_id__related_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/external-references/{external_reference}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get External Reference Timeline Endpoint */
+        get: operations["get_external_reference_timeline_endpoint_api_v1_external_references__external_reference__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/external-references/{external_reference}/comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get External Reference Comparison Endpoint */
+        get: operations["get_external_reference_comparison_endpoint_api_v1_external_references__external_reference__comparison_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Conversation Tasks Endpoint */
+        get: operations["list_conversation_tasks_endpoint_api_v1_conversations__conversation_id__tasks_get"];
+        put?: never;
+        /** Create Conversation Task Endpoint */
+        post: operations["create_conversation_task_endpoint_api_v1_conversations__conversation_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Task Endpoint */
+        patch: operations["update_task_endpoint_api_v1_tasks__task_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1732,6 +1818,45 @@ export interface components {
             /** File */
             file: string;
         };
+        /** ComparisonItemResponse */
+        ComparisonItemResponse: {
+            status: components["schemas"]["ComparisonStatus"];
+            /** Subject */
+            subject: string;
+            /** Attribute */
+            attribute: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Conversation Title */
+            conversation_title: string;
+            /** Current Fact Id */
+            current_fact_id: string | null;
+            /** Current Value */
+            current_value: string | null;
+            /** Prior Fact Id */
+            prior_fact_id: string | null;
+            /** Prior Value */
+            prior_value: string | null;
+            /** Prior Conversation Id */
+            prior_conversation_id: string | null;
+        };
+        /** ComparisonResponse */
+        ComparisonResponse: {
+            /** External Reference */
+            external_reference: string;
+            /** Conversation Count */
+            conversation_count: number;
+            /** Items */
+            items: components["schemas"]["ComparisonItemResponse"][];
+        };
+        /**
+         * ComparisonStatus
+         * @enum {string}
+         */
+        ComparisonStatus: "new" | "changed" | "not_mentioned" | "contradicted";
         /**
          * ComponentHealth
          * @description One dependency's real, live-checked status — never a fabricated
@@ -1862,6 +1987,15 @@ export interface components {
             }[];
             /** Transcript Segment Corrections Total */
             transcript_segment_corrections_total: number;
+        };
+        /** CreateTaskRequest */
+        CreateTaskRequest: {
+            /** Description */
+            description: string;
+            /** Assignee */
+            assignee?: string | null;
+            /** Due Date */
+            due_date?: string | null;
         };
         /**
          * CsrfTokenResponse
@@ -2156,6 +2290,55 @@ export interface components {
             segment_end_ms?: number | null;
             /** Segment Text */
             segment_text?: string | null;
+        };
+        /**
+         * FollowUpStatus
+         * @enum {string}
+         */
+        FollowUpStatus: "open" | "done" | "dismissed";
+        /** FollowUpTaskResponse */
+        FollowUpTaskResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Source */
+            source: string;
+            /** Source Fact Id */
+            source_fact_id: string | null;
+            /** Description */
+            description: string;
+            /** Assignee */
+            assignee: string | null;
+            /** Due Date */
+            due_date: string | null;
+            /** Status */
+            status: string;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Updated By User Id */
+            updated_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** GroupCreateRequest */
         GroupCreateRequest: {
@@ -3449,6 +3632,37 @@ export interface components {
             /** Retired At */
             retired_at: string | null;
         };
+        /** TimelineEntry */
+        TimelineEntry: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Title */
+            title: string;
+            /** Conversation Type */
+            conversation_type: string;
+            /** Status */
+            status: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /**
+             * Fact Count
+             * @default 0
+             */
+            fact_count: number;
+        };
+        /** TimelineResponse */
+        TimelineResponse: {
+            /** External Reference */
+            external_reference: string;
+            /** Conversations */
+            conversations: components["schemas"]["TimelineEntry"][];
+        };
         /** TranscriptResponse */
         TranscriptResponse: {
             /**
@@ -3539,6 +3753,10 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** UpdateTaskRequest */
+        UpdateTaskRequest: {
+            status: components["schemas"]["FollowUpStatus"];
         };
         /** UserCreateRequest */
         UserCreateRequest: {
@@ -7090,6 +7308,204 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LifecycleEventResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_related_conversations_endpoint_api_v1_conversations__conversation_id__related_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_external_reference_timeline_endpoint_api_v1_external_references__external_reference__timeline_get: {
+        parameters: {
+            query: {
+                organization_id: string;
+            };
+            header?: never;
+            path: {
+                external_reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_external_reference_comparison_endpoint_api_v1_external_references__external_reference__comparison_get: {
+        parameters: {
+            query: {
+                organization_id: string;
+            };
+            header?: never;
+            path: {
+                external_reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComparisonResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversation_tasks_endpoint_api_v1_conversations__conversation_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowUpTaskResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation_task_endpoint_api_v1_conversations__conversation_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowUpTaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_task_endpoint_api_v1_tasks__task_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowUpTaskResponse"];
                 };
             };
             /** @description Validation Error */

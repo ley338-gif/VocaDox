@@ -1,0 +1,42 @@
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.item {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.itemActive {
+  border-color: var(--text-link, #4f46e5);
+}
+
+.comparisonRow {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.comparisonHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.comparisonValues {
+  color: var(--text-muted);
+  font-size: var(--font-body-sm-size, 0.875rem);
+}
