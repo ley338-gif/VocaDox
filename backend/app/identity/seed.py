@@ -73,6 +73,12 @@ PERMISSIONS: dict[str, str] = {
     ),
     "analytics:read": "View analytics/evaluation dashboards.",
     "api:access": "Authenticate as a service account against the API.",
+    # Phase 7: retention policy admin management (spec §7's `administration`
+    # domain gains a real admin UI over the retention_policies data model
+    # that has existed since Phase 2 — no scheduler/enforcement here, see
+    # docs/architecture/future-considerations.md's Phase 7 additions).
+    "retention:read": "View retention policies.",
+    "retention:write": "Create/edit retention policies.",
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -115,6 +121,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "review-issue:resolve",
             "document:read",
             "document:edit",
+            "retention:read",
+            "retention:write",
         ],
     ),
     "Template Manager": (

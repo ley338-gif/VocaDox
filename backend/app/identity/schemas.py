@@ -42,3 +42,69 @@ class CsrfTokenResponse(BaseModel):
     endpoint."""
 
     csrf_token: str
+
+
+# -- Phase 7: Admin Portal (Users/Groups/Roles) -----------------------------
+
+
+class UserSummaryResponse(BaseModel):
+    id: uuid.UUID
+    username: str
+    display_name: str
+    email: str | None
+    auth_provider: str
+    is_active: bool
+    model_config = {"from_attributes": True}
+
+
+class UserDetailResponse(UserSummaryResponse):
+    group_ids: list[uuid.UUID]
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=8, max_length=512)
+    display_name: str = Field(min_length=1, max_length=255)
+    email: str | None = Field(default=None, max_length=320)
+    group_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class UserUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    email: str | None = Field(default=None, max_length=320)
+    is_active: bool | None = None
+    group_ids: list[uuid.UUID] | None = None
+
+
+class GroupResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: str | None
+    organization_id: uuid.UUID | None
+    model_config = {"from_attributes": True}
+
+
+class GroupDetailResponse(GroupResponse):
+    role_ids: list[uuid.UUID]
+    member_ids: list[uuid.UUID]
+
+
+class GroupCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    organization_id: uuid.UUID | None = None
+    role_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class GroupUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=1024)
+    role_ids: list[uuid.UUID] | None = None
+
+
+class RoleResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: str | None
+    is_system: bool
+    model_config = {"from_attributes": True}
