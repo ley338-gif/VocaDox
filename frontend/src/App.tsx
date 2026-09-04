@@ -18,10 +18,12 @@ import { AdminOrganizationsPage } from "./pages/AdminOrganizationsPage";
 import { AdminProfilesPage } from "./pages/AdminProfilesPage";
 import { AdminPromptsPage } from "./pages/AdminPromptsPage";
 import { AdminRetentionPage } from "./pages/AdminRetentionPage";
+import { AdminServiceAccountsPage } from "./pages/AdminServiceAccountsPage";
 import { AdminSpeechPage } from "./pages/AdminSpeechPage";
 import { AdminStoragePage } from "./pages/AdminStoragePage";
 import { AdminTemplatesPage } from "./pages/AdminTemplatesPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { AdminWebhooksPage } from "./pages/AdminWebhooksPage";
 import { AdminWorkersPage } from "./pages/AdminWorkersPage";
 import { AppHomePage } from "./pages/AppHomePage";
 import { ConversationDetailPage } from "./pages/ConversationDetailPage";
@@ -202,6 +204,22 @@ export function App() {
             element={
               <RequirePermission code="analytics:read">
                 <AdminEvaluationLabPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/admin/service-accounts"
+            element={
+              <RequirePermission code="service-account:read">
+                <AdminServiceAccountsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/admin/webhooks"
+            element={
+              <RequirePermission code="webhook:read">
+                <AdminWebhooksPage />
               </RequirePermission>
             }
           />
