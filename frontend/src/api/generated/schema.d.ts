@@ -156,6 +156,56 @@ export interface paths {
         patch: operations["update_conversation_endpoint_api_v1_conversations__conversation_id__patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/effective-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Effective Config Endpoint
+         * @description Spec §20's explainability requirement, made real: shows every
+         *     resolved field of the SYSTEM DEFAULT -> PROCESSING PROFILE ->
+         *     CONVERSATION OVERRIDE hierarchy for this conversation, plus exactly
+         *     which layer set each one — not just "the override applied", but
+         *     "here is why every field has the value it has".
+         */
+        get: operations["get_effective_config_endpoint_api_v1_conversations__conversation_id__effective_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/config-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Config Override Endpoint
+         * @description Spec §20's CONVERSATION OVERRIDE layer: a per-conversation, per-field
+         *     override on top of whatever the Processing Profile/system default
+         *     resolved. `payload` is merged into `config_overrides` (a `None` value
+         *     removes that field's override, falling back to the lower layers) —
+         *     never a wholesale profile replacement. Gated by `conversation:update`,
+         *     the same permission that already governs editing this conversation's
+         *     other metadata.
+         */
+        patch: operations["set_config_override_endpoint_api_v1_conversations__conversation_id__config_override_patch"];
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/recordings": {
         parameters: {
             query?: never;
@@ -799,6 +849,290 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates Endpoint */
+        get: operations["list_templates_endpoint_api_v1_templates_get"];
+        put?: never;
+        /** Create Template Endpoint */
+        post: operations["create_template_endpoint_api_v1_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template Endpoint */
+        get: operations["get_template_endpoint_api_v1_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Template Versions Endpoint */
+        get: operations["list_template_versions_endpoint_api_v1_templates__template_id__versions_get"];
+        put?: never;
+        /**
+         * Create Template Version Endpoint
+         * @description Always a brand-new DRAFT version — never mutates a published one
+         *     (spec §42: "never mutate a published template in place").
+         */
+        post: operations["create_template_version_endpoint_api_v1_templates__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{template_id}/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Template Version Endpoint
+         * @description Retires the previously-published version (never deletes/mutates its
+         *     content) and re-points the template at the new one — every past
+         *     `ProcessingRun`/`DocumentRevision` that recorded the old version's id
+         *     keeps resolving to its exact, unchanged content.
+         */
+        post: operations["publish_template_version_endpoint_api_v1_templates__template_id__versions__version_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Prompts Endpoint */
+        get: operations["list_prompts_endpoint_api_v1_prompts_get"];
+        put?: never;
+        /** Create Prompt Endpoint */
+        post: operations["create_prompt_endpoint_api_v1_prompts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prompts/{prompt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Prompt Endpoint */
+        get: operations["get_prompt_endpoint_api_v1_prompts__prompt_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prompts/{prompt_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Prompt Versions Endpoint */
+        get: operations["list_prompt_versions_endpoint_api_v1_prompts__prompt_id__versions_get"];
+        put?: never;
+        /** Create Prompt Version Endpoint */
+        post: operations["create_prompt_version_endpoint_api_v1_prompts__prompt_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prompts/{prompt_id}/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Prompt Version Endpoint */
+        post: operations["publish_prompt_version_endpoint_api_v1_prompts__prompt_id__versions__version_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Model Profiles Endpoint */
+        get: operations["list_model_profiles_endpoint_api_v1_model_profiles_get"];
+        put?: never;
+        /** Create Model Profile Endpoint */
+        post: operations["create_model_profile_endpoint_api_v1_model_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/model-profiles/{model_profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model Profile Endpoint */
+        get: operations["get_model_profile_endpoint_api_v1_model_profiles__model_profile_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Model Profile Endpoint
+         * @description Snapshots the pre-change state into a new `ModelProfileVersion`
+         *     before applying the edit — see app.profiles.service.update_model_profile.
+         */
+        patch: operations["update_model_profile_endpoint_api_v1_model_profiles__model_profile_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/model-profiles/{model_profile_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Model Profile Versions Endpoint */
+        get: operations["list_model_profile_versions_endpoint_api_v1_model_profiles__model_profile_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/processing-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Processing Profiles Endpoint
+         * @description The friendly, end-user-facing list (spec §19: "User sieht
+         *     verständliche Namen") — used to populate the profile picker when
+         *     starting a conversation. Deliberately readable with the same
+         *     `processing-profile:read` permission granted to the standard "User"
+         *     role, not admin-only (only WRITE is admin-gated).
+         */
+        get: operations["list_processing_profiles_endpoint_api_v1_processing_profiles_get"];
+        put?: never;
+        /** Create Processing Profile Endpoint */
+        post: operations["create_processing_profile_endpoint_api_v1_processing_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/processing-profiles/{processing_profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Processing Profile Endpoint */
+        get: operations["get_processing_profile_endpoint_api_v1_processing_profiles__processing_profile_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/processing-profiles/{processing_profile_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Processing Profile Versions Endpoint */
+        get: operations["list_processing_profile_versions_endpoint_api_v1_processing_profiles__processing_profile_id__versions_get"];
+        put?: never;
+        /** Create Processing Profile Version Endpoint */
+        post: operations["create_processing_profile_version_endpoint_api_v1_processing_profiles__processing_profile_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/processing-profiles/{processing_profile_id}/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Processing Profile Version Endpoint */
+        post: operations["publish_processing_profile_version_endpoint_api_v1_processing_profiles__processing_profile_id__versions__version_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -812,7 +1146,10 @@ export interface components {
         };
         /** Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post */
         Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: string;
         };
         /** ComposeRequest */
@@ -836,6 +1173,8 @@ export interface components {
             external_reference_type?: string | null;
             /** @default standard */
             privacy_mode: components["schemas"]["PrivacyMode"];
+            /** Processing Profile Id */
+            processing_profile_id?: string | null;
         };
         /** ConversationListResponse */
         ConversationListResponse: {
@@ -884,6 +1223,8 @@ export interface components {
             privacy_mode: string;
             /** Retention Policy Id */
             retention_policy_id: string | null;
+            /** Processing Profile Id */
+            processing_profile_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1050,6 +1391,8 @@ export interface components {
             approved_by_user_id: string | null;
             /** Approved At */
             approved_at: string | null;
+            /** Template Version Id */
+            template_version_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1280,6 +1623,164 @@ export interface components {
              */
             created_at: string;
         };
+        /** ModelProfileCreateRequest */
+        ModelProfileCreateRequest: {
+            /** Name */
+            name: string;
+            /**
+             * Purpose
+             * @default extraction
+             */
+            purpose: string;
+            /** Provider */
+            provider: string;
+            /** Model Identifier */
+            model_identifier: string;
+            /**
+             * Context Length
+             * @default 8192
+             */
+            context_length: number;
+            /**
+             * Temperature
+             * @default 0
+             */
+            temperature: number;
+            /**
+             * Max Tokens
+             * @default 2048
+             */
+            max_tokens: number;
+            /**
+             * Structured Output
+             * @default true
+             */
+            structured_output: boolean;
+            /** Thinking Mode */
+            thinking_mode?: string | null;
+            /** Configuration */
+            configuration?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** ModelProfileResponse */
+        ModelProfileResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Purpose */
+            purpose: string;
+            /** Provider */
+            provider: string;
+            /** Model Identifier */
+            model_identifier: string;
+            /** Context Length */
+            context_length: number;
+            /** Temperature */
+            temperature: number;
+            /** Max Tokens */
+            max_tokens: number;
+            /** Structured Output */
+            structured_output: boolean;
+            /** Thinking Mode */
+            thinking_mode: string | null;
+            /** Configuration */
+            configuration: {
+                [key: string]: unknown;
+            } | null;
+            /** Version */
+            version: string;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ModelProfileUpdateRequest */
+        ModelProfileUpdateRequest: {
+            /** Name */
+            name?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Model Identifier */
+            model_identifier?: string | null;
+            /** Context Length */
+            context_length?: number | null;
+            /** Temperature */
+            temperature?: number | null;
+            /** Max Tokens */
+            max_tokens?: number | null;
+            /** Structured Output */
+            structured_output?: boolean | null;
+            /** Thinking Mode */
+            thinking_mode?: string | null;
+            /** Configuration */
+            configuration?: {
+                [key: string]: unknown;
+            } | null;
+            /** Enabled */
+            enabled?: boolean | null;
+        };
+        /** ModelProfileVersionResponse */
+        ModelProfileVersionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Model Profile Id
+             * Format: uuid
+             */
+            model_profile_id: string;
+            /** Version Number */
+            version_number: number;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /** Model Identifier */
+            model_identifier: string;
+            /** Context Length */
+            context_length: number;
+            /** Temperature */
+            temperature: number;
+            /** Max Tokens */
+            max_tokens: number;
+            /** Structured Output */
+            structured_output: boolean;
+            /** Thinking Mode */
+            thinking_mode: string | null;
+            /** Configuration */
+            configuration: {
+                [key: string]: unknown;
+            } | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** NoteCreateRequest */
         NoteCreateRequest: {
             /** Content */
@@ -1451,12 +1952,270 @@ export interface components {
             /** Completed At */
             completed_at: string | null;
         };
+        /** ProcessingProfileCreateRequest */
+        ProcessingProfileCreateRequest: {
+            /** Speech Provider Config */
+            speech_provider_config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Diarization Provider Config */
+            diarization_provider_config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Extraction Model Profile Id */
+            extraction_model_profile_id?: string | null;
+            /** Document Model Profile Id */
+            document_model_profile_id?: string | null;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            /**
+             * Template Version Id
+             * Format: uuid
+             */
+            template_version_id: string;
+            /** Prompt Id */
+            prompt_id?: string | null;
+            /** Prompt Version Id */
+            prompt_version_id?: string | null;
+            /**
+             * Language
+             * @default auto
+             */
+            language: string;
+            /** Retention Policy Id */
+            retention_policy_id?: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Is System Default
+             * @default false
+             */
+            is_system_default: boolean;
+        };
+        /** ProcessingProfileResponse */
+        ProcessingProfileResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Is System Default */
+            is_system_default: boolean;
+            /** Current Published Version Id */
+            current_published_version_id: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ProcessingProfileVersionCreateRequest */
+        ProcessingProfileVersionCreateRequest: {
+            /** Speech Provider Config */
+            speech_provider_config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Diarization Provider Config */
+            diarization_provider_config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Extraction Model Profile Id */
+            extraction_model_profile_id?: string | null;
+            /** Document Model Profile Id */
+            document_model_profile_id?: string | null;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            /**
+             * Template Version Id
+             * Format: uuid
+             */
+            template_version_id: string;
+            /** Prompt Id */
+            prompt_id?: string | null;
+            /** Prompt Version Id */
+            prompt_version_id?: string | null;
+            /**
+             * Language
+             * @default auto
+             */
+            language: string;
+            /** Retention Policy Id */
+            retention_policy_id?: string | null;
+        };
+        /** ProcessingProfileVersionResponse */
+        ProcessingProfileVersionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Processing Profile Id
+             * Format: uuid
+             */
+            processing_profile_id: string;
+            /** Version Number */
+            version_number: number;
+            /** Status */
+            status: string;
+            /** Speech Provider Config */
+            speech_provider_config: {
+                [key: string]: unknown;
+            } | null;
+            /** Diarization Provider Config */
+            diarization_provider_config: {
+                [key: string]: unknown;
+            } | null;
+            /** Extraction Model Profile Id */
+            extraction_model_profile_id: string | null;
+            /** Document Model Profile Id */
+            document_model_profile_id: string | null;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            /**
+             * Template Version Id
+             * Format: uuid
+             */
+            template_version_id: string;
+            /** Prompt Id */
+            prompt_id: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: string | null;
+            /** Language */
+            language: string;
+            /** Retention Policy Id */
+            retention_policy_id: string | null;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Published At */
+            published_at: string | null;
+            /** Retired At */
+            retired_at: string | null;
+        };
         /** ProcessingStatusResponse */
         ProcessingStatusResponse: {
             /** Conversation Status */
             conversation_status: string;
             /** Jobs */
             jobs: components["schemas"]["ProcessingJobResponse"][];
+        };
+        /** PromptCreateRequest */
+        PromptCreateRequest: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Purpose
+             * @default extraction
+             */
+            purpose: string;
+            /** System Prompt */
+            system_prompt: string;
+            /** Category Instructions */
+            category_instructions: {
+                [key: string]: string;
+            };
+        };
+        /** PromptResponse */
+        PromptResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Purpose */
+            purpose: string;
+            /** Current Published Version Id */
+            current_published_version_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** PromptVersionCreateRequest */
+        PromptVersionCreateRequest: {
+            /** System Prompt */
+            system_prompt: string;
+            /** Category Instructions */
+            category_instructions: {
+                [key: string]: string;
+            };
+        };
+        /** PromptVersionResponse */
+        PromptVersionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Prompt Id
+             * Format: uuid
+             */
+            prompt_id: string;
+            /** Version Number */
+            version_number: number;
+            /** Status */
+            status: string;
+            /** System Prompt */
+            system_prompt: string;
+            /** Category Instructions */
+            category_instructions: {
+                [key: string]: string;
+            };
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Published At */
+            published_at: string | null;
+            /** Retired At */
+            retired_at: string | null;
         };
         /** ReadinessResponse */
         ReadinessResponse: {
@@ -1562,6 +2321,108 @@ export interface components {
             /** Detail */
             detail: string | null;
         };
+        /** TemplateCreateRequest */
+        TemplateCreateRequest: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Extraction Categories */
+            extraction_categories: {
+                [key: string]: unknown;
+            }[];
+            /** Presentation */
+            presentation: {
+                [key: string]: unknown;
+            }[];
+            /** Review Rules */
+            review_rules?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** TemplateResponse */
+        TemplateResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** Current Published Version Id */
+            current_published_version_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** TemplateVersionCreateRequest */
+        TemplateVersionCreateRequest: {
+            /** Extraction Categories */
+            extraction_categories: {
+                [key: string]: unknown;
+            }[];
+            /** Presentation */
+            presentation: {
+                [key: string]: unknown;
+            }[];
+            /** Review Rules */
+            review_rules?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** TemplateVersionResponse */
+        TemplateVersionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            /** Version Number */
+            version_number: number;
+            /** Status */
+            status: string;
+            /** Extraction Categories */
+            extraction_categories: {
+                [key: string]: unknown;
+            }[];
+            /** Presentation */
+            presentation: {
+                [key: string]: unknown;
+            }[];
+            /** Review Rules */
+            review_rules: {
+                [key: string]: unknown;
+            } | null;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Published At */
+            published_at: string | null;
+            /** Retired At */
+            retired_at: string | null;
+        };
         /** TranscriptResponse */
         TranscriptResponse: {
             /**
@@ -1661,10 +2522,6 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
         };
         /** WordSchema */
         WordSchema: {
@@ -1957,6 +2814,76 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ConversationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_effective_config_endpoint_api_v1_conversations__conversation_id__effective_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_config_override_endpoint_api_v1_conversations__conversation_id__config_override_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
             };
         };
         responses: {
@@ -3322,6 +4249,702 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiarizationProviderStatusResponse"];
+                };
+            };
+        };
+    };
+    list_templates_endpoint_api_v1_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateResponse"][];
+                };
+            };
+        };
+    };
+    create_template_endpoint_api_v1_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_endpoint_api_v1_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_template_versions_endpoint_api_v1_templates__template_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_template_version_endpoint_api_v1_templates__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateVersionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_template_version_endpoint_api_v1_templates__template_id__versions__version_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompts_endpoint_api_v1_prompts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptResponse"][];
+                };
+            };
+        };
+    };
+    create_prompt_endpoint_api_v1_prompts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_prompt_endpoint_api_v1_prompts__prompt_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prompt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_versions_endpoint_api_v1_prompts__prompt_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prompt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_prompt_version_endpoint_api_v1_prompts__prompt_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prompt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptVersionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_prompt_version_endpoint_api_v1_prompts__prompt_id__versions__version_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prompt_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_model_profiles_endpoint_api_v1_model_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileResponse"][];
+                };
+            };
+        };
+    };
+    create_model_profile_endpoint_api_v1_model_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelProfileCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_model_profile_endpoint_api_v1_model_profiles__model_profile_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_model_profile_endpoint_api_v1_model_profiles__model_profile_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_model_profile_versions_endpoint_api_v1_model_profiles__model_profile_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileVersionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_processing_profiles_endpoint_api_v1_processing_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingProfileResponse"][];
+                };
+            };
+        };
+    };
+    create_processing_profile_endpoint_api_v1_processing_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessingProfileCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_processing_profile_endpoint_api_v1_processing_profiles__processing_profile_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                processing_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_processing_profile_versions_endpoint_api_v1_processing_profiles__processing_profile_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                processing_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingProfileVersionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_processing_profile_version_endpoint_api_v1_processing_profiles__processing_profile_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                processing_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessingProfileVersionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingProfileVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_processing_profile_version_endpoint_api_v1_processing_profiles__processing_profile_id__versions__version_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                processing_profile_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessingProfileVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

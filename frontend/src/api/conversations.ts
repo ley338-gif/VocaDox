@@ -72,6 +72,7 @@ export interface Conversation {
   external_reference_type: string | null;
   privacy_mode: PrivacyMode;
   retention_policy_id: string | null;
+  processing_profile_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -162,6 +163,10 @@ export function createConversation(
     external_reference?: string;
     external_reference_type?: string;
     privacy_mode?: PrivacyMode;
+    // Phase 6 (spec §19): the friendly Processing Profile the user picked
+    // ("General", "Meeting", ...). Omitted -> the SYSTEM DEFAULT
+    // configuration hierarchy layer applies (see app.profiles.resolver).
+    processing_profile_id?: string;
   },
   csrfToken: string
 ): Promise<Conversation> {

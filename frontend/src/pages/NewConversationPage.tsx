@@ -7,6 +7,7 @@ import { ApiError } from "../api/client";
 import type { ConversationType, PrivacyMode } from "../api/conversations";
 import { createConversation, uploadMedia } from "../api/conversations";
 import { listMyOrganizations } from "../api/organizations";
+import { listProcessingProfiles } from "../api/profiles";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { Checkbox, Select, TextInput } from "../design-system/FormControls";
@@ -21,6 +22,7 @@ export function NewConversationPage() {
   const [title, setTitle] = useState("");
   const [conversationType, setConversationType] = useState<ConversationType>("general");
   const [organizationId, setOrganizationId] = useState("");
+  const [processingProfileId, setProcessingProfileId] = useState("");
   const [externalReference, setExternalReference] = useState("");
   const [privacyMode, setPrivacyMode] = useState<PrivacyMode>("standard");
   const [file, setFile] = useState<File | null>(null);
@@ -31,6 +33,16 @@ export function NewConversationPage() {
     queryKey: ["organizations"],
     queryFn: listMyOrganizations,
   });
+  // Phase 6 (spec §19): "User sieht verständliche Namen" — a plain list of
+  // published, enabled Processing Profiles the user can pick by friendly
+  // name. Never shown the underlying template/model/prompt composition.
+  const { data: processingProfiles } = useQuery({
+    queryKey: ["processing-profiles"],
+    queryFn: listProcessingProfiles,
+  });
+  const selectableProfiles = (processingProfiles ?? []).filter(
+    (p) => p.enabled && p.current_published_version_id !== null
+  );
 
   async function handleCreate() {
     if (!csrfToken || !organizationId || !title.trim()) return;
@@ -44,6 +56,7 @@ export function NewConversationPage() {
           conversation_type: conversationType,
           external_reference: externalReference || undefined,
           privacy_mode: privacyMode,
+          processing_profile_id: processingProfileId || undefined,
         },
         csrfToken
       );
@@ -143,6 +156,24 @@ export function NewConversationPage() {
               <option value="meeting">Meeting</option>
               <option value="interview">Interview</option>
               <option value="other">Other</option>
+            </Select>
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="profile">Processing profile</label>
+            <Select
+              id="profile"
+              value={processingProfileId}
+              onChange={(event) => setProcessingProfileId(event.target.value)}
+            >
+              <option value="">General (default)</option>
+              {selectableProfiles
+                .filter((p) => !p.is_system_default)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
             </Select>
           </div>
 
