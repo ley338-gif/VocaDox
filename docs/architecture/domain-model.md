@@ -95,7 +95,19 @@ Grouped by the domain package that will own them (see
   `dictionary_entries` remain undelivered, deferred per roadmap §73/spec
   mockup — see `docs/architecture/future-considerations.md`'s Phase 7
   additions): `dictionaries`, `dictionary_entries`
-- **integrations**: `service_accounts`, `webhooks`, `webhook_deliveries`
+- **integrations** (Phase 10 — implemented): `service_accounts`,
+  `webhooks`, `webhook_deliveries`. Service accounts authenticate via API
+  key (Argon2id-hashed secret, reusing `app.identity.passwords`) and are
+  authorized via the *same* `permissions.code` vocabulary Phase 1's RBAC
+  already defines (a service account's `scopes` column is a list of those
+  same codes) — not a parallel scope system. Webhooks fire from the exact
+  audit event types already emitted by Phases 1-9
+  (`app.integrations.service.WEBHOOK_EVENT_TYPES`), HMAC-SHA256 signed,
+  bounded-retry, delivery-logged. See
+  `docs/architecture/future-considerations.md`'s "Phase 10 additions" for
+  the REST Integration API's scope decision and the FHIR/HL7/PVS/KIS/CRM/
+  Meeting-Platform adapter architecture (documentation-only, per roadmap
+  §73 — no such adapter is implemented).
 - **administration / compliance** (Phase 7 — admin CRUD implemented over
   the model, which has existed since Phase 2; no automated enforcement
   scheduler yet, see `docs/admin/retention.md`): `retention_policies`

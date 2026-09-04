@@ -1,13 +1,30 @@
 # `app/integrations/`
 
-**Status: placeholder — not implemented in Phase 0.**
+**Status: implemented (Phase 10, spec §54/§55, roadmap §73).**
 
-This domain package is scaffolded (empty, documented) as part of Phase 0's
-backend layout (spec §7). It will be implemented in:
+Service Accounts (non-human API client identities, API-key authenticated,
+scoped via Phase 1's RBAC permission-code vocabulary) and Webhooks
+(admin-configured, HMAC-SHA256 signed, bounded-retry HTTP delivery with a
+Delivery Log). See:
 
-**Phase 8 — webhooks, external system integrations, service accounts**
+- `app/integrations/models.py` — `ServiceAccount`, `Webhook`,
+  `WebhookDelivery` ORM models, each with a module docstring covering the
+  secret-storage rationale (hashed vs. plaintext) for each.
+- `app/integrations/security.py` — API key generation/parsing, HMAC
+  signing/verification, SSRF-adjacent target URL validation.
+- `app/integrations/service.py` — CRUD, rotation/revocation, event
+  dispatch (hooked onto `app.audit.service.record_event`, not a parallel
+  event-detection mechanism), delivery + bounded retry with backoff.
+- `app/integrations/deps.py` — `require_scope`, the API-key-authenticated
+  FastAPI dependency (additive/parallel to `app.identity.deps`, never a
+  change to human-session authentication).
+- `app/integrations/router.py` — `/admin/service-accounts`,
+  `/admin/webhooks` (+ deliveries) admin CRUD, and the scope-gated
+  `/integrations/api/...` REST Integration API surface.
 
-Until then this package contains only `__init__.py` and this README. Do not
-add business logic here during Phase 0 — see `docs/architecture/domain-model.md`
-for the target-state entities this domain will own, and the root
-`PHASE_0_VALIDATION_REPORT.md` for current scope.
+See `docs/architecture/domain-model.md`'s `integrations` entry and
+`docs/architecture/future-considerations.md`'s "Phase 10 additions" for
+the full design rationale, the REST-Integration-API scope decision, and
+the (documentation-only) FHIR/HL7/PVS/KIS/CRM/Meeting-Platform adapter
+architecture. `PHASE_10_VALIDATION_REPORT.md` at the repo root has the
+full validation record.
