@@ -1,13 +1,20 @@
 # `app/analytics/`
 
-**Status: placeholder — not implemented in Phase 0.**
+**Status: implemented, Phase 8.**
 
-This domain package is scaffolded (empty, documented) as part of Phase 0's
-backend layout (spec §7). It will be implemented in:
+Technical analytics, quality metrics, correction metrics, the Evaluation
+Lab (model + prompt comparison against a synthetic fixture), and Model
+Lifecycle transitions (spec §50/§51, roadmap §73). See
+`docs/admin/analytics-evaluation.md` for the full reference and
+`PHASE_8_VALIDATION_REPORT.md` for what was actually verified.
 
-**Phase 7 — analytics and reporting (Auswertungen)**
+No new domain data model beyond `ModelProfileLifecycleEvent` and
+`EvaluationRun` (`models.py`) — technical/quality/correction analytics are
+computed on read directly from tables that already existed
+(`processing_jobs`, `transcript_segment_corrections`, `fact_corrections`,
+`review_issues`), matching Phase 7's "no duplicate tracking table"
+precedent for admin surfaces built over prior phases' data.
 
-Until then this package contains only `__init__.py` and this README. Do not
-add business logic here during Phase 0 — see `docs/architecture/domain-model.md`
-for the target-state entities this domain will own, and the root
-`PHASE_0_VALIDATION_REPORT.md` for current scope.
+Never a training/fine-tuning pipeline (spec §38 hard rule) — every
+function in this package only ever *reads* existing data or *calls* an
+LLM provider's existing inference API to measure it.

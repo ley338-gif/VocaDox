@@ -79,6 +79,15 @@ PERMISSIONS: dict[str, str] = {
     # docs/architecture/future-considerations.md's Phase 7 additions).
     "retention:read": "View retention policies.",
     "retention:write": "Create/edit retention policies.",
+    # Phase 8 (spec §50/§51): the Evaluation Lab and Model Lifecycle
+    # transitions. `analytics:read` (already seeded above, Phase 1) now
+    # also gates the technical/quality/correction analytics views and
+    # reading evaluation runs/lifecycle history — no separate "read"
+    # permission was invented since it already scoped exactly this.
+    "evaluation:run": "Run an Evaluation Lab model/prompt comparison.",
+    "model-profile:promote": (
+        "Transition a model profile's lifecycle status (including rollback)."
+    ),
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -123,6 +132,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "document:edit",
             "retention:read",
             "retention:write",
+            "evaluation:run",
         ],
     ),
     "Template Manager": (
@@ -133,10 +143,13 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "template:write",
             "model-profile:read",
             "model-profile:write",
+            "model-profile:promote",
             "processing-profile:read",
             "processing-profile:write",
             "profile:write",
             "conversation:read",
+            "analytics:read",
+            "evaluation:run",
         ],
     ),
     "Reviewer": (

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.administration.router import admin_router
 from app.administration.router import router as administration_router
+from app.analytics.router import router as analytics_router
 from app.audit.router import router as audit_router
 from app.conversations.router import router as conversations_router
 from app.diarization.router import router as diarization_router
@@ -69,5 +70,6 @@ def create_app() -> FastAPI:
     app.include_router(admin_groups_router, prefix=settings.api_prefix)
     app.include_router(admin_roles_router, prefix=settings.api_prefix)
     app.include_router(audit_router, prefix=settings.api_prefix)
+    app.include_router(analytics_router, prefix=settings.api_prefix)
 
     return app
