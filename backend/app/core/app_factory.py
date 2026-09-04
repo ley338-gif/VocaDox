@@ -19,6 +19,7 @@ from app.documents.router import router as documents_router
 from app.identity.router import admin_groups_router, admin_roles_router, admin_users_router
 from app.identity.router import router as identity_router
 from app.intelligence.router import router as intelligence_router
+from app.longitudinal.router import router as longitudinal_router
 from app.organizations.router import router as organizations_router
 from app.platform.config import get_settings
 from app.platform.db import model_registry  # noqa: F401 - registers all domain models
@@ -71,5 +72,6 @@ def create_app() -> FastAPI:
     app.include_router(admin_roles_router, prefix=settings.api_prefix)
     app.include_router(audit_router, prefix=settings.api_prefix)
     app.include_router(analytics_router, prefix=settings.api_prefix)
+    app.include_router(longitudinal_router, prefix=settings.api_prefix)
 
     return app

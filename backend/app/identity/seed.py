@@ -88,6 +88,17 @@ PERMISSIONS: dict[str, str] = {
     "model-profile:promote": (
         "Transition a model profile's lifecycle status (including rollback)."
     ),
+    # Phase 9 (spec §39/§40/§41, roadmap §73): Timeline/external-reference
+    # grouping, conversation comparison, and Follow-ups/Tasks. Read access to
+    # a conversation's underlying facts/evidence is still gated separately
+    # by `fact:read`/`evidence:read` (unchanged) — these new codes gate the
+    # longitudinal VIEWS/actions themselves.
+    "timeline:read": (
+        "View the cross-conversation Timeline/Comparison for a shared external reference."
+    ),
+    "task:read": "View Follow-ups/Tasks for a conversation.",
+    "task:create": "Create a user follow-up/task on a conversation.",
+    "task:update": "Update a follow-up/task's status.",
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -133,6 +144,10 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "retention:read",
             "retention:write",
             "evaluation:run",
+            "timeline:read",
+            "task:read",
+            "task:create",
+            "task:update",
         ],
     ),
     "Template Manager": (
@@ -169,6 +184,9 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "review-issue:resolve",
             "document:read",
             "document:edit",
+            "timeline:read",
+            "task:read",
+            "task:update",
         ],
     ),
     "User": (
@@ -203,6 +221,10 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "document:edit",
             "processing-profile:read",
             "template:read",
+            "timeline:read",
+            "task:read",
+            "task:create",
+            "task:update",
         ],
     ),
     "Auditor": (
@@ -218,6 +240,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "evidence:read",
             "review-issue:read",
             "document:read",
+            "timeline:read",
+            "task:read",
         ],
     ),
     "API Service Account": (

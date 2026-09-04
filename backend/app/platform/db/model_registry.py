@@ -33,6 +33,10 @@ from app.identity import models as _identity_models  # noqa: F401
 # model_profiles has no FKs into the above but is imported here for
 # consistency (single place that knows every domain's models module).
 from app.intelligence import models as _intelligence_models  # noqa: F401,E402
+
+# Phase 9: follow_up_tasks FK-references organizations.id, conversations.id,
+# extracted_facts.id, users.id — imported after intelligence/conversations.
+from app.longitudinal import models as _longitudinal_models  # noqa: F401,E402
 from app.media import models as _media_models  # noqa: F401,E402
 from app.organizations import models as _organizations_models  # noqa: F401
 
