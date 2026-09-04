@@ -15,6 +15,8 @@ phases' routers was assessed as out of scope for this phase.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,7 +47,7 @@ async def get_current_service_account(
     return account
 
 
-def require_scope(code: str):
+def require_scope(code: str) -> Callable[..., Awaitable[ServiceAccount]]:
     """Dependency factory mirroring `app.identity.deps.require_permission`
     — 403s unless the authenticated service account was granted `code`.
     Scopes are literally `permissions.code` strings (Phase 1's RBAC

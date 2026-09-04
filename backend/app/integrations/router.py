@@ -35,16 +35,15 @@ from app.documents.service import (
     approve_document,
     compose_document,
 )
-from app.identity.deps import get_current_user, require_csrf, require_permission
+from app.identity.deps import require_csrf, require_permission
 from app.identity.models import User
 from app.integrations.deps import require_scope
-from app.integrations.models import ServiceAccount, Webhook, WebhookDelivery
+from app.integrations.models import ServiceAccount, Webhook
 from app.integrations.schemas import (
     AvailableScopesResponse,
     ServiceAccountCreatedResponse,
     ServiceAccountCreateRequest,
     ServiceAccountResponse,
-    ServiceAccountUpdateRequest,
     WebhookCreatedResponse,
     WebhookCreateRequest,
     WebhookDeliveryListResponse,
@@ -95,12 +94,24 @@ AVAILABLE_SCOPES: tuple[str, ...] = (
     "template:read",
 )
 
+# Module-level singletons (ruff B008: a Depends(...) default must not call
+# the factory inline) -- one per scope this phase's Integration API grants.
+_require_conversation_read = require_scope("conversation:read")
+_require_conversation_create = require_scope("conversation:create")
+_require_transcript_read = require_scope("transcript:read")
+_require_document_read = require_scope("document:read")
+_require_document_edit = require_scope("document:edit")
+_require_document_approve = require_scope("document:approve")
+_require_template_read = require_scope("template:read")
+
 
 # -- Admin: Service Accounts --------------------------------------------
 
 
 @admin_router.get(
-    "/service-accounts", response_model=list[ServiceAccountResponse], dependencies=[Depends(_require_sa_read)]
+    "/service-accounts",
+    response_model=list[ServiceAccountResponse],
+    dependencies=[Depends(_require_sa_read)],
 )
 async def list_service_accounts_endpoint(
     organization_id: uuid.UUID | None = None,
@@ -163,7 +174,9 @@ async def rotate_service_account_endpoint(
 ) -> ServiceAccountCreatedResponse:
     account = await db.get(ServiceAccount, account_id)
     if account is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="service account not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="service account not found"
+        )
     api_key = await rotate_service_account_secret(db, account)
     await record_event(
         db,
@@ -192,7 +205,9 @@ async def revoke_service_account_endpoint(
 ) -> ServiceAccountResponse:
     account = await db.get(ServiceAccount, account_id)
     if account is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="service account not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="service account not found"
+        )
     await revoke_service_account(db, account)
     await record_event(
         db,
@@ -257,9 +272,13 @@ async def create_webhook_endpoint(
             created_by_user_id=user.id,
         )
     except UnsafeWebhookURLError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     await record_event(
         db,
         event_type="webhook.created",
@@ -296,9 +315,13 @@ async def update_webhook_endpoint(
             is_active=payload.is_active,
         )
     except UnsafeWebhookURLError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     await record_event(
         db,
         event_type="webhook.updated",
@@ -394,19 +417,17 @@ def _require_owner(account: ServiceAccount) -> uuid.UUID:
 
 @api_router.get("/conversations", response_model=list[ConversationResponse])
 async def api_list_conversations(
-    account: ServiceAccount = Depends(require_scope("conversation:read")),
+    account: ServiceAccount = Depends(_require_conversation_read),
     db: AsyncSession = Depends(get_session),
 ) -> list[ConversationResponse]:
-    conversations, _total = await list_conversations(
-        db, organization_ids={account.organization_id}
-    )
+    conversations, _total = await list_conversations(db, organization_ids={account.organization_id})
     return [ConversationResponse.model_validate(c) for c in conversations]
 
 
 @api_router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
 async def api_get_conversation(
     conversation_id: uuid.UUID,
-    account: ServiceAccount = Depends(require_scope("conversation:read")),
+    account: ServiceAccount = Depends(_require_conversation_read),
     db: AsyncSession = Depends(get_session),
 ) -> ConversationResponse:
     conversation = await _get_scoped_conversation(db, account, conversation_id)
@@ -418,7 +439,7 @@ async def api_get_conversation(
 )
 async def api_create_conversation(
     payload: ConversationCreateRequest,
-    account: ServiceAccount = Depends(require_scope("conversation:create")),
+    account: ServiceAccount = Depends(_require_conversation_create),
     db: AsyncSession = Depends(get_session),
 ) -> ConversationResponse:
     owner_user_id = _require_owner(account)
@@ -448,7 +469,7 @@ async def api_create_conversation(
 @api_router.get("/conversations/{conversation_id}/transcript", response_model=TranscriptResponse)
 async def api_get_transcript(
     conversation_id: uuid.UUID,
-    account: ServiceAccount = Depends(require_scope("transcript:read")),
+    account: ServiceAccount = Depends(_require_transcript_read),
     db: AsyncSession = Depends(get_session),
 ) -> TranscriptResponse:
     await _get_scoped_conversation(db, account, conversation_id)
@@ -466,14 +487,16 @@ async def api_get_transcript(
 @api_router.get("/conversations/{conversation_id}/document", response_model=DocumentResponse)
 async def api_get_document(
     conversation_id: uuid.UUID,
-    account: ServiceAccount = Depends(require_scope("document:read")),
+    account: ServiceAccount = Depends(_require_document_read),
     db: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     await _get_scoped_conversation(db, account, conversation_id)
     result = await db.execute(select(Document).where(Document.conversation_id == conversation_id))
     document = result.scalar_one_or_none()
     if document is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no document composed yet")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="no document composed yet"
+        )
     revision = (
         await db.get(DocumentRevision, document.current_revision_id)
         if document.current_revision_id
@@ -492,7 +515,7 @@ async def api_get_document(
 async def api_compose_document(
     conversation_id: uuid.UUID,
     body: ComposeRequest,  # noqa: ARG001 - reserved, always empty today (matches the human route)
-    account: ServiceAccount = Depends(require_scope("document:edit")),
+    account: ServiceAccount = Depends(_require_document_edit),
     db: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     await _get_scoped_conversation(db, account, conversation_id)
@@ -523,7 +546,7 @@ async def api_compose_document(
 )
 async def api_approve_document(
     conversation_id: uuid.UUID,
-    account: ServiceAccount = Depends(require_scope("document:approve")),
+    account: ServiceAccount = Depends(_require_document_approve),
     db: AsyncSession = Depends(get_session),
 ) -> DocumentResponse:
     await _get_scoped_conversation(db, account, conversation_id)
@@ -534,7 +557,9 @@ async def api_approve_document(
     result = await db.execute(select(Document).where(Document.conversation_id == conversation_id))
     document = result.scalar_one_or_none()
     if document is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no document composed yet")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="no document composed yet"
+        )
     try:
         document = await approve_document(
             db, document=document, conversation_id=conversation_id, approved_by=owner
@@ -562,7 +587,7 @@ async def api_approve_document(
 
 @api_router.get("/templates", response_model=list[TemplateResponse])
 async def api_list_templates(
-    account: ServiceAccount = Depends(require_scope("template:read")),  # noqa: ARG001
+    account: ServiceAccount = Depends(_require_template_read),  # noqa: ARG001
     db: AsyncSession = Depends(get_session),
 ) -> list[TemplateResponse]:
     templates = await list_templates(db)

@@ -82,7 +82,11 @@ async def _wire_dispatch_sessionmaker(app_env):  # noqa: ANN001, F811
 
 
 async def wait_for_deliveries(
-    sessionmaker: async_sessionmaker, webhook_id, *, count: int, timeout: float = 5.0
+    sessionmaker: async_sessionmaker,
+    webhook_id,
+    *,
+    count: int,
+    timeout: float = 5.0,  # noqa: ASYNC109 - test polling helper, not production code
 ) -> list:
     from app.integrations.models import WebhookDelivery
 

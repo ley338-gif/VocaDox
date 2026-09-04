@@ -28,10 +28,11 @@ import asyncio
 import json
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.conversations.models import Conversation
 from app.identity.passwords import hash_password, verify_password
@@ -60,15 +61,15 @@ logger = logging.getLogger("vocadox.integrations")
 # `tests/integrations/conftest.py` points this override at the test
 # engine's sessionmaker for the duration of each test. Production code
 # never calls `set_dispatch_sessionmaker`.
-_dispatch_sessionmaker_override = None
+_dispatch_sessionmaker_override: async_sessionmaker[AsyncSession] | None = None
 
 
-def set_dispatch_sessionmaker(sessionmaker) -> None:  # noqa: ANN001
+def set_dispatch_sessionmaker(sessionmaker: async_sessionmaker[AsyncSession] | None) -> None:
     global _dispatch_sessionmaker_override
     _dispatch_sessionmaker_override = sessionmaker
 
 
-def _get_dispatch_sessionmaker():
+def _get_dispatch_sessionmaker() -> async_sessionmaker[AsyncSession]:
     return _dispatch_sessionmaker_override or get_sessionmaker()
 
 # The audit event types (exact strings already emitted across Phases 1-9 —
@@ -114,6 +115,11 @@ _SAFE_PAYLOAD_KEYS = frozenset(
 
 DEFAULT_BACKOFF_SCHEDULE: tuple[float, ...] = (2.0, 10.0, 60.0, 300.0)
 DELIVERY_TIMEOUT_SECONDS = 10.0
+
+# (url, body, headers) -> (status_code, response_text) -- the seam
+# `attempt_delivery`'s `http_post` param and `_default_http_post` share, so
+# tests can inject a fake transport without a real network call.
+HttpPost = Callable[[str, bytes, dict[str, str]], Awaitable[tuple[int, str]]]
 
 
 # -- Service Accounts -----------------------------------------------------
@@ -374,7 +380,7 @@ async def attempt_delivery(
     event_type: str,
     payload: dict[str, object],
     attempt_number: int,
-    http_post=None,
+    http_post: HttpPost | None = None,
 ) -> WebhookDelivery:
     """Makes exactly one real HTTP delivery attempt and persists the
     result as a WebhookDelivery row (committed here, not left to the
@@ -434,8 +440,8 @@ async def dispatch_with_retry(
     payload: dict[str, object],
     *,
     backoff_schedule: tuple[float, ...] = DEFAULT_BACKOFF_SCHEDULE,
-    sleep=asyncio.sleep,
-    http_post=None,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    http_post: HttpPost | None = None,
 ) -> None:
     """Bounded retry loop: 1 initial attempt + len(backoff_schedule)
     retries (5 attempts total with the default schedule), never infinite.

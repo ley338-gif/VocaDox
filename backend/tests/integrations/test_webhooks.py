@@ -17,9 +17,9 @@ import json
 import uuid
 
 import pytest
-
 from app.integrations.security import UnsafeWebhookURLError, validate_webhook_url, verify_signature
 from app.integrations.service import attempt_delivery, dispatch_with_retry
+
 from tests.conversations.conftest import login
 from tests.integrations.conftest import wait_for_deliveries
 
@@ -221,9 +221,8 @@ async def test_retry_with_backoff_is_bounded_and_records_every_attempt(
 
     assert len(http_receiver.received) == 3  # bounded: not infinite
 
-    from sqlalchemy import select
-
     from app.integrations.models import WebhookDelivery
+    from sqlalchemy import select
 
     async with db_sessionmaker() as session:
         result = await session.execute(
@@ -257,9 +256,8 @@ async def test_retry_stops_after_first_success(db_sessionmaker, http_receiver):
 
     assert len(http_receiver.received) == 1
 
-    from sqlalchemy import select
-
     from app.integrations.models import WebhookDelivery
+    from sqlalchemy import select
 
     async with db_sessionmaker() as session:
         result = await session.execute(
