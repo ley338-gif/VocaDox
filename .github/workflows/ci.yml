@@ -113,8 +113,26 @@ jobs:
       - name: build
         run: npm run build
 
+      # `npm audit`'s classic "quick audit" endpoint has become unreliable
+      # (npm's own CLI now prints "This endpoint is being retired. Use the
+      # bulk advisory endpoint instead.") — observed hanging for 10+ minutes
+      # then failing with transient registry errors (503, or a 400 "Invalid
+      # package tree" that does not reproduce locally against the same
+      # package-lock.json). Retried with a short per-attempt timeout so a
+      # registry-side outage fails fast and retries instead of hanging the
+      # whole job; a REAL high/critical vulnerability still fails the build
+      # on the first attempt that successfully reaches the endpoint.
       - name: npm audit (Node dependency vulnerabilities)
-        run: npm audit --audit-level=high
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 120 npm audit --audit-level=high; then
+              exit 0
+            fi
+            echo "npm audit attempt $attempt failed/timed out — retrying in 15s..." >&2
+            sleep 15
+          done
+          echo "::error::npm audit failed after 3 attempts (see above for the last error)."
+          exit 1
 
   openapi-client-drift:
     name: OpenAPI TS client drift check
