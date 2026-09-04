@@ -2585,7 +2585,7 @@ dependencies:
   approval_status: approved
 - name: alembic
   ecosystem: pypi
-  version: 1.19.1
+  version: 1.19.2
   scope: runtime
   direct: true
   license: MIT
