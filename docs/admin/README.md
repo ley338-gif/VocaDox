@@ -1,10 +1,12 @@
 # Admin docs
 
-**Phase 7 status: the Admin Portal (`/admin`) is now implemented** — see
-`admin-portal.md` for the full navigation/section reference. This page
-keeps the Phase 1 bootstrap procedure below, since every admin action
-(creating more users, managing groups/roles, ...) still depends on having
-a first System Admin account to log in as.
+**Phase 8 status: Analytics, the Evaluation Lab, and Model Lifecycle are
+now implemented** — see `analytics-evaluation.md`. **Phase 7 status: the
+Admin Portal (`/admin`) is implemented** — see `admin-portal.md` for the
+full navigation/section reference. This page keeps the Phase 1 bootstrap
+procedure below, since every admin action (creating more users, managing
+groups/roles, ...) still depends on having a first System Admin account
+to log in as.
 
 ## Bootstrapping the first System Admin user
 
@@ -68,6 +70,14 @@ frequently a no-op) followed by `python -m app.identity.seed` (or
 new `retention:read`/`retention:write` permission codes — idempotent,
 safe to run on every upgrade, same pattern as every prior phase's RBAC
 seed update.
+
+**Upgrading an existing (pre-Phase-8) installation**: Phase 8 DOES add a
+new migration (`0009_analytics_evaluation`: `model_profiles
+.lifecycle_status`, `model_profile_lifecycle_events`, `evaluation_runs`).
+Run `alembic upgrade head` then `python -m app.identity.seed` to pick up
+the new `evaluation:run`/`model-profile:promote` permission codes
+(`analytics:read`, seeded since Phase 1, already gates the read-only
+analytics/evaluation views — no new "read" permission was needed).
 
 Additional users/groups/organizations/role assignments are now managed
 through the Admin Portal UI (`/admin/users`, `/admin/groups`,

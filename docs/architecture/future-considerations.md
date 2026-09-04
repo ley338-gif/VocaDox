@@ -252,3 +252,56 @@ to this list rather than building it opportunistically.
   itself, no per-role customizable dashboards**: the nav structure in
   `AdminLayout.tsx` is fixed, matching the spec's mockup exactly — not
   configurable, which is intentional simplicity for this phase.
+
+## Phase 8 additions (Analytics / Evaluation Lab / Model Lifecycle)
+
+- **Longitudinal Documentation/Timeline, Service Accounts/API/Webhooks,
+  Backup/Restore, GPU-metrics dashboard, automated Retention Cleanup,
+  final hardening audit**: all remain explicitly later-phase roadmap items
+  (Phase 9/10/11/12), untouched this phase.
+
+- **No real fine-tuning/training pipeline, ever**: per spec §38, correction
+  feedback and the Evaluation Lab are for quality measurement only. No
+  code path in this codebase feeds conversation/correction data into a
+  model-training process — this is a hard, permanent boundary, not a
+  "not yet" item.
+
+- **Evaluation Lab fixture is a single small synthetic scenario**
+  (`app/analytics/fixtures.py`, `consultation_ramipril_v1`): real, honestly
+  scored, but one scenario — a future phase wanting broader coverage
+  (varied scenarios, more categories, longer transcripts, multiple
+  languages) would add more fixtures rather than growing this one
+  indefinitely. The gold-matching logic is a naive case-insensitive
+  substring matcher against German-language expected values; a model that
+  answers correctly but in a different language or phrasing (observed for
+  real with `qwen2.5:14b`'s English-language decision text — see
+  PHASE_8_VALIDATION_REPORT.md) will under-count as "unmatched" even
+  though it means the same thing. A more robust (e.g. LLM-graded or
+  multi-language-aware) matcher is future work, not built here to avoid
+  adding a second LLM call (and its own uncertainty) into the very
+  mechanism meant to measure LLM correctness.
+
+- **Model Lifecycle checklist is an admin attestation, not automated
+  verification**: `transition_model_lifecycle` requires the admin to
+  assert `license_check`/`compatibility_check`/`benchmark`/
+  `security_review`/`admin_approval` are all true for a forward
+  transition, but nothing in this codebase actually re-runs a license
+  scan or a benchmark at transition time — a future phase could wire the
+  Evaluation Lab's own comparison mechanism in as an automatic "benchmark"
+  checklist input (still requiring an explicit admin click to apply it),
+  or link out to `compliance/check_licenses.py`'s output for the license
+  check.
+
+- **No UI/API to delete a `ModelProfileLifecycleEvent` or an
+  `EvaluationRun`**: both are intentionally append-only/permanent audit
+  trails (matching `FactCorrection`/`TranscriptSegmentCorrection`'s
+  existing precedent) — a future phase adding data-retention rules for
+  these tables should route through the existing `RetentionPolicy`
+  domain rather than an ad hoc delete endpoint.
+
+- **Technical analytics' `volume_by_day` grouping is computed in Python
+  over all matching rows**, not a database-side `GROUP BY date(...)` —
+  fine at today's expected admin-dataset scale (mirrors Phase 7 Storage's
+  "real but not built for massive scale" disclosed limitation) but would
+  not scale indefinitely; a future phase could move this to a SQL-side
+  aggregation once volume warrants it.

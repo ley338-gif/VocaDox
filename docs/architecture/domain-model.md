@@ -76,13 +76,20 @@ Grouped by the domain package that will own them (see
 - **templates**: `templates`, `template_versions`, `prompts`,
   `prompt_versions`
 - **profiles** (Phase 4 — `model_profiles` implemented as a minimal
-  foundation only; everything else below still target-only): full target
-  list is `model_profiles`, `model_profile_versions`,
-  `processing_profiles`, `processing_profile_versions` — Phase 4's
-  `model_profiles` has only id/name/provider/model_identifier/purpose/
-  context_length/temperature/max_tokens/structured_output/version/enabled,
-  no versioning table and no processing-profile bundling yet. See
+  foundation; Phase 6 — versioned, admin-manageable, plus
+  `processing_profiles`/`processing_profile_versions`; Phase 8 — adds
+  `model_profiles.lifecycle_status` (spec §51: AVAILABLE/TESTING/PILOT/
+  PRODUCTION/RETIRED) and `model_profile_lifecycle_events`, an append-only
+  transition audit trail): full entity list is `model_profiles`,
+  `model_profile_versions`, `model_profile_lifecycle_events`,
+  `processing_profiles`, `processing_profile_versions`. See
   `docs/architecture/future-considerations.md`.
+- **analytics** (Phase 8 — implemented): technical/quality/correction
+  analytics are computed on read from existing tables (no new table);
+  `evaluation_runs` (spec §50: one row per Evaluation Lab model/prompt
+  comparison run, storing only ids/config/counts, never fixture or
+  conversation content) is the one new table. See
+  `docs/admin/analytics-evaluation.md`.
 - **workers**: `processing_runs`, `processing_jobs`
 - **administration** (Phase 7 — admin surface implemented; `dictionaries`/
   `dictionary_entries` remain undelivered, deferred per roadmap §73/spec
