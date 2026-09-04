@@ -1,13 +1,23 @@
 # `app/administration/`
 
-**Status: placeholder — not implemented in Phase 0.**
+**Status: implemented (Phase 7).**
 
-This domain package is scaffolded (empty, documented) as part of Phase 0's
-backend layout (spec §7). It will be implemented in:
+Houses the Phase 7 Admin Portal's backend surface that doesn't belong to
+a more specific existing domain package: Dashboard aggregation, provider
+status (speech/diarization/LLM — the speech/diarization endpoints predate
+this phase, from Phase 3), Jobs/Workers read-model, Storage usage, and
+Retention Policy CRUD. See `app.administration.router`/`.service`/
+`.schemas` and `docs/admin/admin-portal.md` for the full reference.
 
-**Phase 6 — admin console: users, model management, system settings**
+Deliberately does NOT own: Users/Groups/Roles (`app.identity`),
+Organizations (`app.organizations`), Audit (`app.audit`), Templates/
+Prompts (`app.templates`), Model/Processing Profiles (`app.profiles`) —
+each of those already had its own domain package with the right models/
+service functions; this phase added admin-facing endpoints to those
+existing packages rather than duplicating them here.
 
-Until then this package contains only `__init__.py` and this README. Do not
-add business logic here during Phase 0 — see `docs/architecture/domain-model.md`
-for the target-state entities this domain will own, and the root
-`PHASE_0_VALIDATION_REPORT.md` for current scope.
+`RetentionPolicy` itself is still modeled in `app.conversations.models`
+(unchanged since Phase 2) — this package only adds the CRUD/read layer
+over it, per the target domain model's original placement (`docs
+/architecture/domain-model.md` lists retention_policies under
+"administration / compliance").
