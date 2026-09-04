@@ -166,11 +166,15 @@ to this list rather than building it opportunistically.
   built — matching the brief's "does not need Phase 7-grade polish" scope.
   A future phase could add a real category/field editor.
 
-- **`SpeechProfile`/`DiarizationProfile` database entities**: still Phase
-  7 (see `docs/architecture/model-management-foundation.md`) —
+- **`SpeechProfile`/`DiarizationProfile` database entities**: remains
+  future work beyond Phase 7 (see
+  `docs/architecture/model-management-foundation.md`) —
   `ProcessingProfileVersion.speech_provider_config`/
   `diarization_provider_config` are honestly-scoped small JSON hints, not
-  a real FK to a named, multi-option provider profile table yet.
+  a real FK to a named, multi-option provider profile table yet. Phase 7
+  added the missing admin UI to *edit* these JSON hints per Processing
+  Profile version (closing that specific gap), but did not promote them
+  to a real named/reusable entity.
 
 - **Per-organization Processing Profiles / Templates**: both remain
   global (platform-wide) in Phase 6, matching the existing "one global
@@ -200,3 +204,51 @@ to this list rather than building it opportunistically.
   scoped to `FactCategory.GENERAL_FACT` exactly as Phase 4 left it. Worth
   generalizing once a second template with genuinely comparable
   subject/attribute/value-shaped facts exists.
+
+## Phase 7 additions (Administration / Admin Portal)
+
+- **Dictionaries**: appears in the product spec's illustrative `/admin`
+  mockup nav but is NOT in the roadmap §73 bullet list for Phase 7 —
+  deliberately deferred, not built, not even a placeholder page.
+
+- **Evaluation Lab / model comparison, Longitudinal Documentation, Service
+  Accounts/API scopes/Webhooks, automated Retention Cleanup worker,
+  Backup/Restore, GPU-metrics dashboard, final hardening audit**: all
+  appear in the spec's illustrative full-admin-portal mockup but are
+  explicitly later-phase roadmap items (Phase 8/9/10/11/12) — none were
+  implemented, matching the phase brief's explicit boundary.
+
+- **Retention Policy admin UI ships without enforcement**: Phase 7 adds
+  real create/edit UI over `RetentionPolicy` rows (`/admin/retention`),
+  but no scheduler/cleanup worker reads or acts on them — assigning a
+  policy still only records intent. The automated enforcement job is
+  Phase 11's "Retention Cleanup" scope.
+
+- **No `SpeechProfile`/`DiarizationProfile` database entity**: Phase 7
+  added an admin UI to set `speech_provider_config`/
+  `diarization_provider_config` per Processing Profile *version* (closing
+  the specific "no UI for these JSON hints" gap Phase 6 flagged), but
+  these remain small JSON blobs on `ProcessingProfileVersion`, not a real
+  named/reusable/multi-option provider-profile table. A future phase
+  wanting a genuinely richer speech/diarization configuration experience
+  (e.g. named presets shared across multiple Processing Profiles) would
+  need that real entity.
+
+- **Storage page's directory-size scan is a synchronous full walk**: real,
+  not fabricated, but would not scale well to a very large media volume —
+  a future phase could cache totals or compute them via a background job
+  instead of walking the filesystem on every admin page load.
+
+- **About & Licenses page shows no compliance data in the production
+  container image**: `compliance/`/`THIRD_PARTY_NOTICES.md` are not
+  COPYed into `backend/Dockerfile` (its build context is `backend/` only,
+  one level below the repo root where those files live) — a deliberate
+  scope decision this phase (not worth restructuring the Docker build for
+  one info page), not a bug. A future phase could either widen the build
+  context or embed a generated summary file inside `backend/` at build
+  time.
+
+- **No admin UI for reordering/renaming the Admin Portal navigation
+  itself, no per-role customizable dashboards**: the nav structure in
+  `AdminLayout.tsx` is fixed, matching the spec's mockup exactly — not
+  configurable, which is intentional simplicity for this phase.

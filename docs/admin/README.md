@@ -1,10 +1,10 @@
 # Admin docs
 
-Phase 1 status: no admin console UI exists yet (targeted for Phase 7 — see
-`backend/app/administration/README.md`). What Phase 1 does add is the
-initial-admin bootstrap procedure below, since every other identity/RBAC
-admin action (creating more users, managing groups/roles, ...) depends on
-having a first System Admin account to log in as.
+**Phase 7 status: the Admin Portal (`/admin`) is now implemented** — see
+`admin-portal.md` for the full navigation/section reference. This page
+keeps the Phase 1 bootstrap procedure below, since every admin action
+(creating more users, managing groups/roles, ...) still depends on having
+a first System Admin account to log in as.
 
 ## Bootstrapping the first System Admin user
 
@@ -48,24 +48,28 @@ What it does:
 
 After this, log in at `/login` with that username/password. The account
 has every permission in the system (`system:admin` included), so it can
-reach the `/admin`-gated route once that portal exists (Phase 7).
+reach the full `/admin` portal — see `admin-portal.md`.
 
-## Roles and permissions (Phase 1 data model)
+## Roles and permissions
 
 Seeded roles and what each grants are defined in
 `backend/app/identity/seed.py` (`ROLES`, `PERMISSIONS`) — System Admin,
 Manager, Template Manager, Reviewer, User, Auditor, API Service Account,
-matching the product spec's role list exactly. Only identity/organizations
-permissions have real enforcement points so far
-(`system:admin`, `user:manage`, `group:manage`, `organization:manage`,
-`audit:read`); permissions for domains that don't exist yet
-(`conversation:*`, `document:*`, `template:*`, ...) are seeded now so role
-definitions are complete and stable, with enforcement landing alongside
-each domain in later phases.
+matching the product spec's role list exactly. As of Phase 7, every
+permission referenced by an Admin Portal page has a real enforcement
+point; `retention:read`/`retention:write` are new this phase (Manager +
+System Admin). See `admin-portal.md` for the full page-by-page
+permission reference.
 
-There is no admin UI yet to create additional users, groups, or role
-assignments beyond the bootstrap flow above — that's the Phase 7 admin
-portal's job. Until then, additional users/groups/role assignments require
-direct use of the `app.identity.service` functions (e.g. via a Python
-shell against the running environment), which is an accepted Phase 1
-limitation, not a recommended pattern for production operation.
+**Upgrading an existing (pre-Phase-7) installation**: run
+`alembic upgrade head` (Phase 7 added no new tables/columns, so this is
+frequently a no-op) followed by `python -m app.identity.seed` (or
+`docker compose exec backend python -m app.identity.seed`) to pick up the
+new `retention:read`/`retention:write` permission codes — idempotent,
+safe to run on every upgrade, same pattern as every prior phase's RBAC
+seed update.
+
+Additional users/groups/organizations/role assignments are now managed
+through the Admin Portal UI (`/admin/users`, `/admin/groups`,
+`/admin/organizations`) or its underlying REST API — the Phase 1 "requires
+a Python shell against the running environment" limitation is resolved.

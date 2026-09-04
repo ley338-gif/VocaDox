@@ -60,10 +60,34 @@ export interface ProcessingProfileVersion {
   processing_profile_id: string;
   version_number: number;
   status: string;
+  speech_provider_config: Record<string, unknown> | null;
+  diarization_provider_config: Record<string, unknown> | null;
   template_id: string;
   template_version_id: string;
   language: string;
   published_at: string | null;
+}
+
+export interface ProcessingProfileVersionCreatePayload {
+  speech_provider_config?: Record<string, unknown> | null;
+  diarization_provider_config?: Record<string, unknown> | null;
+  extraction_model_profile_id?: string | null;
+  template_id: string;
+  template_version_id: string;
+  language?: string;
+  retention_policy_id?: string | null;
+}
+
+export function createProcessingProfileVersion(
+  processingProfileId: string,
+  payload: ProcessingProfileVersionCreatePayload,
+  csrfToken: string
+): Promise<ProcessingProfileVersion> {
+  return request(`/processing-profiles/${processingProfileId}/versions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function listModelProfiles(): Promise<ModelProfile[]> {

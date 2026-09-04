@@ -84,9 +84,14 @@ Grouped by the domain package that will own them (see
   no versioning table and no processing-profile bundling yet. See
   `docs/architecture/future-considerations.md`.
 - **workers**: `processing_runs`, `processing_jobs`
-- **administration**: `dictionaries`, `dictionary_entries`
+- **administration** (Phase 7 — admin surface implemented; `dictionaries`/
+  `dictionary_entries` remain undelivered, deferred per roadmap §73/spec
+  mockup — see `docs/architecture/future-considerations.md`'s Phase 7
+  additions): `dictionaries`, `dictionary_entries`
 - **integrations**: `service_accounts`, `webhooks`, `webhook_deliveries`
-- **administration / compliance**: `retention_policies`
+- **administration / compliance** (Phase 7 — admin CRUD implemented over
+  the model, which has existed since Phase 2; no automated enforcement
+  scheduler yet, see `docs/admin/retention.md`): `retention_policies`
 
 ## Conversation state machine (spec §22)
 

@@ -221,6 +221,38 @@ async def cancel_queued_job(session: AsyncSession, job: ProcessingJob) -> bool:
     return True
 
 
+async def retry_failed_job(
+    session: AsyncSession, queue: QueueBackend, job: ProcessingJob
+) -> bool:
+    """Phase 7 Admin Portal "Jobs" retry action: manually re-queue a
+    terminally FAILED job. Only FAILED jobs are eligible (matching
+    `cancel_queued_job`'s "only QUEUED jobs can be cancelled cleanly"
+    precedent — a RUNNING job is left alone). Resets `attempt` to 0 so a
+    job that exhausted its automatic retry budget (`fail_job`'s
+    `is_retryable`/`max_attempts` check) can still be retried once by an
+    explicit admin action, which is a deliberate, narrow escape hatch, not
+    a change to the automatic retry policy itself."""
+    if job.status != ProcessingStatus.FAILED.value:
+        return False
+    job.status = ProcessingStatus.QUEUED.value
+    job.attempt = 0
+    job.error_code = None
+    job.error_message_safe = None
+    job.failure_class = None
+    job.started_at = None
+    job.completed_at = None
+    job.worker_id = None
+    job.lease_expires_at = None
+    await session.flush()
+    await write_outbox_entry(
+        session,
+        job_id=job.id,
+        queue_name=queue_name_for(JobType(job.job_type)),
+        payload=str(job.id),
+    )
+    return True
+
+
 async def reclaim_stale_jobs(
     session: AsyncSession, queue: QueueBackend, *, now: datetime | None = None
 ) -> list[ProcessingJob]:
