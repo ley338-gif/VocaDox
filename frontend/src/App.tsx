@@ -5,10 +5,12 @@ import { AuthProvider } from "./auth/AuthContext";
 import { RequireAuth, RequirePermission } from "./auth/RequireAuth";
 import { DesignSystemPage } from "./design-system/DesignSystemPage";
 import { AdminAboutPage } from "./pages/AdminAboutPage";
+import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
 import { AdminAuditPage } from "./pages/AdminAuditPage";
 import { AdminAuthenticationPage } from "./pages/AdminAuthenticationPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
 import { AdminDiarizationPage } from "./pages/AdminDiarizationPage";
+import { AdminEvaluationLabPage } from "./pages/AdminEvaluationLabPage";
 import { AdminGroupsPage } from "./pages/AdminGroupsPage";
 import { AdminJobsPage } from "./pages/AdminJobsPage";
 import { AdminModelsPage } from "./pages/AdminModelsPage";
@@ -184,6 +186,22 @@ export function App() {
             element={
               <RequirePermission code="retention:read">
                 <AdminRetentionPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/admin/analytics"
+            element={
+              <RequirePermission code="analytics:read">
+                <AdminAnalyticsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/admin/evaluation"
+            element={
+              <RequirePermission code="analytics:read">
+                <AdminEvaluationLabPage />
               </RequirePermission>
             }
           />

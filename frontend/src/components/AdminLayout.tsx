@@ -13,8 +13,9 @@ import { useAuth } from "../auth/useAuth";
  * in `RequirePermission` in App.tsx).
  *
  * Deliberately excludes items the roadmap places in later phases
- * (Dictionaries, Evaluation, Service Accounts/API/Webhooks, Backups) —
- * see docs/architecture/future-considerations.md's Phase 7 additions.
+ * (Dictionaries, Service Accounts/API/Webhooks, Backups) — see
+ * docs/architecture/future-considerations.md. Analytics/Evaluation Lab
+ * (spec §50/§73) were added in Phase 8.
  */
 
 interface NavItem {
@@ -56,6 +57,8 @@ const SECTIONS: NavSection[] = [
       { to: "/admin/workers", label: "Workers", permission: "system:admin" },
       { to: "/admin/storage", label: "Storage", permission: "system:admin" },
       { to: "/admin/retention", label: "Retention", permission: "retention:read" },
+      { to: "/admin/analytics", label: "Analytics", permission: "analytics:read" },
+      { to: "/admin/evaluation", label: "Evaluation Lab", permission: "analytics:read" },
     ],
   },
   {

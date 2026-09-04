@@ -1482,6 +1482,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/analytics/technical": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Technical Analytics Endpoint */
+        get: operations["technical_analytics_endpoint_api_v1_admin_analytics_technical_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/analytics/quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quality Metrics Endpoint */
+        get: operations["quality_metrics_endpoint_api_v1_admin_analytics_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/analytics/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Correction Metrics Endpoint */
+        get: operations["correction_metrics_endpoint_api_v1_admin_analytics_corrections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/evaluation/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Evaluation Runs Endpoint */
+        get: operations["list_evaluation_runs_endpoint_api_v1_admin_evaluation_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/evaluation/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Evaluation Run Endpoint */
+        get: operations["get_evaluation_run_endpoint_api_v1_admin_evaluation_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/evaluation/model-comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Model Comparison Endpoint
+         * @description Runs the real Evaluation Lab fixture through two `ModelProfile`s'
+         *     actual configured providers (spec §50) — never a mockup table. Both
+         *     subjects must be distinct rows; identical ids are rejected (comparing
+         *     a profile to itself is not a comparison).
+         */
+        post: operations["run_model_comparison_endpoint_api_v1_admin_evaluation_model_comparison_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/evaluation/prompt-comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Prompt Comparison Endpoint
+         * @description Compares two `PromptVersion`s (spec §43's DRAFT/TEST/PUBLISHED/
+         *     RETIRED lifecycle) run against the SAME model profile, isolating the
+         *     prompt as the only variable.
+         */
+        post: operations["run_prompt_comparison_endpoint_api_v1_admin_evaluation_prompt_comparison_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/model-profiles/{model_profile_id}/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Model Lifecycle Endpoint */
+        get: operations["get_model_lifecycle_endpoint_api_v1_admin_model_profiles__model_profile_id__lifecycle_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/model-profiles/{model_profile_id}/lifecycle-transition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transition Model Lifecycle Endpoint
+         * @description Spec §51: every lifecycle transition — forward promotion OR
+         *     rollback — is exactly this one explicit, permission-gated,
+         *     admin-initiated endpoint call. No cron/background process anywhere in
+         *     this codebase calls `transition_model_lifecycle`.
+         */
+        post: operations["transition_model_lifecycle_endpoint_api_v1_admin_model_profiles__model_profile_id__lifecycle_transition_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1680,6 +1850,19 @@ export interface components {
             external_reference_type?: string | null;
             privacy_mode?: components["schemas"]["PrivacyMode"] | null;
         };
+        /** CorrectionMetricsResponse */
+        CorrectionMetricsResponse: {
+            /** Fact Corrections By Category */
+            fact_corrections_by_category: {
+                [key: string]: number;
+            };
+            /** Most Corrected Subjects */
+            most_corrected_subjects: {
+                [key: string]: unknown;
+            }[];
+            /** Transcript Segment Corrections Total */
+            transcript_segment_corrections_total: number;
+        };
         /**
          * CsrfTokenResponse
          * @description Returned by `GET /auth/csrf` so a page that still has a valid
@@ -1836,6 +2019,56 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** EvaluationRunListResponse */
+        EvaluationRunListResponse: {
+            /** Items */
+            items: components["schemas"]["EvaluationRunResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** EvaluationRunResponse */
+        EvaluationRunResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Run Type */
+            run_type: string;
+            /** Status */
+            status: string;
+            /** Fixture Key */
+            fixture_key: string;
+            /** Subject A */
+            subject_a: {
+                [key: string]: unknown;
+            };
+            /** Subject B */
+            subject_b: {
+                [key: string]: unknown;
+            };
+            /** Result A */
+            result_a: {
+                [key: string]: unknown;
+            } | null;
+            /** Result B */
+            result_b: {
+                [key: string]: unknown;
+            } | null;
+            /** Error Message Safe */
+            error_message_safe: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Completed At */
+            completed_at: string | null;
         };
         /** ExtractRequest */
         ExtractRequest: Record<string, never>;
@@ -2021,6 +2254,54 @@ export interface components {
             /** Detail */
             detail: string | null;
         };
+        /** LifecycleEventResponse */
+        LifecycleEventResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Model Profile Id
+             * Format: uuid
+             */
+            model_profile_id: string;
+            /** From Status */
+            from_status: string | null;
+            /** To Status */
+            to_status: string;
+            /** Is Rollback */
+            is_rollback: boolean;
+            /** Checklist */
+            checklist: {
+                [key: string]: unknown;
+            } | null;
+            /** Note */
+            note: string | null;
+            /** Actor User Id */
+            actor_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** LifecycleTransitionRequest */
+        LifecycleTransitionRequest: {
+            /** To Status */
+            to_status: string;
+            /**
+             * Is Rollback
+             * @default false
+             */
+            is_rollback: boolean;
+            /** Checklist */
+            checklist?: {
+                [key: string]: boolean;
+            } | null;
+            /** Note */
+            note?: string | null;
+        };
         /** LivenessResponse */
         LivenessResponse: {
             /**
@@ -2147,6 +2428,31 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** ModelComparisonRequest */
+        ModelComparisonRequest: {
+            /**
+             * Model Profile Id A
+             * Format: uuid
+             */
+            model_profile_id_a: string;
+            /**
+             * Model Profile Id B
+             * Format: uuid
+             */
+            model_profile_id_b: string;
+        };
+        /** ModelLifecycleResponse */
+        ModelLifecycleResponse: {
+            /**
+             * Model Profile Id
+             * Format: uuid
+             */
+            model_profile_id: string;
+            /** Lifecycle Status */
+            lifecycle_status: string;
+            /** Events */
+            events: components["schemas"]["LifecycleEventResponse"][];
         };
         /** ModelProfileCreateRequest */
         ModelProfileCreateRequest: {
@@ -2688,6 +2994,24 @@ export interface components {
             /** Jobs */
             jobs: components["schemas"]["app__transcription__schemas__ProcessingJobResponse"][];
         };
+        /** PromptComparisonRequest */
+        PromptComparisonRequest: {
+            /**
+             * Prompt Version Id A
+             * Format: uuid
+             */
+            prompt_version_id_a: string;
+            /**
+             * Prompt Version Id B
+             * Format: uuid
+             */
+            prompt_version_id_b: string;
+            /**
+             * Model Profile Id
+             * Format: uuid
+             */
+            model_profile_id: string;
+        };
         /** PromptCreateRequest */
         PromptCreateRequest: {
             /** Key */
@@ -2774,6 +3098,31 @@ export interface components {
             published_at: string | null;
             /** Retired At */
             retired_at: string | null;
+        };
+        /** QualityMetricsResponse */
+        QualityMetricsResponse: {
+            /** Transcript Segments Total */
+            transcript_segments_total: number;
+            /** Transcript Segments Corrected */
+            transcript_segments_corrected: number;
+            /** Transcript Correction Rate */
+            transcript_correction_rate: number | null;
+            /** Fact Review Status Counts */
+            fact_review_status_counts: {
+                [key: string]: number;
+            };
+            /** Facts Total */
+            facts_total: number;
+            /** Fact Corrected Or Removed Rate */
+            fact_corrected_or_removed_rate: number | null;
+            /** Review Issue Status Counts */
+            review_issue_status_counts: {
+                [key: string]: number;
+            };
+            /** Review Issue Resolution Counts */
+            review_issue_resolution_counts: {
+                [key: string]: number;
+            };
         };
         /** QueueCounts */
         QueueCounts: {
@@ -2978,6 +3327,23 @@ export interface components {
             model_volume_disk_total_bytes: number;
             /** Model Volume Disk Free Bytes */
             model_volume_disk_free_bytes: number;
+        };
+        /** TechnicalAnalyticsResponse */
+        TechnicalAnalyticsResponse: {
+            /** Window Days */
+            window_days: number;
+            /** Total Jobs */
+            total_jobs: number;
+            /** Volume By Day */
+            volume_by_day: {
+                [key: string]: number;
+            };
+            /** By Job Type */
+            by_job_type: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
         };
         /** TemplateCreateRequest */
         TemplateCreateRequest: {
@@ -6454,6 +6820,283 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditEventTypesResponse"];
+                };
+            };
+        };
+    };
+    technical_analytics_endpoint_api_v1_admin_analytics_technical_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TechnicalAnalyticsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quality_metrics_endpoint_api_v1_admin_analytics_quality_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityMetricsResponse"];
+                };
+            };
+        };
+    };
+    correction_metrics_endpoint_api_v1_admin_analytics_corrections_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionMetricsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_evaluation_runs_endpoint_api_v1_admin_evaluation_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRunListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_evaluation_run_endpoint_api_v1_admin_evaluation_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_model_comparison_endpoint_api_v1_admin_evaluation_model_comparison_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelComparisonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_prompt_comparison_endpoint_api_v1_admin_evaluation_prompt_comparison_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptComparisonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_model_lifecycle_endpoint_api_v1_admin_model_profiles__model_profile_id__lifecycle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelLifecycleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transition_model_lifecycle_endpoint_api_v1_admin_model_profiles__model_profile_id__lifecycle_transition_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model_profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LifecycleTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleEventResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
