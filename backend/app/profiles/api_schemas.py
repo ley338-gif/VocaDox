@@ -25,6 +25,10 @@ class ModelProfileResponse(BaseModel):
     configuration: dict[str, Any] | None
     version: str
     enabled: bool
+    # Phase 8 (spec §51): AVAILABLE/TESTING/PILOT/PRODUCTION/RETIRED — see
+    # app.profiles.models.ModelLifecycleStatus. Read-only here; only
+    # app.analytics.router's lifecycle-transition endpoint ever changes it.
+    lifecycle_status: str
     created_at: datetime
     updated_at: datetime
 

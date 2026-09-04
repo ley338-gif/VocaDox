@@ -2532,6 +2532,8 @@ export interface components {
             version: string;
             /** Enabled */
             enabled: boolean;
+            /** Lifecycle Status */
+            lifecycle_status: string;
             /**
              * Created At
              * Format: date-time
