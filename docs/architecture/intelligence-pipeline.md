@@ -40,16 +40,20 @@ triples), `decision`, `task` (covers both "Tasks" and "Follow-Ups").
 Each is requested as an independent LLM call with its own Pydantic schema
 (`app.intelligence.schemas`) — never one shared prompt.
 
-## Model configuration
+## Model configuration and template-driven categories (Phase 6)
 
-The extraction model is a `model_profiles` row
-(`app.profiles.ModelProfile`, purpose=`extraction`), not a hardcoded
-string — `app.profiles.service.get_active_profile` is the only place
-worker code learns which model/temperature/max_tokens to use. This is a
-deliberately minimal foundation, NOT the full Phase 6 Processing Profiles
-system (no Speech/Diarization/Document-Model/Template/Prompt-Version/
-Language/Retention-Policy bundling into named presets) — see
-`docs/architecture/future-considerations.md`.
+The extraction model is a `model_profiles` row (`app.profiles.ModelProfile`,
+purpose=`extraction`), not a hardcoded string. As of Phase 6 it is a real,
+versioned, admin-manageable entity (`app.profiles.service
+.update_model_profile` snapshots a `ModelProfileVersion` before every
+edit), and which categories get extracted is itself template-driven
+(`app.templates.schema_builder`) rather than the fixed 3-category dict
+Phase 4 hardcoded — see `docs/architecture/templates.md` for the full
+Template Engine / Processing Profile / Configuration Hierarchy
+architecture. `app.profiles.resolver.resolve_effective_config` (SYSTEM
+DEFAULT -> PROCESSING PROFILE -> CONVERSATION OVERRIDE) is the one place
+`app.processing.orchestrator.execute_extract` learns which
+model/template/prompt version actually applies to a given conversation.
 
 ## Uncertainty (spec §25)
 
@@ -88,11 +92,12 @@ approval gating (an unresolved `HIGH`/`CRITICAL` issue blocks a document
 from `APPROVED`). See `docs/architecture/documents.md` for the full
 Review Wizard / approval workflow.
 
-## Deferred to Phase 6
+## Status as of Phase 6
 
 Document generation/composition, document revisions, the Review Wizard
-UX, and export are now implemented (Phase 5) — see
-`docs/architecture/documents.md`. Still deferred: the full pluggable
-Template Engine/template versions, prompt version lifecycle, the full
-Processing Profiles system, analytics/evaluation. See
-`docs/architecture/future-considerations.md`.
+UX, and export are implemented (Phase 5) — see
+`docs/architecture/documents.md`. The Template Engine, prompt version
+lifecycle, and the full Processing Profiles/Configuration Hierarchy system
+are implemented (Phase 6) — see `docs/architecture/templates.md`. Still
+deferred: analytics/evaluation (Phase 8), and the items listed under
+"Phase 6 additions" in `docs/architecture/future-considerations.md`.

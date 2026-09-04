@@ -1,12 +1,24 @@
-# Model management (Phase 3 foundation only)
+# Model management (Phase 3 foundation; Phase 6 extended ModelProfile/ProcessingProfile)
 
-Phase 3 deliberately implements only the **backend/domain foundation**
-for model management — a full admin Model Management UI (browse
-available models, install/upgrade/remove from the browser, configure
-provider profiles per-organization) is explicitly Phase 7 scope, not
-this phase's.
+Phase 3 deliberately implemented only the **backend/domain foundation**
+for model management. Phase 6 (see `docs/architecture/templates.md`) made
+`ModelProfile` a real, versioned, admin-manageable entity and added the
+`ProcessingProfile` system on top of it — but a full admin Model
+Management UI (browse available models, install/upgrade/remove from the
+browser) and a `SpeechProfile`/`DiarizationProfile` **database** entity
+remain explicitly Phase 7 scope, not this phase's — see "What's still
+deferred to Phase 7" below (updated from Phase 3's original list).
 
-## What exists today
+## What exists today (Phase 6)
+
+- `ModelProfile`/`ModelProfileVersion` (spec §18) — a real, admin-manageable,
+  versioned entity (`app.profiles.models`, `PATCH /api/v1/model-profiles/{id}`).
+- `ProcessingProfile`/`ProcessingProfileVersion` (spec §19) — named,
+  friendly presets ("General", "Meeting") bundling extraction model +
+  template + language + retention. See `docs/architecture/templates.md`.
+- The Configuration Hierarchy resolver (`app.profiles.resolver`, spec §20).
+
+## What existed before Phase 6 (Phase 3 baseline, still true for Speech/Diarization)
 
 - `SpeechProfile`/`DiarizationProfile` equivalent: `Settings.speech_provider`,
   `speech_model_dir_name`, `speech_device` (and the diarization

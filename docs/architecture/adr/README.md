@@ -28,3 +28,5 @@ MADR-style (Status / Context / Decision / Consequences), numbered sequentially. 
 - [0024](0024-llm-provider-selection.md) — LLM provider and extraction model selection
 - [0025](0025-extraction-schema-design.md) — Extraction category/schema design
 - [0026](0026-contradiction-detection.md) — Contradiction detection approach
+- [0027](0027-synchronous-document-composition.md) — Document composition runs synchronously, not via ProcessingJob
+- [0028](0028-dynamic-template-extraction-schemas.md) — Template-defined extraction categories build Pydantic schemas dynamically
