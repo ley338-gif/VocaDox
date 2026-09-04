@@ -99,6 +99,18 @@ PERMISSIONS: dict[str, str] = {
     "task:read": "View Follow-ups/Tasks for a conversation.",
     "task:create": "Create a user follow-up/task on a conversation.",
     "task:update": "Update a follow-up/task's status.",
+    # Phase 10 (spec §54/§55, roadmap §73): admin management of Service
+    # Accounts and Webhooks. Distinct from `api:access` above (Phase 1's
+    # pre-existing, still-unused "is this actor allowed to call the API at
+    # all" placeholder) -- these gate the ADMIN CRUD over the accounts/
+    # webhooks themselves, not API access by a service account (that's
+    # authenticated by API key + its own granted scopes, see
+    # app.integrations.deps.require_scope, never by a human permission
+    # code).
+    "service-account:read": "View service accounts (API clients).",
+    "service-account:write": "Create, rotate, and revoke service accounts.",
+    "webhook:read": "View webhooks and their delivery logs.",
+    "webhook:write": "Create, update, and delete webhooks.",
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -148,6 +160,10 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "task:read",
             "task:create",
             "task:update",
+            "service-account:read",
+            "service-account:write",
+            "webhook:read",
+            "webhook:write",
         ],
     ),
     "Template Manager": (

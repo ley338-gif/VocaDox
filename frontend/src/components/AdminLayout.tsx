@@ -62,6 +62,13 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "Integrations",
+    items: [
+      { to: "/admin/service-accounts", label: "Service Accounts", permission: "service-account:read" },
+      { to: "/admin/webhooks", label: "Webhooks", permission: "webhook:read" },
+    ],
+  },
+  {
     title: "Security",
     items: [
       { to: "/admin/authentication", label: "Authentication", permission: "system:admin" },

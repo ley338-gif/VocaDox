@@ -1,6 +1,7 @@
 # Admin docs
 
-**Phase 9 status: Timeline/external-reference grouping, deterministic
+**Phase 10 status: Service Accounts and Webhooks are now implemented** —
+see `integrations.md`. **Phase 9 status: Timeline/external-reference grouping, deterministic
 Conversation Comparison, and Follow-ups/Tasks are now implemented** — see
 `docs/architecture/domain-model.md`'s "Phase 9: Longitudinal Documentation"
 section. **Phase 8 status: Analytics, the Evaluation Lab, and Model

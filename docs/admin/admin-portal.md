@@ -8,9 +8,17 @@ Dashboard
 MANAGEMENT: Users, Groups, Organizations, Templates
 AI: Models, Speech, Diarization, Processing Profiles, Prompts
 OPERATIONS: Jobs, Workers, Storage, Retention
+INTEGRATIONS: Service Accounts, Webhooks
 SECURITY: Authentication, Audit
 SYSTEM: About & Licenses
 ```
+
+(Analytics and Evaluation Lab, shipped in Phase 8, and Timeline/
+Follow-ups, shipped in Phase 9 as part of the conversation detail view
+rather than a `/admin` section, are not reflected in this diagram —
+pre-existing documentation drift this phase did not attempt to fix. See
+`docs/admin/analytics-evaluation.md` and `docs/architecture/domain-model
+.md`'s "Phase 9" section for those instead.)
 
 `frontend/src/components/AdminLayout.tsx` renders this sidebar; each link
 is hidden unless the current user has that section's permission, but the
@@ -24,9 +32,10 @@ already scoped that resource (e.g. `user:manage`, `audit:read`,
 `template:read`).
 
 **Explicitly out of scope this phase** (see
-`docs/architecture/future-considerations.md`): Dictionaries, Evaluation
-Lab, Service Accounts/API/Webhooks, Backups, and any automated Retention
-Cleanup worker.
+`docs/architecture/future-considerations.md`): Dictionaries, Backups, and
+any automated Retention Cleanup worker. Evaluation Lab (Phase 8) and
+Service Accounts/Webhooks (Phase 10) were out of scope for this phase but
+have since shipped — see the table below.
 
 ## Section-by-section reference
 
@@ -47,6 +56,8 @@ Cleanup worker.
 | Retention | `retention:read`/`:write` | `GET/POST /admin/retention-policies`, `PATCH .../{id}` | Manages the `RetentionPolicy` rows that have existed since Phase 2. **No automated enforcement/cleanup runs against them** — that's Phase 11's "Retention Cleanup" scope. |
 | Authentication | `system:admin` | (static, read-only) | Shows which `AuthProviderType` is actually implemented (LOCAL only) vs. interface-only (OIDC/LDAP_AD/REVERSE_PROXY) — no new provider type added. |
 | Audit | `audit:read` | `GET /admin/audit-events` | Filterable/paginated viewer over `audit_events`. Never shows conversation/fact/transcript/document content — verified by inspection of every `record_event` call site. |
+| Service Accounts | `service-account:read`/`:write` | `app.integrations.router` (Phase 10) | Create/rotate/revoke non-human API clients; the API key is shown once, at creation/rotation. See `docs/admin/integrations.md`. |
+| Webhooks | `webhook:read`/`:write` | `app.integrations.router` (Phase 10) | Create/update/rotate-secret/delete admin-configured HTTP delivery targets + a per-webhook Delivery Log viewer. See `docs/admin/integrations.md`. |
 | About & Licenses | `system:admin` | `GET /admin/about` | App version + a license-compliance summary + a `THIRD_PARTY_NOTICES.md` excerpt. **The production container image does not ship `compliance/`/`THIRD_PARTY_NOTICES.md`** (outside `backend/Dockerfile`'s build context) — a real deployment shows an honest "not shipped in this deployment" for the license section rather than fabricated data. |
 
 ## What "real data, not a mockup" means here

@@ -18,6 +18,8 @@ from app.diarization.router import router as diarization_router
 from app.documents.router import router as documents_router
 from app.identity.router import admin_groups_router, admin_roles_router, admin_users_router
 from app.identity.router import router as identity_router
+from app.integrations.router import admin_router as integrations_admin_router
+from app.integrations.router import api_router as integrations_api_router
 from app.intelligence.router import router as intelligence_router
 from app.longitudinal.router import router as longitudinal_router
 from app.organizations.router import router as organizations_router
@@ -73,5 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_router, prefix=settings.api_prefix)
     app.include_router(analytics_router, prefix=settings.api_prefix)
     app.include_router(longitudinal_router, prefix=settings.api_prefix)
+    app.include_router(integrations_admin_router, prefix=settings.api_prefix)
+    app.include_router(integrations_api_router, prefix=settings.api_prefix)
 
     return app

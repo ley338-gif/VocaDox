@@ -27,6 +27,10 @@ from app.documents import models as _documents_models  # noqa: F401,E402
 from app.evidence import models as _evidence_models  # noqa: F401,E402
 from app.identity import models as _identity_models  # noqa: F401
 
+# Phase 10: service_accounts/webhooks FK-reference organizations.id and
+# users.id; webhook_deliveries FK-references webhooks.id.
+from app.integrations import models as _integrations_models  # noqa: F401,E402
+
 # Phase 4: extracted_facts FK-references processing_runs.id and
 # conversations.id; fact_evidence FK-references extracted_facts.id and
 # transcript_segments.id; review_issues FK-references conversations.id.

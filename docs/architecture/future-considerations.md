@@ -350,3 +350,64 @@ to this list rather than building it opportunistically.
   removed" as a distinct state — a future phase could add one if fact
   deletion becomes a real workflow (today, facts are never hard-deleted by
   any existing code path).
+
+## Phase 10 additions (Integrations)
+
+- **Full dual-auth (session OR API key) on every existing human-facing
+  route was assessed and explicitly NOT done this phase.** Instead,
+  `app.integrations.router`'s `/integrations/api/*` surface is a thin,
+  additive set of routes that call the *same* domain service functions
+  (`create_conversation`, `compose_document`, `approve_document`,
+  `list_templates`, ...) the human routers already call — see that
+  module's docstring and `PHASE_10_VALIDATION_REPORT.md`'s "Architecture
+  Deviations". Retrofitting `app.identity.deps.require_permission` to
+  accept a `User | ServiceAccount` union across every Phase 1-9 router
+  was judged too high a regression-risk surface for one phase; a future
+  hardening phase could do this properly (e.g. a shared `Principal`
+  protocol) if the two-surface approach becomes a maintenance burden.
+
+- **Webhook delivery retry is in-process (`asyncio.create_task`), not on
+  the existing Valkey-backed job queue** (`app.processing.queues`). A
+  process restart mid-retry loses the *pending* retry (already-made
+  attempts stay durably logged in `webhook_deliveries`). Moving dispatch
+  onto the real job queue for durable retries across restarts is a
+  reasonable Phase 11+ hardening candidate — deliberately not built now
+  to avoid adding queue-topology complexity to a phase whose merge gate
+  only requires bounded retry + an accurate delivery log, not
+  restart-durable retry.
+
+- **No richer/opt-in webhook payload content option was implemented.**
+  The spec allows richer payloads as an explicit admin opt-in; this phase
+  ships only the safe default (ids/metadata, see
+  `app.integrations.service._SAFE_PAYLOAD_KEYS`) and defers the opt-in
+  richer-payload feature entirely rather than building an
+  under-exercised, higher-risk content-inclusion path under this phase's
+  time budget.
+
+- **Future FHIR/HL7/PVS/KIS/CRM/Meeting-Platform adapters — architecture
+  only, no implementation** (spec: prepare, do not implement
+  prematurely). The extension point is exactly the Webhook mechanism this
+  phase ships: a future adapter is a *webhook receiver process* (deployed
+  separately, outside this repo's trust boundary) that:
+  1. Is registered as an ordinary `Webhook` row, subscribed to the event
+     types it cares about (e.g. `document.approved` for a FHIR
+     `DocumentReference`/`Composition` export, `conversation.created` for
+     a PVS/KIS appointment-linkage sync).
+  2. Verifies the HMAC signature (`app.integrations.security.
+     verify_signature`) exactly as any other receiver must.
+  3. Uses the event's ids (never inline content, per the safe-payload
+     default) to call back into the REST Integration API
+     (`/integrations/api/...`) with its own `ServiceAccount` API key,
+     scoped to only the resources it needs, to fetch the actual
+     transcript/document/fact data it then translates into the target
+     system's wire format (FHIR resources, HL7 v2 messages, a PVS/KIS/CRM
+     vendor API call, a meeting-platform webhook of its own).
+  4. Never runs inside the VocaDox backend process — no FHIR/HL7 parsing
+     or generation library is a dependency of this repository, and no
+     connector-specific UI exists in the Admin Portal beyond the
+     general-purpose Service Account/Webhook management this phase adds.
+
+  This mirrors ADR-0005's provider-abstraction pattern (define the real
+  interface — here, "subscribe to events + call the scoped REST API" —
+  before any concrete implementation exists) rather than speculatively
+  building FHIR/HL7 code with no real deployment to validate it against.

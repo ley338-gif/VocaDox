@@ -21,6 +21,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     throw new ApiError(response.status, detail);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -376,4 +377,127 @@ export interface AboutInfo {
 
 export function getAbout(): Promise<AboutInfo> {
   return request("/admin/about");
+}
+
+// -- Phase 10: Service Accounts & Webhooks ---------------------------------
+
+export interface ServiceAccount {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  key_prefix: string;
+  scopes: string[];
+  is_active: boolean;
+  owner_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  last_rotated_at: string | null;
+  last_used_at: string | null;
+}
+
+export interface ServiceAccountCreated extends ServiceAccount {
+  api_key: string;
+}
+
+export function listServiceAccounts(): Promise<ServiceAccount[]> {
+  return request("/admin/service-accounts");
+}
+
+export function listAvailableScopes(): Promise<{ scopes: string[] }> {
+  return request("/admin/service-accounts/scopes");
+}
+
+export function createServiceAccount(
+  payload: {
+    name: string;
+    description?: string | null;
+    organization_id: string;
+    scopes: string[];
+    owner_user_id?: string | null;
+  },
+  csrfToken: string
+): Promise<ServiceAccountCreated> {
+  return request("/admin/service-accounts", jsonInit("POST", payload, csrfToken));
+}
+
+export function rotateServiceAccount(
+  accountId: string,
+  csrfToken: string
+): Promise<ServiceAccountCreated> {
+  return request(`/admin/service-accounts/${accountId}/rotate`, jsonInit("POST", {}, csrfToken));
+}
+
+export function revokeServiceAccount(accountId: string, csrfToken: string): Promise<ServiceAccount> {
+  return request(`/admin/service-accounts/${accountId}/revoke`, jsonInit("POST", {}, csrfToken));
+}
+
+export interface Webhook {
+  id: string;
+  organization_id: string;
+  name: string;
+  target_url: string;
+  event_types: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookCreated extends Webhook {
+  secret: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  webhook_id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  attempt_number: number;
+  status: string;
+  response_status_code: number | null;
+  error_message: string | null;
+  created_at: string;
+  delivered_at: string | null;
+}
+
+export function listWebhooks(): Promise<Webhook[]> {
+  return request("/admin/webhooks");
+}
+
+export function listWebhookEventTypes(): Promise<{ event_types: string[] }> {
+  return request("/admin/webhooks/event-types");
+}
+
+export function createWebhook(
+  payload: { name: string; organization_id: string; target_url: string; event_types: string[] },
+  csrfToken: string
+): Promise<WebhookCreated> {
+  return request("/admin/webhooks", jsonInit("POST", payload, csrfToken));
+}
+
+export function updateWebhook(
+  webhookId: string,
+  payload: Partial<{ name: string; target_url: string; event_types: string[]; is_active: boolean }>,
+  csrfToken: string
+): Promise<Webhook> {
+  return request(`/admin/webhooks/${webhookId}`, jsonInit("PATCH", payload, csrfToken));
+}
+
+export function rotateWebhookSecret(webhookId: string, csrfToken: string): Promise<WebhookCreated> {
+  return request(`/admin/webhooks/${webhookId}/rotate-secret`, jsonInit("POST", {}, csrfToken));
+}
+
+export function deleteWebhook(webhookId: string, csrfToken: string): Promise<void> {
+  return request(`/admin/webhooks/${webhookId}`, { method: "DELETE", headers: { "X-CSRF-Token": csrfToken } });
+}
+
+export function listWebhookDeliveries(
+  webhookId: string,
+  params: { limit?: number; offset?: number } = {}
+): Promise<{ items: WebhookDelivery[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params.limit) query.set("limit", String(params.limit));
+  if (params.offset) query.set("offset", String(params.offset));
+  const qs = query.toString();
+  return request(`/admin/webhooks/${webhookId}/deliveries${qs ? `?${qs}` : ""}`);
 }
