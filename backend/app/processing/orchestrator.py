@@ -643,10 +643,13 @@ async def execute_extract(
     llm_provider: LLMProvider,
     job: ProcessingJob,
 ) -> uuid.UUID:
+    from app.conversations.models import Conversation
     from app.intelligence.service import run_extraction
-    from app.profiles.models import ModelProfilePurpose
+    from app.profiles.models import ModelProfile, ModelProfilePurpose
+    from app.profiles.resolver import NoSystemDefaultProfileError, resolve_effective_config
     from app.profiles.service import get_active_profile
     from app.providers.llm import LLMModelUnavailableError
+    from app.templates.models import PromptVersion, TemplateVersion
 
     metadata = job.job_metadata or {}
     transcript_id = metadata.get("transcript_id")
@@ -660,7 +663,32 @@ async def execute_extract(
     if transcript is None:
         raise ValueError("no active, ready transcript to extract from")
 
-    profile = await get_active_profile(session, purpose=ModelProfilePurpose.EXTRACTION)
+    # Phase 6: resolve the effective configuration hierarchy (spec §20) for
+    # this conversation — which template/prompt/extraction-model actually
+    # apply, and which layer (system default / processing profile /
+    # conversation override) decided each. Falls back to the pre-Phase-6
+    # get_active_profile()-only behavior if no ProcessingProfile is seeded
+    # at all (e.g. an older installation mid-upgrade before the Phase 6
+    # seed has run) rather than hard-failing extraction.
+    conversation = await session.get(Conversation, job.conversation_id)
+    assert conversation is not None
+    template_version: TemplateVersion | None = None
+    prompt_version: PromptVersion | None = None
+    processing_profile_version_id: uuid.UUID | None = None
+    profile: ModelProfile | None = None
+    try:
+        effective = await resolve_effective_config(session, conversation)
+        processing_profile_version_id = effective.processing_profile_version_id
+        template_version = await session.get(TemplateVersion, effective.template_version_id)
+        if effective.prompt_version_id is not None:
+            prompt_version = await session.get(PromptVersion, effective.prompt_version_id)
+        if effective.extraction_model_profile_id is not None:
+            profile = await session.get(ModelProfile, effective.extraction_model_profile_id)
+    except NoSystemDefaultProfileError:
+        pass
+
+    if profile is None:
+        profile = await get_active_profile(session, purpose=ModelProfilePurpose.EXTRACTION)
     if profile is None:
         raise LLMModelUnavailableError(
             "no enabled extraction ModelProfile configured — run `python -m app.profiles.seed`"
@@ -676,6 +704,9 @@ async def execute_extract(
         model=status.model,
         model_revision=status.model_revision,
         application_version=APPLICATION_VERSION,
+        template_version_id=template_version.id if template_version else None,
+        prompt_version_id=prompt_version.id if prompt_version else None,
+        processing_profile_version_id=processing_profile_version_id,
         configuration_snapshot={
             "model_profile_id": str(profile.id),
             "temperature": profile.temperature,
@@ -691,6 +722,11 @@ async def execute_extract(
         processing_run_id=run.id,
         provider=llm_provider,
         profile=profile,
+        template_version=template_version,
+        system_prompt=prompt_version.system_prompt if prompt_version else None,
+        category_instruction_overrides=prompt_version.category_instructions
+        if prompt_version
+        else None,
     )
 
     run.status = RunStatus.SUCCEEDED.value

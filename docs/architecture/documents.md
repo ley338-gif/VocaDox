@@ -141,8 +141,21 @@ deferred (see `future-considerations.md`) rather than adding an
 unresearched dependency. Audited (`document.exported`, ids/format only —
 never full content).
 
+## Template-driven presentation (Phase 6)
+
+`compose_document` now resolves the conversation's effective `Template`
+version (`app.profiles.resolver.resolve_effective_config`) and uses its
+`presentation` (ordered `{category, title}` list) to decide section
+order/titles, instead of a hardcoded category→title mapping — see
+`docs/architecture/templates.md`. The 3 builtin categories
+(`general_fact`/`decision`/`task`) render byte-identically to before; a
+genuinely template-defined category (e.g. Meeting's `action_item`) falls
+through to a generic "field: value" renderer. `DocumentRevision.
+template_version_id` records which version actually rendered it.
+
 ## What's NOT built here
 
-The full pluggable Template Engine, Prompt Version lifecycle, Processing
-Profiles, cross-conversation Timeline, Admin Portal, Analytics — see
-`future-considerations.md`.
+Cross-conversation Timeline, the full Admin Portal, Analytics — see
+`future-considerations.md`. The Template Engine/Prompt Version
+lifecycle/Processing Profiles referenced above as still-deferred in
+earlier phases are now implemented (Phase 6).

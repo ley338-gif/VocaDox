@@ -128,12 +128,22 @@ async def run_all_jobs(
 
 
 async def create_conversation_with_source_audio(
-    http_client: AsyncClient, headers: dict[str, str], *, organization_id: str
+    http_client: AsyncClient,
+    headers: dict[str, str],
+    *,
+    organization_id: str,
+    processing_profile_id: str | None = None,
 ) -> tuple[str, str]:
-    """Returns (conversation_id, source_media_id)."""
+    """Returns (conversation_id, source_media_id). `processing_profile_id`
+    (Phase 6) is optional — omitted means the SYSTEM DEFAULT config
+    hierarchy layer applies (see app.profiles.resolver), unchanged from
+    every pre-Phase-6 caller of this helper."""
+    body: dict[str, str] = {"title": "Processing test", "organization_id": organization_id}
+    if processing_profile_id:
+        body["processing_profile_id"] = processing_profile_id
     resp = await http_client.post(
         "/api/v1/conversations",
-        json={"title": "Processing test", "organization_id": organization_id},
+        json=body,
         headers=headers,
     )
     assert resp.status_code == 201, resp.text

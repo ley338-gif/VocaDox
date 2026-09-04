@@ -19,12 +19,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.evidence.models import EvidenceType, FactEvidence
 from app.intelligence.contradictions import FactForContradictionCheck, detect_contradictions
 from app.intelligence.models import Certainty, ExtractedFact, FactCategory, FactStatus
-from app.intelligence.prompts import SYSTEM_PROMPT, build_prompt, render_transcript
-from app.intelligence.schemas import EXTRACTION_CATEGORIES, NOT_MENTIONED
+from app.intelligence.prompts import SYSTEM_PROMPT, build_prompt_from_instruction, render_transcript
+from app.intelligence.schemas import NOT_MENTIONED
 from app.intelligence.uncertainty import classify as classify_uncertainty
 from app.profiles.models import ModelProfile
 from app.providers.llm import LLMProvider
 from app.review.models import ReviewIssue, ReviewIssueType
+from app.templates.models import TemplateVersion
+from app.templates.schema_builder import ResolvedCategory, resolve_categories
 from app.transcription.models import Transcript, TranscriptSegment
 
 # Hard cap on how much transcript text one extraction call sends, in
@@ -81,26 +83,29 @@ def _build_transcript_text(segments: list[TranscriptSegment]) -> str:
 
 
 async def _extract_category(
-    provider: LLMProvider, profile: ModelProfile, category: str, transcript_text: str
+    provider: LLMProvider,
+    profile: ModelProfile,
+    resolved: ResolvedCategory,
+    transcript_text: str,
+    system_prompt: str,
 ) -> list[dict]:
-    schema_cls, item_field, _fact_type = EXTRACTION_CATEGORIES[category]
-    json_schema = schema_cls.model_json_schema()
-    prompt = build_prompt(category, transcript_text)
+    json_schema = resolved.schema_cls.model_json_schema()
+    prompt = build_prompt_from_instruction(resolved.instruction, transcript_text)
     response = await provider.complete_structured(
         prompt,
         json_schema=json_schema,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         temperature=profile.temperature,
         max_tokens=profile.max_tokens,
     )
     try:
         raw = json.loads(response.text)
-        validated = schema_cls.model_validate(raw)
+        validated = resolved.schema_cls.model_validate(raw)
     except (json.JSONDecodeError, pydantic.ValidationError) as exc:
         raise ExtractionValidationError(
-            f"category={category}: LLM response failed schema validation: {exc}"
+            f"category={resolved.key}: LLM response failed schema validation: {exc}"
         ) from exc
-    items = getattr(validated, item_field)
+    items = getattr(validated, resolved.item_field)
     return [item.model_dump() for item in items]
 
 
@@ -150,7 +155,39 @@ async def run_extraction(
     processing_run_id: uuid.UUID | None,
     provider: LLMProvider,
     profile: ModelProfile,
+    template_version: TemplateVersion | None = None,
+    system_prompt: str | None = None,
+    category_instruction_overrides: dict[str, str] | None = None,
 ) -> ExtractionOutcome:
+    """`template_version` (Phase 6) drives which categories are extracted —
+    defaults to the "general" template's published version (the exact same
+    3 builtin categories Phase 4/5 hardcoded) when omitted, so every
+    existing caller (including every pre-Phase-6 test) keeps its exact
+    prior behavior unchanged. `system_prompt`/`category_instruction_overrides`
+    similarly default to the template's own wording unless an admin has
+    published a different `PromptVersion` for it (see
+    app.processing.orchestrator.execute_extract, which is the only caller
+    that ever passes them) — this is how a published PromptVersion actually
+    changes extraction behavior, not just gets recorded for provenance."""
+    if template_version is None:
+        from app.templates.service import get_default_template_version
+
+        template_version = await get_default_template_version(session)
+    resolved_categories = resolve_categories(template_version.extraction_categories)
+    if category_instruction_overrides:
+        resolved_categories = [
+            r if r.key not in category_instruction_overrides
+            else ResolvedCategory(
+                key=r.key,
+                fact_type=r.fact_type,
+                item_field=r.item_field,
+                schema_cls=r.schema_cls,
+                instruction=category_instruction_overrides[r.key],
+            )
+            for r in resolved_categories
+        ]
+    effective_system_prompt = system_prompt or SYSTEM_PROMPT
+
     segments = await _load_segments(session, transcript.id)
     segments_by_sequence = {s.sequence: s for s in segments}
     transcript_text = _build_transcript_text(segments)
@@ -159,8 +196,12 @@ async def run_extraction(
     created_facts: list[ExtractedFact] = []
     uncertainty_issues_created = 0
 
-    for category, (_schema_cls, _item_field, fact_type) in EXTRACTION_CATEGORIES.items():
-        items = await _extract_category(provider, profile, category, transcript_text)
+    for resolved in resolved_categories:
+        category = resolved.key
+        fact_type = resolved.fact_type
+        items = await _extract_category(
+            provider, profile, resolved, transcript_text, effective_system_prompt
+        )
         facts_by_category[category] = 0
         for item in items:
             certainty = Certainty(item["certainty"])

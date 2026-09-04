@@ -36,6 +36,12 @@ from app.organizations import models as _organizations_models  # noqa: F401
 # Phase 3: processing_runs must be imported before transcription/diarization
 # (both FK-reference processing_runs.id).
 from app.processing import models as _processing_models  # noqa: F401,E402
+
+# Phase 6: model_profiles/processing_profiles (ProcessingProfileVersion
+# FK-references templates.id/template_versions.id/prompts.id/
+# prompt_versions.id — actual import order doesn't affect SQLAlchemy FK
+# resolution, both are imported here regardless).
 from app.profiles import models as _profiles_models  # noqa: F401,E402
 from app.review import models as _review_models  # noqa: F401,E402
+from app.templates import models as _templates_models  # noqa: F401,E402
 from app.transcription import models as _transcription_models  # noqa: F401,E402

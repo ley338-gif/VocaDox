@@ -18,6 +18,11 @@ class ConversationCreateRequest(BaseModel):
     external_reference: str | None = Field(default=None, max_length=255)
     external_reference_type: str | None = Field(default=None, max_length=64)
     privacy_mode: PrivacyMode = PrivacyMode.STANDARD
+    # Phase 6 (spec §19): the friendly Processing Profile name the user
+    # picked when starting this conversation (e.g. "General", "Meeting").
+    # Omitted/None means the SYSTEM DEFAULT layer applies (see
+    # app.profiles.resolver) — unchanged pre-Phase-6 behavior.
+    processing_profile_id: uuid.UUID | None = None
 
     @field_validator("title")
     @classmethod
@@ -51,6 +56,7 @@ class ConversationResponse(BaseModel):
     external_reference_type: str | None
     privacy_mode: str
     retention_policy_id: uuid.UUID | None
+    processing_profile_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

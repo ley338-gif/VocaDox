@@ -146,6 +146,21 @@ class ProcessingRun(Base):
     error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error_message_safe: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
+    # Phase 6 (spec §43: "Every ProcessingRun must record which prompt
+    # version was actually used, for genuine reproducibility"). All three
+    # additive/nullable — a pre-Phase-6 run (or any run for a stage that
+    # doesn't use a template/prompt, e.g. NORMALIZATION) simply has NULLs
+    # here, unchanged from before this phase.
+    template_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("template_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    prompt_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("prompt_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    processing_profile_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("processing_profile_versions.id", ondelete="SET NULL"), nullable=True
+    )
+
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

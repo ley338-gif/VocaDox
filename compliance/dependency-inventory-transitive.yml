@@ -2801,7 +2801,7 @@ dependencies:
   approval_status: approved
 - name: googleapis-common-protos
   ecosystem: pypi
-  version: 1.75.2
+  version: 1.75.3
   scope: worker
   direct: false
   license: Apache-2.0

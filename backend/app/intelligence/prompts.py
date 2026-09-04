@@ -42,6 +42,15 @@ _CATEGORY_INSTRUCTIONS: dict[str, str] = {
 }
 
 
+def get_builtin_category_instruction(category: str) -> str:
+    """Public accessor for `_CATEGORY_INSTRUCTIONS`, used by
+    `app.templates.schema_builder` when a template's category definition
+    marks itself `builtin: true` (i.e. the "General Conversation"
+    template) so it can reuse the exact wording rather than duplicating
+    it."""
+    return _CATEGORY_INSTRUCTIONS[category]
+
+
 def render_transcript(segments: list[tuple[int, str]]) -> str:
     """`segments` is a list of (sequence, text) tuples in order. Renders
     each as a `[SEG n] text` line so the model can cite sequence numbers
@@ -51,9 +60,18 @@ def render_transcript(segments: list[tuple[int, str]]) -> str:
 
 
 def build_prompt(category: str, transcript_text: str) -> str:
-    instructions = _CATEGORY_INSTRUCTIONS[category]
+    return build_prompt_from_instruction(_CATEGORY_INSTRUCTIONS[category], transcript_text)
+
+
+def build_prompt_from_instruction(instruction: str, transcript_text: str) -> str:
+    """Phase 6: the template-driven counterpart of `build_prompt` — takes
+    the instruction text directly (from a `TemplateVersion`'s category
+    definition or an admin-published `PromptVersion`) instead of looking it
+    up by a fixed category key, so a template-defined category (e.g.
+    Meeting's "agenda_topic") gets a real, category-specific prompt too,
+    not a generic fallback."""
     return (
-        f"{instructions}\n\n"
+        f"{instruction}\n\n"
         "Transcript (each line is one segment, tagged with its segment number):\n"
         f"{transcript_text}\n\n"
         "Return only facts genuinely present above. Respond with JSON matching the given "

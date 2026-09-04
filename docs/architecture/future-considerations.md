@@ -156,3 +156,47 @@ lost and aren't quietly decided by accident later.
 If you're implementing a later phase and considering adding something that
 feels like it belongs here instead of in your phase's actual scope, add it
 to this list rather than building it opportunistically.
+
+## Phase 6 additions (Templates & Profiles)
+
+- **Full template/prompt authoring UI**: `AdminTemplatesPage` (frontend)
+  lists templates/versions/processing profiles and publishes a draft
+  version, but creating a brand-new template/prompt or a new draft version
+  from richer form fields (rather than raw JSON via the REST API) is not
+  built — matching the brief's "does not need Phase 7-grade polish" scope.
+  A future phase could add a real category/field editor.
+
+- **`SpeechProfile`/`DiarizationProfile` database entities**: still Phase
+  7 (see `docs/architecture/model-management-foundation.md`) —
+  `ProcessingProfileVersion.speech_provider_config`/
+  `diarization_provider_config` are honestly-scoped small JSON hints, not
+  a real FK to a named, multi-option provider profile table yet.
+
+- **Per-organization Processing Profiles / Templates**: both remain
+  global (platform-wide) in Phase 6, matching the existing "one global
+  provider config for the whole deployment" precedent. Per-organization
+  scoping (e.g. an org wanting its own custom template) is a real future
+  need but not built here.
+
+- **`ModelProfilePurpose.DOCUMENT_GENERATION`**: reserved as a data field
+  on `ProcessingProfileVersion.document_model_profile_id`, but no runtime
+  code path ever calls an LLM for document composition (ADR-0027 remains a
+  hard constraint) — a future phase that genuinely wants an LLM-assisted
+  drafting mode (as an alternative to, never a replacement for,
+  deterministic composition) would need to design that as new, explicit,
+  clearly-labeled functionality, not silently repurpose this field.
+
+- **Richer PromptVersion wiring**: a published `PromptVersion`'s
+  `system_prompt`/`category_instructions` only take effect when a
+  `ProcessingProfileVersion` explicitly references it (Phase 6's seeded
+  "general"/"meeting" profiles do not, by choice, to keep the seeded
+  behavior minimal and obviously correct) — a future phase's admin UI
+  should make wiring a new PromptVersion into a live ProcessingProfile a
+  one-click action.
+
+- **Contradiction detection scoped to `general_fact` only**: Meeting's new
+  categories (`agenda_topic`/`decision`/`action_item`) are not checked for
+  cross-fact contradictions — `app.intelligence.contradictions` remains
+  scoped to `FactCategory.GENERAL_FACT` exactly as Phase 4 left it. Worth
+  generalizing once a second template with genuinely comparable
+  subject/attribute/value-shaped facts exists.

@@ -150,6 +150,7 @@ async def create_conversation_endpoint(
         external_reference=payload.external_reference,
         external_reference_type=payload.external_reference_type,
         privacy_mode=payload.privacy_mode,
+        processing_profile_id=payload.processing_profile_id,
     )
     await record_event(
         db,
@@ -203,7 +204,7 @@ async def update_conversation_endpoint(
     return ConversationResponse.model_validate(conversation)
 
 
-@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_conversation_endpoint(
     conversation_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -223,6 +224,89 @@ async def delete_conversation_endpoint(
         event_metadata={"conversation_id": str(conversation.id)},
     )
     await db.commit()
+
+
+@router.get("/{conversation_id}/effective-config")
+async def get_effective_config_endpoint(
+    conversation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+) -> dict:
+    """Spec §20's explainability requirement, made real: shows every
+    resolved field of the SYSTEM DEFAULT -> PROCESSING PROFILE ->
+    CONVERSATION OVERRIDE hierarchy for this conversation, plus exactly
+    which layer set each one — not just "the override applied", but
+    "here is why every field has the value it has"."""
+    conversation = await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="conversation:read"
+    )
+    from app.profiles.resolver import resolve_effective_config
+
+    effective = await resolve_effective_config(db, conversation)
+    return {
+        "processing_profile_id": str(effective.processing_profile_id)
+        if effective.processing_profile_id
+        else None,
+        "processing_profile_version_id": str(effective.processing_profile_version_id)
+        if effective.processing_profile_version_id
+        else None,
+        "fields": effective.explain(),
+    }
+
+
+@router.patch("/{conversation_id}/config-override", response_model=ConversationResponse)
+async def set_config_override_endpoint(
+    conversation_id: uuid.UUID,
+    payload: dict,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> ConversationResponse:
+    """Spec §20's CONVERSATION OVERRIDE layer: a per-conversation, per-field
+    override on top of whatever the Processing Profile/system default
+    resolved. `payload` is merged into `config_overrides` (a `None` value
+    removes that field's override, falling back to the lower layers) —
+    never a wholesale profile replacement. Gated by `conversation:update`,
+    the same permission that already governs editing this conversation's
+    other metadata."""
+    conversation = await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="conversation:update"
+    )
+    allowed_fields = {
+        "speech_provider_config",
+        "diarization_provider_config",
+        "extraction_model_profile_id",
+        "document_model_profile_id",
+        "template_id",
+        "template_version_id",
+        "prompt_id",
+        "prompt_version_id",
+        "language",
+        "retention_policy_id",
+    }
+    unknown = set(payload) - allowed_fields
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"unknown override field(s): {unknown}"
+        )
+    overrides = dict(conversation.config_overrides or {})
+    for key, value in payload.items():
+        if value is None:
+            overrides.pop(key, None)
+        else:
+            overrides[key] = value
+    conversation.config_overrides = overrides
+    await db.flush()
+    await record_event(
+        db,
+        event_type="conversation.config_override_updated",
+        user_id=user.id,
+        username=user.username,
+        event_metadata={"conversation_id": str(conversation.id), "fields": list(payload.keys())},
+    )
+    await db.commit()
+    await db.refresh(conversation)
+    return ConversationResponse.model_validate(conversation)
 
 
 # -- Recording finalize / media upload --------------------------------------
@@ -484,7 +568,11 @@ async def get_media_content_endpoint(
     return FileResponse(path=path, media_type=media.content_type, filename=filename)
 
 
-@router.delete("/{conversation_id}/media/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{conversation_id}/media/{media_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 async def delete_media_endpoint(
     conversation_id: uuid.UUID,
     media_id: uuid.UUID,
@@ -626,7 +714,9 @@ async def update_participant_endpoint(
 
 
 @router.delete(
-    "/{conversation_id}/participants/{participant_id}", status_code=status.HTTP_204_NO_CONTENT
+    "/{conversation_id}/participants/{participant_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
 )
 async def delete_participant_endpoint(
     conversation_id: uuid.UUID,
@@ -766,7 +856,11 @@ async def update_marker_endpoint(
     return MarkerResponse.model_validate(marker)
 
 
-@router.delete("/{conversation_id}/markers/{marker_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{conversation_id}/markers/{marker_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 async def delete_marker_endpoint(
     conversation_id: uuid.UUID,
     marker_id: uuid.UUID,
@@ -886,7 +980,11 @@ async def update_note_endpoint(
     return NoteResponse.model_validate(note)
 
 
-@router.delete("/{conversation_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{conversation_id}/notes/{note_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 async def delete_note_endpoint(
     conversation_id: uuid.UUID,
     note_id: uuid.UUID,

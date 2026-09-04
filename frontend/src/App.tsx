@@ -5,6 +5,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { RequireAuth, RequirePermission } from "./auth/RequireAuth";
 import { DesignSystemPage } from "./design-system/DesignSystemPage";
 import { AdminHomePage } from "./pages/AdminHomePage";
+import { AdminTemplatesPage } from "./pages/AdminTemplatesPage";
 import { AppHomePage } from "./pages/AppHomePage";
 import { ConversationDetailPage } from "./pages/ConversationDetailPage";
 import { ConversationsListPage } from "./pages/ConversationsListPage";
@@ -57,6 +58,14 @@ export function App() {
             element={
               <RequirePermission code="system:admin">
                 <AdminHomePage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/admin/templates"
+            element={
+              <RequirePermission code="template:read">
+                <AdminTemplatesPage />
               </RequirePermission>
             }
           />
