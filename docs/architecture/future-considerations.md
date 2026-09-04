@@ -305,3 +305,48 @@ to this list rather than building it opportunistically.
   "real but not built for massive scale" disclosed limitation) but would
   not scale indefinitely; a future phase could move this to a SQL-side
   aggregation once volume warrants it.
+
+## Phase 9 additions (Longitudinal Documentation)
+
+- **Service Accounts/API scopes/Webhooks, Backup/Restore/GPU-metrics
+  dashboard/automated Retention Cleanup, final hardening audit**: remain
+  explicitly later-phase roadmap items (Phase 10/11/12), untouched here.
+
+- **No notification/reminder/email system for Follow-ups/Tasks**: a task
+  going overdue, or an AI-extracted task being created, never triggers any
+  outbound notification in this codebase — Phase 10 (Integrations)
+  territory per the phase brief. Today a user must open the conversation's
+  Tasks tab to see open items.
+
+- **Comparison is scoped per (organization_id, external_reference), not
+  cached/precomputed**: `app.longitudinal.service.build_comparison`
+  re-derives the full comparison on every request by re-reading every
+  conversation's facts in the group. Fine at the expected scale of a
+  single patient/case/client's conversation history (a handful to a few
+  dozen conversations), but would need memoization or a persisted
+  comparison-result table if a future phase needs this at much larger
+  group sizes.
+
+- **The temporal diff only compares `GENERAL_FACT` items** — `DECISION`
+  and `TASK` category facts are not part of the NEW/CHANGED/NOT_MENTIONED/
+  CONTRADICTED comparison (Follow-ups/Tasks already surface `TASK` facts
+  through their own dedicated view). A future phase wanting "this decision
+  changed between visits" comparison would need its own normalized
+  key shape for `DecisionItem`/`TaskItem`, analogous to GeneralFactItem's
+  (subject, attribute, value) triple — not built here since neither has an
+  obvious stable identity key the way (subject, attribute) does.
+
+- **`FollowUpTask.due_date` is a free-form string** (mirrors
+  `app.intelligence.schemas.TaskItem.due_date` exactly, including
+  accepting `"NOT_MENTIONED"`/unparsed natural-language phrases like "in 2
+  weeks") — never parsed into a real date. No due-date sorting/reminder
+  feature is possible until a future phase decides how (or whether) to
+  parse these into actual dates, which the spec does not require now.
+
+- **A task's `source_fact_id` is `ON DELETE SET NULL`, not cascaded**: if
+  a `FollowUpTask`'s originating `ExtractedFact` is ever deleted, the task
+  row survives (a human may already be acting on it) but silently loses
+  its evidence link. No UI currently surfaces "this task's evidence was
+  removed" as a distinct state — a future phase could add one if fact
+  deletion becomes a real workflow (today, facts are never hard-deleted by
+  any existing code path).

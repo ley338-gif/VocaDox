@@ -1,7 +1,11 @@
 # Admin docs
 
-**Phase 8 status: Analytics, the Evaluation Lab, and Model Lifecycle are
-now implemented** — see `analytics-evaluation.md`. **Phase 7 status: the
+**Phase 9 status: Timeline/external-reference grouping, deterministic
+Conversation Comparison, and Follow-ups/Tasks are now implemented** — see
+`docs/architecture/domain-model.md`'s "Phase 9: Longitudinal Documentation"
+section. **Phase 8 status: Analytics, the Evaluation Lab, and Model
+Lifecycle are now implemented** — see `analytics-evaluation.md`. **Phase 7
+status: the
 Admin Portal (`/admin`) is implemented** — see `admin-portal.md` for the
 full navigation/section reference. This page keeps the Phase 1 bootstrap
 procedure below, since every admin action (creating more users, managing
@@ -78,6 +82,13 @@ Run `alembic upgrade head` then `python -m app.identity.seed` to pick up
 the new `evaluation:run`/`model-profile:promote` permission codes
 (`analytics:read`, seeded since Phase 1, already gates the read-only
 analytics/evaluation views — no new "read" permission was needed).
+
+**Upgrading an existing (pre-Phase-9) installation**: Phase 9 DOES add a
+new migration (`0010_longitudinal_documentation`: `follow_up_tasks`). Run
+`alembic upgrade head` then `python -m app.identity.seed` to pick up the
+new `timeline:read`/`task:read`/`task:create`/`task:update` permission
+codes (granted to Manager/Reviewer/User/Auditor as appropriate — see
+`backend/app/identity/seed.py`'s `ROLES`).
 
 Additional users/groups/organizations/role assignments are now managed
 through the Admin Portal UI (`/admin/users`, `/admin/groups`,
