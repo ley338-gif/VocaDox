@@ -49,6 +49,20 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.platform.db.session import Base
 
 
+class ModelLifecycleStatus(StrEnum):
+    """Spec §51: AVAILABLE -> TESTING -> PILOT -> PRODUCTION -> RETIRED,
+    with explicit-admin-action rollback to any prior status (see
+    app.analytics.service.transition_model_lifecycle). Every transition —
+    forward or rollback — is a `model_profile_lifecycle_events` row; there
+    is no automatic/unattended transition anywhere in this codebase."""
+
+    AVAILABLE = "available"
+    TESTING = "testing"
+    PILOT = "pilot"
+    PRODUCTION = "production"
+    RETIRED = "retired"
+
+
 class ModelProfilePurpose(StrEnum):
     EXTRACTION = "extraction"
     # Phase 6: reserved for a future LLM-assisted document-drafting mode.
@@ -92,6 +106,13 @@ class ModelProfile(Base):
     configuration: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     version: Mapped[str] = mapped_column(String(64), nullable=False, default="1")
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    # Phase 8 (spec §51): additive, defaulted lifecycle status — see
+    # ModelLifecycleStatus. Never changed by any automatic/background
+    # process; only app.analytics.service.transition_model_lifecycle
+    # (an explicit admin action) ever writes this field.
+    lifecycle_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=ModelLifecycleStatus.AVAILABLE.value, index=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

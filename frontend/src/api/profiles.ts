@@ -43,6 +43,8 @@ export interface ModelProfile {
   thinking_mode: string | null;
   version: string;
   enabled: boolean;
+  /** Phase 8 (spec §51): AVAILABLE/TESTING/PILOT/PRODUCTION/RETIRED. */
+  lifecycle_status: string;
 }
 
 export interface ProcessingProfile {

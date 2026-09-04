@@ -2,6 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import {
+  getModelLifecycle,
+  LIFECYCLE_CHECKLIST_KEYS,
+  transitionModelLifecycle,
+} from "../api/analytics";
+import {
   createProcessingProfileVersion,
   listModelProfiles,
   listProcessingProfileVersions,
@@ -52,6 +57,7 @@ export function AdminProfilesPage() {
   });
 
   const canWrite = hasPermission("processing-profile:write");
+  const [expandedLifecycleId, setExpandedLifecycleId] = useState<string | null>(null);
 
   async function handlePublish(profileId: string, versionId: string) {
     if (!csrfToken) return;
@@ -187,6 +193,11 @@ export function AdminProfilesPage() {
 
       <section style={{ marginTop: "var(--space-8)" }}>
         <h2 style={{ fontSize: "var(--font-h2-size)" }}>Model Profiles</h2>
+        <p style={{ color: "var(--text-secondary)" }}>
+          Lifecycle: AVAILABLE → TESTING → PILOT → PRODUCTION → RETIRED, with rollback to any
+          earlier status. Every transition is an explicit admin action — nothing here ever
+          changes automatically.
+        </p>
         {modelProfilesQuery.data?.map((mp) => (
           <div
             key={mp.id}
@@ -197,12 +208,171 @@ export function AdminProfilesPage() {
               marginTop: "var(--space-3)",
             }}
           >
-            <strong>{mp.name}</strong> — {mp.provider}/{mp.model_identifier} (v{mp.version})
-            {mp.enabled ? <Badge tone="success">enabled</Badge> : <Badge tone="neutral">disabled</Badge>}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <strong>{mp.name}</strong> — {mp.provider}/{mp.model_identifier} (v{mp.version}){" "}
+                {mp.enabled ? (
+                  <Badge tone="success">enabled</Badge>
+                ) : (
+                  <Badge tone="neutral">disabled</Badge>
+                )}{" "}
+                <Badge tone={LIFECYCLE_TONE[mp.lifecycle_status] ?? "neutral"}>
+                  {mp.lifecycle_status}
+                </Badge>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  setExpandedLifecycleId(expandedLifecycleId === mp.id ? null : mp.id)
+                }
+              >
+                {expandedLifecycleId === mp.id ? "Hide lifecycle" : "Lifecycle"}
+              </Button>
+            </div>
+            {expandedLifecycleId === mp.id && <ModelLifecyclePanel modelProfileId={mp.id} />}
           </div>
         ))}
       </section>
     </AdminLayout>
+  );
+}
+
+const LIFECYCLE_TONE: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
+  available: "neutral",
+  testing: "info",
+  pilot: "warning",
+  production: "success",
+  retired: "danger",
+};
+
+const LIFECYCLE_ORDER = ["available", "testing", "pilot", "production", "retired"];
+
+function ModelLifecyclePanel({ modelProfileId }: { modelProfileId: string }) {
+  const { csrfToken, hasPermission } = useAuth();
+  const queryClient = useQueryClient();
+  const canPromote = hasPermission("model-profile:promote");
+  const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const lifecycleQuery = useQuery({
+    queryKey: ["admin", "model-profile-lifecycle", modelProfileId],
+    queryFn: () => getModelLifecycle(modelProfileId),
+  });
+
+  const currentStatus = lifecycleQuery.data?.lifecycle_status ?? "available";
+  const currentIndex = LIFECYCLE_ORDER.indexOf(currentStatus);
+  const nextStatus = LIFECYCLE_ORDER[currentIndex + 1];
+
+  async function refresh() {
+    await queryClient.invalidateQueries({
+      queryKey: ["admin", "model-profile-lifecycle", modelProfileId],
+    });
+    await queryClient.invalidateQueries({ queryKey: ["admin", "model-profiles"] });
+  }
+
+  async function handlePromote() {
+    if (!csrfToken || !nextStatus) return;
+    setError(null);
+    try {
+      await transitionModelLifecycle(
+        modelProfileId,
+        { to_status: nextStatus, is_rollback: false, checklist, note: note || null },
+        csrfToken
+      );
+      setNote("");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "transition failed");
+    }
+  }
+
+  async function handleRollback(toStatus: string) {
+    if (!csrfToken) return;
+    setError(null);
+    try {
+      await transitionModelLifecycle(
+        modelProfileId,
+        { to_status: toStatus, is_rollback: true, note: note || null },
+        csrfToken
+      );
+      setNote("");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "rollback failed");
+    }
+  }
+
+  return (
+    <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border-default)" }}>
+      {canPromote && (
+        <div style={{ display: "grid", gap: "var(--space-2)", maxWidth: "480px" }}>
+          {nextStatus && (
+            <>
+              <div style={{ fontWeight: 600 }}>Promote to {nextStatus}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
+                {LIFECYCLE_CHECKLIST_KEYS.map((key) => (
+                  <label key={key} style={{ display: "flex", gap: "var(--space-1)" }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(checklist[key])}
+                      onChange={(e) => setChecklist({ ...checklist, [key]: e.target.checked })}
+                    />
+                    {key.replace(/_/g, " ")}
+                  </label>
+                ))}
+              </div>
+              <TextInput
+                placeholder="Note (optional)"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+              <Button variant="primary" onClick={() => void handlePromote()}>
+                Promote to {nextStatus}
+              </Button>
+            </>
+          )}
+          {currentIndex > 0 && (
+            <div>
+              <div style={{ fontWeight: 600, marginTop: "var(--space-3)" }}>Rollback</div>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                {LIFECYCLE_ORDER.slice(0, currentIndex).map((status) => (
+                  <Button
+                    key={status}
+                    variant="secondary"
+                    onClick={() => void handleRollback(status)}
+                  >
+                    → {status}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          {currentStatus === "retired" && (
+            <div>
+              <div style={{ fontWeight: 600, marginTop: "var(--space-3)" }}>Reactivate</div>
+              <Button variant="secondary" onClick={() => void handleRollback("available")}>
+                → available
+              </Button>
+            </div>
+          )}
+          {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
+        </div>
+      )}
+
+      <h4 style={{ marginTop: "var(--space-4)" }}>History</h4>
+      <ul>
+        {lifecycleQuery.data?.events.map((event) => (
+          <li key={event.id}>
+            {new Date(event.created_at).toLocaleString()} —{" "}
+            {event.from_status ? `${event.from_status} → ` : ""}
+            {event.to_status}
+            {event.is_rollback ? " (rollback)" : ""}
+            {event.note ? `: ${event.note}` : ""}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

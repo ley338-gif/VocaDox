@@ -76,6 +76,26 @@ def get_llm_provider() -> LLMProvider:
     return FakeLLMProvider()
 
 
+def get_llm_provider_for_model_identifier(*, provider: str, model_identifier: str) -> LLMProvider:
+    """Phase 8: the Evaluation Lab needs to build a real provider instance
+    for an ARBITRARY `ModelProfile` row's own `provider`/`model_identifier`
+    (not just the single globally-configured one `get_llm_provider` builds)
+    so it can run two genuinely different model configs side by side. Domain
+    code (app.analytics) must never construct `OllamaLLMProvider`/
+    `FakeLLMProvider` directly (see tests/test_architecture_boundaries.py)
+    — this factory is the one place that's allowed to."""
+    settings = get_settings()
+    if provider == "ollama":
+        return OllamaLLMProvider(
+            OllamaConfig(
+                base_url=settings.llm_base_url,
+                model=model_identifier,
+                timeout_seconds=settings.llm_timeout_seconds,
+            )
+        )
+    return FakeLLMProvider()
+
+
 def get_media_normalizer() -> MediaNormalizer:
     """FFmpeg-based normalization is used whenever the `ffmpeg` binary is
     resolvable on PATH; otherwise falls back to the Phase 2 no-op
