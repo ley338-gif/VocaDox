@@ -24,8 +24,10 @@ import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
 import { DocumentPanel } from "../components/DocumentPanel";
 import { FactsPanel } from "../components/FactsPanel";
+import { LongitudinalPanel } from "../components/LongitudinalPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
 import { ReviewWizard } from "../components/ReviewWizard";
+import { TasksPanel } from "../components/TasksPanel";
 import { TranscriptPanel } from "../components/TranscriptPanel";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
@@ -40,6 +42,8 @@ type Tab =
   | "transcript"
   | "facts"
   | "timeline"
+  | "related"
+  | "tasks"
   | "details"
   | "participants"
   | "notes"
@@ -189,6 +193,8 @@ export function ConversationDetailPage() {
             "transcript",
             "facts",
             "timeline",
+            "related",
+            "tasks",
             "details",
             "participants",
             "notes",
@@ -365,6 +371,22 @@ export function ConversationDetailPage() {
                     </li>
                   ))}
               </ul>
+            </div>
+          )}
+
+          {tab === "related" && (
+            <div className={styles.sideCard}>
+              <LongitudinalPanel
+                conversationId={conversationId}
+                organizationId={conversation.organization_id}
+                externalReference={conversation.external_reference}
+              />
+            </div>
+          )}
+
+          {tab === "tasks" && (
+            <div className={styles.sideCard}>
+              <TasksPanel conversationId={conversationId} />
             </div>
           )}
 
