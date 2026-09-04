@@ -118,6 +118,14 @@ class DocumentRevision(Base):
     # recomputed retroactively from current review_issues state.
     blocking_issue_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
 
+    # Phase 6: which TemplateVersion's presentation rules actually rendered
+    # this revision — nullable/additive so a pre-Phase-6 revision (or one
+    # composed before the Phase 6 seed ran) simply has NULL here, never
+    # recomputed after the fact from today's template state.
+    template_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("template_versions.id", ondelete="SET NULL"), nullable=True
+    )
+
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

@@ -15,9 +15,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     DateTime,
@@ -124,6 +125,23 @@ class Conversation(Base):
     retention_policy_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("retention_policies.id", ondelete="SET NULL"), nullable=True
     )
+
+    # Phase 6 (spec §19/§20): PROCESSING PROFILE layer — the friendly,
+    # user-picked preset for this conversation. NULL means "no profile
+    # chosen" — the SYSTEM DEFAULT layer applies (see
+    # app.profiles.resolver.resolve_effective_config), matching every
+    # pre-Phase-6 conversation's behavior exactly (unchanged extraction/
+    # composition via the "general" template).
+    processing_profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("processing_profiles.id", ondelete="SET NULL"), nullable=True
+    )
+    # CONVERSATION OVERRIDE layer: a small JSON object keyed by the same
+    # field names as app.profiles.resolver.EffectiveConfig
+    # (extraction_model_profile_id, template_id, template_version_id, ...).
+    # Only fields present here override the resolved
+    # ProcessingProfile/SYSTEM DEFAULT value for THIS conversation alone —
+    # never a wholesale profile replacement.
+    config_overrides: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True

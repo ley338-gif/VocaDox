@@ -59,8 +59,18 @@ PERMISSIONS: dict[str, str] = {
     "document:read": "View a conversation's composed document and revision history.",
     "document:edit": "Compose a document and apply fact corrections during review.",
     "document:approve": "Approve/finalize generated documents.",
-    "template:write": "Create/edit documentation templates.",
-    "profile:write": "Create/edit processing profiles.",
+    "template:read": "View documentation templates and their versions.",
+    "template:write": "Create/edit/publish documentation templates.",
+    "model-profile:read": "View model profiles (extraction/document-generation model config).",
+    "model-profile:write": "Create/edit model profiles.",
+    "processing-profile:read": "View processing profiles (the named end-user presets).",
+    "processing-profile:write": "Create/edit/publish processing profiles.",
+    # Deprecated aliases kept for backward compatibility with the Phase 1-5
+    # seed (the "Template Manager" role already referenced these) — every
+    # NEW enforcement point uses the granular codes above instead.
+    "profile:write": (
+        "Create/edit processing profiles (deprecated alias of processing-profile:write)."
+    ),
     "analytics:read": "View analytics/evaluation dashboards.",
     "api:access": "Authenticate as a service account against the API.",
 }
@@ -110,7 +120,16 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
     "Template Manager": (
         "Manages documentation templates and processing profiles.",
         True,
-        ["template:write", "profile:write", "conversation:read"],
+        [
+            "template:read",
+            "template:write",
+            "model-profile:read",
+            "model-profile:write",
+            "processing-profile:read",
+            "processing-profile:write",
+            "profile:write",
+            "conversation:read",
+        ],
     ),
     "Reviewer": (
         "Reviews and approves generated documents.",
@@ -161,6 +180,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "review-issue:resolve",
             "document:read",
             "document:edit",
+            "processing-profile:read",
+            "template:read",
         ],
     ),
     "Auditor": (

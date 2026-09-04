@@ -25,6 +25,7 @@ class DocumentRevisionResponse(BaseModel):
     created_by_user_id: uuid.UUID | None
     approved_by_user_id: uuid.UUID | None
     approved_at: datetime | None
+    template_version_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

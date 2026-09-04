@@ -50,13 +50,18 @@ from app.identity.models import User
 from app.intelligence.models import ExtractedFact, FactCategory, FactCorrection, FactReviewStatus
 from app.platform.version import APPLICATION_VERSION
 from app.processing.models import ProcessingRun, RunStatus, RunType
+from app.profiles.resolver import NoSystemDefaultProfileError, resolve_effective_config
 from app.review.models import ReviewIssue, ReviewIssueResolution, ReviewIssueStatus
+from app.templates.models import TemplateVersion
 
-_CATEGORY_TITLES = {
-    FactCategory.GENERAL_FACT: "General Facts",
-    FactCategory.DECISION: "Decisions",
-    FactCategory.TASK: "Tasks & Follow-Ups",
-}
+# Fallback presentation used only if no TemplateVersion can be resolved at
+# all (e.g. a fresh test DB with no Phase 6 seed applied) — identical to
+# Phase 5's hardcoded mapping, so behavior is unchanged in that edge case.
+_FALLBACK_PRESENTATION = [
+    {"category": FactCategory.GENERAL_FACT.value, "title": "General Facts"},
+    {"category": FactCategory.DECISION.value, "title": "Decisions"},
+    {"category": FactCategory.TASK.value, "title": "Tasks & Follow-Ups"},
+]
 
 # Severities that block progressing a document to APPROVED (spec §27:
 # "High/Critical severity review issues can block approval — implement
@@ -86,18 +91,54 @@ def _effective_value(fact: ExtractedFact) -> dict[str, Any]:
 
 
 def _render_statement(fact: ExtractedFact) -> str:
+    """Byte-identical rendering for the 3 builtin categories (never
+    touched, so every pre-Phase-6/Phase-5 rendered document is unchanged).
+    Any other category — i.e. anything a Phase 6 template defines, like
+    Meeting's agenda_topic/action_item — falls through to a generic
+    "field: value" renderer built from whatever keys the fact actually
+    has, proving the composer isn't secretly still hardcoded to 3
+    categories."""
     value = _effective_value(fact)
-    if fact.category == FactCategory.GENERAL_FACT.value:
+    keys = set(value.keys())
+    if fact.category == FactCategory.GENERAL_FACT.value and keys <= {
+        "subject", "attribute", "value", "certainty", "evidence_segment_sequences",
+    }:
         subject = value.get("subject", "?")
         attribute = value.get("attribute", "?")
         return f"{subject} — {attribute}: {value.get('value', '?')}"
-    if fact.category == FactCategory.DECISION.value:
+    if fact.category == FactCategory.DECISION.value and keys <= {
+        "description", "decided_by", "certainty", "evidence_segment_sequences",
+    }:
         return str(value.get("description", "?"))
-    return (
-        f"{value.get('description', '?')} "
-        f"(assignee: {value.get('assignee', 'not mentioned')}, "
-        f"due: {value.get('due_date', 'not mentioned')})"
-    )
+    if fact.category == FactCategory.TASK.value and keys <= {
+        "description", "assignee", "due_date", "certainty", "evidence_segment_sequences",
+    }:
+        return (
+            f"{value.get('description', '?')} "
+            f"(assignee: {value.get('assignee', 'not mentioned')}, "
+            f"due: {value.get('due_date', 'not mentioned')})"
+        )
+    parts = [
+        f"{key}: {v}"
+        for key, v in value.items()
+        if key not in ("certainty", "evidence_segment_sequences") and v not in (None, "")
+    ]
+    return "; ".join(parts) if parts else "(no details)"
+
+
+async def _resolve_template_version(
+    session: AsyncSession, conversation_id: uuid.UUID
+) -> TemplateVersion | None:
+    from app.conversations.models import Conversation
+
+    conversation = await session.get(Conversation, conversation_id)
+    if conversation is None:  # pragma: no cover - FK integrity guards this in practice
+        return None
+    try:
+        effective = await resolve_effective_config(session, conversation)
+    except NoSystemDefaultProfileError:
+        return None
+    return await session.get(TemplateVersion, effective.template_version_id)
 
 
 async def _open_blocking_issues(
@@ -132,23 +173,40 @@ async def compose_document(
     )
     facts = list(result.scalars().all())
 
+    # Phase 6: presentation (section order/titles) comes from the
+    # conversation's effective Template — see app.profiles.resolver. Falls
+    # back to Phase 5's exact hardcoded 3-category presentation if no
+    # ProcessingProfile/Template can be resolved at all (e.g. a bare test
+    # DB with no Phase 6 seed applied), so behavior for that edge case is
+    # unchanged.
+    template_version = await _resolve_template_version(session, conversation_id)
+    presentation = (
+        template_version.presentation if template_version is not None else _FALLBACK_PRESENTATION
+    )
+    known_categories = {p["category"] for p in presentation}
+    # A fact whose category isn't in the resolved template's presentation
+    # (e.g. facts left over from an earlier extraction run under a
+    # different template) still gets a section — appended at the end,
+    # titled from the raw category string — so a document composition
+    # never silently drops a real, non-removed fact.
+    extra_categories = sorted({f.category for f in facts} - known_categories)
+    full_presentation = list(presentation) + [
+        {"category": c, "title": c.replace("_", " ").title()} for c in extra_categories
+    ]
+
     sections: list[dict[str, Any]] = []
     text_lines: list[str] = []
-    for category in (FactCategory.GENERAL_FACT, FactCategory.DECISION, FactCategory.TASK):
-        category_facts = [f for f in facts if f.category == category.value]
+    for entry in full_presentation:
+        category = entry["category"]
+        title = entry["title"]
+        category_facts = [f for f in facts if f.category == category]
         if not category_facts:
             continue
         statements = [
             {"text": _render_statement(f), "fact_ids": [str(f.id)]} for f in category_facts
         ]
-        sections.append(
-            {
-                "category": category.value,
-                "title": _CATEGORY_TITLES[category],
-                "statements": statements,
-            }
-        )
-        text_lines.append(f"## {_CATEGORY_TITLES[category]}")
+        sections.append({"category": category, "title": title, "statements": statements})
+        text_lines.append(f"## {title}")
         text_lines.extend(f"- {s['text']}" for s in statements)
         text_lines.append("")
 
@@ -214,6 +272,7 @@ async def compose_document(
         status=validated_status.value,
         blocking_issue_ids=[str(i.id) for i in blocking],
         created_by_user_id=requested_by.id,
+        template_version_id=template_version.id if template_version is not None else None,
     )
     session.add(revision)
     await session.flush()

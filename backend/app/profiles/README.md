@@ -1,13 +1,20 @@
 # `app/profiles/`
 
-**Status: placeholder — not implemented in Phase 0.**
+**Status: implemented (Phase 6, extending Phase 4's minimal `ModelProfile`
+foundation).**
 
-This domain package is scaffolded (empty, documented) as part of Phase 0's
-backend layout (spec §7). It will be implemented in:
+`ModelProfile`/`ModelProfileVersion` (spec §18) — a real, admin-manageable,
+versioned entity. `ProcessingProfile`/`ProcessingProfileVersion` (spec §19)
+— named, user-friendly presets ("General", "Meeting") bundling Speech +
+Diarization provider config, Extraction Model, Template + Template
+Version, Prompt + Prompt Version, Language, Retention Policy.
+`app.profiles.resolver.resolve_effective_config` implements the spec §20
+Configuration Hierarchy (SYSTEM DEFAULT -> PROCESSING PROFILE ->
+CONVERSATION OVERRIDE) with per-field source explainability.
 
-**Phase 6 — model profiles and processing profiles**
+Speech/Diarization remain `Settings`-driven configuration, not a full
+`SpeechProfile`/`DiarizationProfile` DB entity — that table is still Phase
+7 (see `docs/architecture/model-management-foundation.md`).
 
-Until then this package contains only `__init__.py` and this README. Do not
-add business logic here during Phase 0 — see `docs/architecture/domain-model.md`
-for the target-state entities this domain will own, and the root
-`PHASE_0_VALIDATION_REPORT.md` for current scope.
+See `docs/architecture/templates.md`, `PHASE_6_VALIDATION_REPORT.md`, and
+`app.profiles.seed` for the seeded initial profiles.

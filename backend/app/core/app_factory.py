@@ -22,6 +22,10 @@ from app.platform.health import router as health_router
 from app.platform.logging import configure_logging
 from app.platform.middleware import RequestIdMiddleware
 from app.platform.version import APPLICATION_VERSION
+from app.profiles.router import processing_router as processing_profiles_router
+from app.profiles.router import router as model_profiles_router
+from app.templates.router import prompts_router
+from app.templates.router import router as templates_router
 from app.transcription.router import router as transcription_router
 
 
@@ -53,5 +57,9 @@ def create_app() -> FastAPI:
     app.include_router(intelligence_router, prefix=settings.api_prefix)
     app.include_router(documents_router, prefix=settings.api_prefix)
     app.include_router(administration_router, prefix=settings.api_prefix)
+    app.include_router(templates_router, prefix=settings.api_prefix)
+    app.include_router(prompts_router, prefix=settings.api_prefix)
+    app.include_router(model_profiles_router, prefix=settings.api_prefix)
+    app.include_router(processing_profiles_router, prefix=settings.api_prefix)
 
     return app

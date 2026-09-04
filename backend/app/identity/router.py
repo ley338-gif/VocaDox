@@ -95,6 +95,7 @@ async def login(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_csrf)],
+    response_model=None,
 )
 async def logout(
     response: Response,

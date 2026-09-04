@@ -40,6 +40,7 @@ async def create_conversation(
     external_reference_type: str | None = None,
     privacy_mode: PrivacyMode = PrivacyMode.STANDARD,
     retention_policy_id: uuid.UUID | None = None,
+    processing_profile_id: uuid.UUID | None = None,
 ) -> Conversation:
     conversation = Conversation(
         organization_id=organization_id,
@@ -52,6 +53,7 @@ async def create_conversation(
         external_reference_type=external_reference_type,
         privacy_mode=privacy_mode.value,
         retention_policy_id=retention_policy_id,
+        processing_profile_id=processing_profile_id,
     )
     session.add(conversation)
     await session.flush()
