@@ -6,15 +6,27 @@ for the full design rationale.
 ## What exists today
 
 `RetentionPolicy` rows (name, `retention_days`, `delete_source_media`,
-`delete_derived_media`, `active`) can be created/edited via the Phase 7
-Admin Portal (`/admin/retention`, gated by `retention:read`/
-`retention:write`) or its REST API (`GET/POST /admin/retention-policies`,
-`PATCH /admin/retention-policies/{id}`) and assigned to a `Conversation`
-via its `retention_policy_id` FK. **No scheduler reads or acts on these
-policies** — assigning a policy today records intent only; the admin UI
-manages the policy definitions, it does not enforce them. Automated
-enforcement (a "Retention Cleanup" worker that actually deletes expired
-data) is Phase 11 scope, not implemented here.
+`delete_derived_media`, `delete_transcript`, `active`) can be created/
+edited via the Phase 7 Admin Portal (`/admin/retention`, gated by
+`retention:read`/`retention:write`) or its REST API (`GET/POST
+/admin/retention-policies`, `PATCH /admin/retention-policies/{id}`) and
+assigned to a `Conversation` via its `retention_policy_id` FK.
+
+**As of Phase 11, enforcement exists but is not self-scheduling.**
+`app.cli.retention_cleanup` (also reachable via `POST
+/admin/retention-cleanup/run`, gated by `retention-cleanup:trigger`, and
+`docker compose run --rm retention-cleanup run [--execute]`) evaluates
+every active policy against its assigned conversations and deletes
+expired source/derived media and/or transcripts (dry-run by default; a
+full item-level audit trail is recorded in `RetentionCleanupRun`/
+`RetentionCleanupItem`, viewable via `retention-cleanup:read`). **Nothing
+in this codebase calls it automatically** — no in-process scheduler,
+cron, or Kubernetes CronJob ships with VocaDox itself. An operator who
+needs retention actually enforced on a schedule must wire up their own
+external trigger (host cron, `systemd` timer, or k8s CronJob invoking the
+CLI/API above) — see `docs/architecture/future-considerations.md`'s
+"Phase 11 additions" and `PHASE_12_VALIDATION_REPORT.md`'s Retention
+Audit for the full disposition of this gap.
 
 `Settings.default_retention_policy_name`
 (`VOCADOX_DEFAULT_RETENTION_POLICY_NAME`) is unset by default, meaning
@@ -30,10 +42,11 @@ conversation data after a fixed period, you must:
 1. Create the appropriate `RetentionPolicy` row(s) via `/admin/retention`.
 2. Assign them to conversations (a Processing Profile version's
    `retention_policy_id`, or directly via the conversation API).
-3. Understand that **enforcement (actually deleting data on schedule) is
-   not implemented yet** — until the Phase 11 Retention Cleanup worker
-   ships, you are responsible for manual or externally-scripted
-   enforcement if you need it now.
+3. Configure an **external scheduler** (cron/systemd timer/k8s CronJob)
+   to invoke `docker compose run --rm retention-cleanup run --execute`
+   (or the equivalent API call) on whatever cadence your obligation
+   requires — VocaDox enforces policies correctly once triggered, but
+   nothing triggers it on your behalf.
 
 **Do not treat the existence of the `retention_policies` table as a GDPR
 or other regulatory compliance guarantee by itself.** It is a data-model
@@ -41,6 +54,8 @@ foundation, not a compliance feature.
 
 ## Manual deletion today
 
-Until a scheduler exists, `DELETE /conversations/{id}` (or the UI's
-Delete action) is the only way to actually remove a conversation's media —
-see `docs/architecture/conversations.md`, "Deletion semantics."
+Until an external scheduler is configured to run the Retention Cleanup
+CLI/API on your behalf, `DELETE /conversations/{id}` (or the UI's Delete
+action) remains the only way to *immediately* remove a specific
+conversation's media on demand — see
+`docs/architecture/conversations.md`, "Deletion semantics."
