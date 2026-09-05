@@ -77,23 +77,26 @@ export function DataTable<T>({
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={column.sortable ? styles.sortable : undefined}
                 style={{ width: column.width, textAlign: column.align }}
-                onClick={() => toggleSort(column)}
                 aria-sort={
                   sortKey === column.key ? (sortDirection === "asc" ? "ascending" : "descending") : undefined
                 }
               >
-                <span className={styles.thContent}>
-                  {column.header}
-                  {column.sortable &&
-                    sortKey === column.key &&
-                    (sortDirection === "asc" ? (
-                      <ChevronUp size={12} aria-hidden="true" />
-                    ) : (
-                      <ChevronDown size={12} aria-hidden="true" />
-                    ))}
-                </span>
+                {column.sortable ? (
+                  <button type="button" className={styles.sortable} onClick={() => toggleSort(column)}>
+                    <span className={styles.thContent}>
+                      {column.header}
+                      {sortKey === column.key &&
+                        (sortDirection === "asc" ? (
+                          <ChevronUp size={12} aria-hidden="true" />
+                        ) : (
+                          <ChevronDown size={12} aria-hidden="true" />
+                        ))}
+                    </span>
+                  </button>
+                ) : (
+                  <span className={styles.thContent}>{column.header}</span>
+                )}
               </th>
             ))}
             {rowActions && <th aria-label="Aktionen" />}
@@ -128,6 +131,18 @@ export function DataTable<T>({
                 key={keyExtractor(row)}
                 className={onRowClick ? styles.clickableRow : undefined}
                 onClick={() => onRowClick?.(row)}
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? "button" : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onRowClick(row);
+                        }
+                      }
+                    : undefined
+                }
               >
                 {columns.map((column) => (
                   <td key={column.key} style={{ textAlign: column.align }}>
