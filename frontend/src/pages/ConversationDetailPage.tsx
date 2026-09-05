@@ -343,7 +343,7 @@ export function ConversationDetailPage() {
                     description="Automatisch erstellt, sobald ein Dokument zusammengestellt wurde."
                   />
                 )}
-                {documentSections && <DocumentContent sections={documentSections} />}
+                {documentSections && <DocumentContent sections={documentSections} maxStatements={6} />}
               </div>
 
               {conversation.description && (
