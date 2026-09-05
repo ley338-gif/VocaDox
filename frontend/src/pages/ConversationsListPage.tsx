@@ -1,26 +1,42 @@
 import { useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Inbox, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import type { ConversationStatus } from "../api/conversations";
+import type { Conversation } from "../api/conversations";
 import { listConversations } from "../api/conversations";
-import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Select, TextInput } from "../design-system/FormControls";
+import { EmptyState, ErrorState } from "../design-system/States";
+import { StatusBadge } from "../design-system/StatusBadge";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
+import { Pagination } from "../design-system/Pagination";
 import styles from "./ConversationsListPage.module.css";
 
-const STATUS_TONE: Record<ConversationStatus, "neutral" | "success" | "warning" | "danger" | "info"> = {
-  created: "neutral",
-  recording: "warning",
-  uploaded: "info",
-  normalizing: "info",
-  ready: "success",
-  failed: "danger",
-  deleted: "neutral",
-};
-
 const PAGE_SIZE = 20;
+
+const COLUMNS: DataTableColumn<Conversation>[] = [
+  { key: "title", header: "Titel", render: (row) => row.title, sortable: true, sortValue: (row) => row.title },
+  { key: "type", header: "Typ", render: (row) => row.conversation_type },
+  { key: "status", header: "Status", render: (row) => <StatusBadge status={row.status} /> },
+  {
+    key: "privacy",
+    header: "Datenschutz",
+    render: (row) => (row.privacy_mode === "restricted" ? "Eingeschränkt" : "Standard"),
+  },
+  {
+    key: "duration",
+    header: "Dauer",
+    render: (row) => (row.duration_ms ? `${Math.round(row.duration_ms / 1000)}s` : "—"),
+  },
+  {
+    key: "created",
+    header: "Erstellt",
+    render: (row) => new Date(row.created_at).toLocaleDateString(),
+    sortable: true,
+    sortValue: (row) => row.created_at,
+  },
+];
 
 export function ConversationsListPage() {
   const navigate = useNavigate();
@@ -45,16 +61,16 @@ export function ConversationsListPage() {
   return (
     <div>
       <div className={styles.header}>
-        <h1 style={{ fontSize: "var(--font-h1-size)" }}>Conversations</h1>
+        <h1 style={{ fontSize: "var(--font-h1-size)" }}>Gespräche</h1>
         <Button variant="primary" type="button" onClick={() => navigate("/app/conversations/new")}>
-          <Plus size={16} aria-hidden="true" /> New conversation
+          <Plus size={16} aria-hidden="true" /> Neues Gespräch
         </Button>
       </div>
 
       <div className={styles.filters}>
         <TextInput
-          placeholder="Search by title…"
-          aria-label="Search conversations"
+          placeholder="Nach Titel suchen…"
+          aria-label="Gespräche durchsuchen"
           value={search}
           onChange={(event) => {
             setOffset(0);
@@ -62,108 +78,63 @@ export function ConversationsListPage() {
           }}
         />
         <Select
-          aria-label="Filter by status"
+          aria-label="Nach Status filtern"
           value={statusFilter}
           onChange={(event) => {
             setOffset(0);
             setStatusFilter(event.target.value);
           }}
         >
-          <option value="">All statuses</option>
-          <option value="created">Created</option>
-          <option value="recording">Recording</option>
-          <option value="uploaded">Uploaded</option>
-          <option value="normalizing">Normalizing</option>
-          <option value="ready">Ready</option>
-          <option value="failed">Failed</option>
+          <option value="">Alle Status</option>
+          <option value="created">Erstellt</option>
+          <option value="recording">Aufnahme läuft</option>
+          <option value="uploaded">Hochgeladen</option>
+          <option value="normalizing">Verarbeitung</option>
+          <option value="ready">Bereit</option>
+          <option value="failed">Fehler</option>
         </Select>
         <Select
-          aria-label="Filter by type"
+          aria-label="Nach Typ filtern"
           value={typeFilter}
           onChange={(event) => {
             setOffset(0);
             setTypeFilter(event.target.value);
           }}
         >
-          <option value="">All types</option>
-          <option value="general">General</option>
-          <option value="medical">Medical</option>
-          <option value="therapy">Therapy</option>
+          <option value="">Alle Typen</option>
+          <option value="general">Allgemein</option>
+          <option value="medical">Medizinisch</option>
+          <option value="therapy">Therapie</option>
           <option value="meeting">Meeting</option>
           <option value="interview">Interview</option>
-          <option value="other">Other</option>
+          <option value="other">Sonstiges</option>
         </Select>
       </div>
 
-      {isLoading && <p style={{ color: "var(--text-muted)" }}>Loading conversations…</p>}
-      {isError && <p role="alert">Couldn&apos;t load conversations. Try reloading the page.</p>}
+      <DataTable
+        columns={COLUMNS}
+        rows={data?.items ?? []}
+        keyExtractor={(row) => row.id}
+        loading={isLoading}
+        error={isError ? <ErrorState message="Gespräche konnten nicht geladen werden." /> : undefined}
+        onRowClick={(row) => navigate(`/app/conversations/${row.id}`)}
+        empty={
+          <EmptyState
+            icon={<Inbox size={20} aria-hidden="true" />}
+            title="Noch keine Gespräche"
+            description="Starten Sie ein neues Gespräch, um loszulegen."
+            action={
+              <Button variant="primary" type="button" onClick={() => navigate("/app/conversations/new")}>
+                Gespräch starten
+              </Button>
+            }
+          />
+        }
+      />
 
-      {!isLoading && !isError && data && data.items.length === 0 && (
-        <div className={styles.emptyState}>
-          <p>No conversations yet.</p>
-          <Button variant="primary" type="button" onClick={() => navigate("/app/conversations/new")}>
-            Start your first conversation
-          </Button>
-        </div>
-      )}
-
-      {!isLoading && !isError && data && data.items.length > 0 && (
-        <>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Privacy</th>
-                <th>Duration</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((conversation) => (
-                <tr
-                  key={conversation.id}
-                  className={styles.row}
-                  tabIndex={0}
-                  onClick={() => navigate(`/app/conversations/${conversation.id}`)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") navigate(`/app/conversations/${conversation.id}`);
-                  }}
-                >
-                  <td>{conversation.title}</td>
-                  <td>{conversation.conversation_type}</td>
-                  <td>
-                    <Badge tone={STATUS_TONE[conversation.status]}>{conversation.status}</Badge>
-                  </td>
-                  <td>{conversation.privacy_mode === "restricted" ? "Restricted" : "Standard"}</td>
-                  <td>{conversation.duration_ms ? `${Math.round(conversation.duration_ms / 1000)}s` : "—"}</td>
-                  <td>{new Date(conversation.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className={styles.pagination}>
-            <Button
-              variant="secondary"
-              type="button"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="secondary"
-              type="button"
-              disabled={offset + PAGE_SIZE >= data.total}
-              onClick={() => setOffset(offset + PAGE_SIZE)}
-            >
-              Next
-            </Button>
-          </div>
-        </>
+      {data && data.total > 0 && (
+        <Pagination offset={offset} limit={PAGE_SIZE} total={data.total} onOffsetChange={setOffset} />
       )}
     </div>
   );
 }
-
