@@ -246,13 +246,16 @@ dependencies:
       Ollama server. Never installed in the api/frontend images beyond
       what `[dev]` already required for tests.
 
-  # Phase 4 note: Ollama itself (the local LLM inference server) is a
-  # separate container image, not a Python dependency — see
-  # container-inventory.yml and
-  # docs/architecture/adr/0024-llm-provider-selection.md for the full
-  # runtime/model evaluation. CI's mandatory test suite always runs
-  # against FakeLLMProvider; httpx above is the only new pypi package
-  # Phase 4 adds.
+  # Phase 4 note: Ollama itself (the local LLM inference server) was never
+  # a Python dependency — it was a separate bundled container image (see
+  # docs/architecture/adr/0024-llm-provider-selection.md for the original
+  # runtime/model evaluation), removed from VocaDox's own shipped
+  # container set entirely as of the Phase 12 GA-blocker fix (CVE-2026-56854
+  # — see docs/architecture/adr/0029-remove-bundled-ollama.md and
+  # container-inventory.yml's removal note). VocaDox now always talks to
+  # an admin-managed external Ollama instance. CI's mandatory test suite
+  # always runs against FakeLLMProvider regardless; httpx above is the
+  # only new pypi package Phase 4 added and remains needed either way.
 
   # ---------------------------------------------------------------------
   # Node (npm)

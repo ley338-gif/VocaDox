@@ -11,7 +11,9 @@
 > speech-to-text (faster-whisper) and speaker diarization
 > (pyannote.audio), deterministic transcript alignment, and a reviewable
 > transcript UI (Phase 3, hardened in Phase 3.1); a local LLM provider
-> (Ollama) with structured, evidence-linked fact extraction (Phase 4);
+> (Ollama, admin-managed and external — see
+> [ADR-0029](docs/architecture/adr/0029-remove-bundled-ollama.md)) with
+> structured, evidence-linked fact extraction (Phase 4);
 > Review Wizard, document composition, and an immutable approval workflow
 > (Phase 5); versioned Templates and Processing/Model Profiles (Phase 6);
 > a full Admin Portal (users/groups/organizations/models/jobs/storage/

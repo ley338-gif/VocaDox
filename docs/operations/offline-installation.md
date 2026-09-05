@@ -35,7 +35,7 @@ runtime network dependency beyond the compose network itself.
 |---|---|---|
 | `backend` (api) | None outbound. Serves inbound HTTP only. | No code path in `app/` makes an outbound HTTP/network call except to `postgres`/`valkey` (both compose-internal) — confirmed by inspection of every provider/service module; the app never calls an LLM/speech/diarization provider directly (that's the workers' job, and even the workers are offline — see below). |
 | `worker-speech` / `worker-diarization` | None, once models are installed. | `app/workers/_offline_env.py` forces `HF_HUB_OFFLINE=1` before `huggingface_hub` can be imported — see `offline-model-installation.md` for the real test that found and fixed a hidden dependent-repo network call. `FasterWhisperSpeechProvider` never had a Hub-resolution step to begin with (loads model files directly off disk). |
-| `worker-extraction` | Depends entirely on which LLM provider is configured. | If configured with a local provider (e.g. Ollama, also compose-internal), no internet call. If configured against a real hosted LLM API, that is an explicit, visible outbound call by design (`VOCADOX_LLM_PROVIDER`/related settings) — not something this phase changes or hides. An offline deployment must use a local LLM provider. |
+| `worker-extraction` | Depends entirely on which LLM provider is configured. | If configured against a local Ollama instance (an admin-managed instance reachable via `VOCADOX_LLM_BASE_URL` — no longer a bundled compose service as of the Phase 12 GA-blocker fix, see `docs/architecture/adr/0029-remove-bundled-ollama.md`) that is itself running fully offline, no internet call from `worker-extraction`'s own network path. If configured against a real hosted LLM API, that is an explicit, visible outbound call by design (`VOCADOX_LLM_PROVIDER`/related settings) — not something this phase changes or hides. An offline deployment must use a local LLM provider, and that provider's own reachability (network location, offline-ness) is now the deploying admin's responsibility rather than something VocaDox's own compose stack guarantees. |
 | `postgres` / `valkey` | None outbound (accept inbound compose-internal connections only). | Official images, no outbound calls in normal operation. |
 | `frontend` | None outbound from the container itself; the browser loads the SPA and calls `backend` over whatever network path the operator exposes. | Static asset build (production `runtime` target) — no server-side rendering, no build-time-only dependency resolution at runtime. |
 | Backup/Restore (`app.operations.backup_service`, Phase 11) | None outbound. | `pg_dump`/`pg_restore`/tar operate entirely against the compose-internal `postgres` service and local/mounted filesystem paths — no network calls beyond that. |
@@ -53,10 +53,13 @@ runtime network dependency beyond the compose network itself.
    for exactly which repos), so the `vocadox_models_data` volume is
    already populated before the workers ever start in the offline
    environment.
-3. **Configure a local LLM provider** (e.g. Ollama, itself running
-   offline once its own model is pulled) if `worker-extraction`'s
-   document-generation step needs to run offline too — a hosted LLM API
-   is an explicit exception to "fully offline," not a bug.
+3. **Stand up and configure your own local LLM provider** (e.g. an
+   admin-managed Ollama instance you run yourself, capable of running
+   fully offline once its own model is pulled — VocaDox does not bundle
+   this any more, see `docs/admin/llm-provider.md`) if
+   `worker-extraction`'s document-generation step needs to run offline
+   too — a hosted LLM API is an explicit exception to "fully offline,"
+   not a bug.
 4. **No additional step is needed for backup/restore or retention
    cleanup** — both are pure database/filesystem operations with no
    external dependency of their own.

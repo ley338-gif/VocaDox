@@ -1,7 +1,12 @@
 # 0024 — LLM provider and extraction model selection
 
 ## Status
-Accepted
+Accepted. **Amended by
+[0029-remove-bundled-ollama](0029-remove-bundled-ollama.md)** (Phase 12
+GA-blocker fix): the runtime choice (Ollama, MIT) and model choice
+(Qwen2.5:14b, Apache-2.0) below are unchanged, but Ollama is no longer run
+as a bundled Compose service — see 0029 for why and for the current
+admin-managed-external-instance setup.
 
 ## Context
 Phase 4 needs one real, local LLM inference provider for structured fact
@@ -55,9 +60,12 @@ pointing at a different pulled model — see `app.profiles`.
 - `app.profiles.ModelProfile` (not a hardcoded string in worker code)
   carries the actual model identifier — see ADR discussion in
   `docs/architecture/intelligence-pipeline.md`.
-- The `ollama` container image itself (not the model) currently ships
-  with one open, documented CRITICAL vulnerability finding baked into its
-  upstream Go binary — see `compliance/container-inventory.yml`'s
-  `ollama/ollama` entry and PHASE_4_VALIDATION_REPORT.md's Open Risks.
-  This is a genuine, currently-unresolved gap requiring the product
-  owner's decision, not silently waived.
+- The `ollama` container image itself (not the model) shipped with one
+  open, documented CRITICAL vulnerability finding (CVE-2026-56854) baked
+  into its upstream Go binary, disclosed here and re-confirmed unfixed
+  through Phase 12 — see the historical discussion in
+  `compliance/container-inventory.yml`'s (removed) `ollama/ollama` entry
+  and PHASE_4_VALIDATION_REPORT.md's Open Risks. **Resolved for GA by
+  [0029-remove-bundled-ollama](0029-remove-bundled-ollama.md)**: the
+  bundled Compose service was dropped entirely rather than continuing to
+  re-accept the same unfixed finding every phase.

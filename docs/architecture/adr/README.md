@@ -30,3 +30,4 @@ MADR-style (Status / Context / Decision / Consequences), numbered sequentially. 
 - [0026](0026-contradiction-detection.md) — Contradiction detection approach
 - [0027](0027-synchronous-document-composition.md) — Document composition runs synchronously, not via ProcessingJob
 - [0028](0028-dynamic-template-extraction-schemas.md) — Template-defined extraction categories build Pydantic schemas dynamically
+- [0029](0029-remove-bundled-ollama.md) — Remove the bundled Ollama Compose service (GA-blocker fix, amends 0024)

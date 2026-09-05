@@ -1,48 +1,92 @@
 # Phase 12 Validation Report — Hardening / RC (Final Phase, GA Readiness)
 
-## Executive Summary
+## Executive Summary — REVISED 2026-09-05 (GA-blocker resolved)
 
-**FINAL GA RECOMMENDATION: NO-GO** — pending one specific, named,
-owner-level decision. Every other audit dimension in this phase passed
-cleanly: full backend (288) and frontend (21) test suites pass with no
-regressions, lint/typecheck are clean on both sides, license compliance
-is PASS with 0 blocked/0 unknown, `pip-audit`/`npm audit` are clean, a
-real Docker Compose fresh install (build → migrate 0001→0012 → bootstrap
-→ login → admin API) succeeded, a smoke-level load test showed no errors
-under concurrency, a live backend crash/recovery test showed clean
-recovery, and no new P0 (correctness/data-loss/security-breach) finding
-was found anywhere in the codebase.
+**FINAL GA RECOMMENDATION: GO.** This section and "Final GA
+Recommendation" below were rewritten after the product owner resolved
+this report's original (and only) blocking finding by removing the
+bundled `ollama` Compose service rather than continuing to accept it —
+see "GA-blocker resolution" below for the full account. The rest of this
+document is preserved as originally written (the initial NO-GO
+determination and the three options it presented) for an accurate
+historical record of how this GA determination was actually reached;
+only this Executive Summary and the Final GA Recommendation section have
+been updated to reflect the now-resolved state.
 
-The single blocking item is **CVE-2026-56854** (a CRITICAL-severity,
-`golang.org/x/crypto/ssh` source-address-restriction-bypass finding),
-present in the vendored, statically-linked `ollama/ollama:0.33.2`
-container image that Phase 4 added to `deploy/docker-compose.yml`. This
-finding was disclosed (not hidden) and **accepted by the product owner
-on 2026-08-18** during Phase 4, and every phase since (5 through 11) has
-carried it forward unchanged as an open, accepted risk rather than a
-blocker to that phase's own narrower merge gate. Phase 12's own merge
-gate, however, is explicit and stricter than every prior phase's: **"zero
-open P0/P1 findings from the audit (fixed, not just documented)"** and
-**"no unresolved Critical vulnerability."** Re-verified today
-(2026-09-05) against the latest upstream Ollama release (0.33.3,
-released 2026-09-02): the vulnerable `golang.org/x/crypto` dependency is
-still present (`v0.43.0`; the upstream fix, tracked at
-[golang/go#80213](https://github.com/golang/go/issues/80213), remains
-unreleased/"FixPending"), and the underlying reachability analysis
-(`ollama serve` never opens an SSH listener, only its own HTTP API on
-`:11434`) is unchanged and reconfirmed. **This is a real, if narrow,
-finding that is disclosed and reasoned about, not merely rubber-stamped
-forward** — but under Phase 12's own literal "fixed, not just
-documented" bar, an *accepted-but-unfixed* CRITICAL finding does not
-satisfy the strictest gate in the project. Per this phase's explicit
-process rule ("if you hit something that requires the product owner's
-own judgment ... document it clearly with options ... rather than
-silently picking one yourself"), this is presented as a decision point
-below rather than resolved unilaterally. If the owner reaffirms Phase
-4's original acceptance today, at the GA gate specifically (not merely
-letting it ride forward from a mid-roadmap phase), that reaffirmation
-alone is sufficient to flip this report's recommendation to GO — no
-further engineering work is implied by that path.
+Every audit dimension in this phase passed cleanly: full backend (293,
+including 5 new tests added for this fix) and frontend (21) test suites
+pass with no regressions, lint/typecheck are clean on both sides, license
+compliance is PASS with 0 blocked/0 unknown, `pip-audit`/`npm audit` are
+clean, a real Docker Compose fresh install (build --no-cache → up →
+migrate 0001→0012 → bootstrap → login → admin API) succeeded, a
+smoke-level load test showed no errors under concurrency, a live backend
+crash/recovery test showed clean recovery, and no new P0
+(correctness/data-loss/security-breach) finding was found anywhere in
+the codebase.
+
+### GA-blocker resolution: CVE-2026-56854 fixed by removing the bundled Ollama container
+
+The single blocking item originally identified was **CVE-2026-56854** (a
+CRITICAL-severity, `golang.org/x/crypto/ssh` source-address-restriction-
+bypass finding), present in the vendored, statically-linked
+`ollama/ollama:0.33.2` container image that Phase 4 added to
+`deploy/docker-compose.yml`. This finding was disclosed (not hidden) and
+**accepted by the product owner on 2026-08-18** during Phase 4, and every
+phase since (5 through 11) carried it forward unchanged as an open,
+accepted risk rather than a blocker to that phase's own narrower merge
+gate. Phase 12's own merge gate, however, was explicit and stricter than
+every prior phase's: **"zero open P0/P1 findings from the audit (fixed,
+not just documented)"** and **"no unresolved Critical vulnerability."**
+Re-verified against the latest upstream Ollama release at the time
+(0.33.3, released 2026-09-02): the vulnerable `golang.org/x/crypto`
+dependency was still present (`v0.43.0`; the upstream fix, tracked at
+[golang/go#80213](https://github.com/golang/go/issues/80213), remained
+unreleased/"FixPending"), so an *accepted-but-unfixed* CRITICAL finding
+did not satisfy the strictest gate in the project, correctly producing an
+initial **NO-GO**.
+
+Per this project's standing process rule, that NO-GO was presented as a
+decision point with three named options (reaffirm acceptance at the GA
+gate; drop the bundled service; wait for an upstream fix) rather than
+resolved unilaterally. **The product owner has now chosen option 2**:
+drop the bundled `ollama` Compose service entirely and require an
+admin-managed external Ollama instance instead (already fully supported
+via `VOCADOX_LLM_BASE_URL`, documented in `docs/admin/llm-provider.md`'s
+pre-existing "Bring your own Ollama" section). This was implemented,
+re-validated end-to-end, and merged — see
+`docs/architecture/adr/0029-remove-bundled-ollama.md` for the full
+decision record. Concretely:
+
+- `deploy/docker-compose.yml`'s `ollama` service and `vocadox_ollama_data`
+  volume are removed. VocaDox's own Compose stack no longer builds,
+  starts, or ships this container at all.
+- `compliance/container-inventory.yml`'s `ollama/ollama` entry is removed
+  (documented in the file's own removal note, with full history
+  preserved via git) — there is nothing left in VocaDox's shipped
+  container set to carry risk on.
+- `Settings.llm_base_url` (`backend/app/platform/config.py`) no longer
+  defaults to the now-nonexistent `http://ollama:11434`; if
+  `VOCADOX_LLM_PROVIDER=ollama` is set without an explicit
+  `VOCADOX_LLM_BASE_URL`, `worker-extraction` now fails clearly and
+  immediately at startup with `LLMModelUnavailableError` — never a
+  silent timeout against a made-up host.
+- Real end-to-end validation (this session): a real external Ollama
+  instance was stood up (a throwaway, non-VocaDox-managed `docker run
+  ollama/ollama:0.33.2` container, entirely outside `deploy/
+  docker-compose.yml`), `qwen2.5:14b` was pulled into it, and a full
+  fresh `docker compose build --no-cache` / `up` of the now-Ollama-less
+  VocaDox stack was pointed at it via `VOCADOX_LLM_BASE_URL` to confirm
+  fact extraction genuinely still works end to end against an external
+  instance — see "Comprehensive E2E Results" below for the full
+  transcript/output. The "not configured" failure path
+  (`VOCADOX_LLM_PROVIDER=ollama` with no `VOCADOX_LLM_BASE_URL`) was also
+  verified to fail clearly rather than hang or silently misbehave.
+
+This is a genuine **fix**, not another acceptance cycle: the vulnerable
+component is no longer part of VocaDox's own build/ship/scan surface at
+all. The trade-off — losing the one-command bundled-LLM convenience in
+favor of requiring a separately admin-managed Ollama instance — was
+made explicitly by the product owner, not assumed.
 
 No other P0 or P1 finding remains open. Everything else this report
 documents (no in-process retention-cleanup scheduler, no encrypted/
@@ -51,7 +95,10 @@ metrics history) was already disclosed by its originating phase as an
 intentionally-deferred, non-blocking, documented limitation — this phase
 re-verified each one is still accurately described and still narrow in
 scope, and found no new instance of any of these patterns elsewhere in
-the codebase.
+the codebase. Finding #12 (genuine multi-voice diarization accuracy has
+never been empirically verified) remains open exactly as originally
+disclosed — it is unrelated to this fix and is not resolved by it; see
+"Open Risks" below.
 
 ## Scope
 
@@ -470,6 +517,29 @@ via targeted greps for `"not implemented"`/`"not yet implemented"`
 phrasing repo-wide — a more exhaustive semantic staleness review (docs
 that are stale without using that literal phrasing) was not performed.
 
+### GA-blocker-fix session documentation updates (2026-09-05)
+
+Removing the bundled `ollama` service touched considerably more
+documentation than a typical fix, since it was previously referenced
+across admin docs, security docs, ADRs, and compliance files as both a
+feature and a disclosed risk. Updated (grepped for `ollama`/`Ollama`
+case-insensitively across the whole repo and fixed every stale hit):
+`docs/admin/llm-provider.md` (rewritten — "bring your own Ollama" is now
+the primary, only documented path, not a fallback mitigation),
+`docs/security/llm-supply-chain.md`, `docs/operations/
+offline-installation.md`, `docs/architecture/future-considerations.md`,
+`docs/architecture/adr/0024-llm-provider-selection.md` (amended, points
+to the new ADR), `docs/architecture/adr/README.md`, `README.md`,
+`THIRD_PARTY_NOTICES.md`, `compliance/container-inventory.yml`,
+`compliance/model-inventory.yml`, `compliance/dependency-inventory.yml`,
+`deploy/.env.example`. Added `docs/architecture/adr/
+0029-remove-bundled-ollama.md` as the decision record. Historical/
+generic mentions of Ollama that remained accurate after the change
+(e.g. ADR-0005's list of heavyweight engine examples, past validation
+reports' description of what was tested at the time) were deliberately
+left unchanged — this was a targeted fix of stale claims, not a
+find-and-replace of every occurrence of the word "Ollama."
+
 ## Comprehensive E2E Results
 
 **This is the section where this phase's honesty matters most, per its
@@ -528,11 +598,78 @@ single-voice-two-rates fixture used throughout this project to date) to
 finally close the one link in this chain that has never had real
 multi-speaker evidence.
 
+### GA-blocker-fix session: real external-Ollama extraction re-test (2026-09-05)
+
+Separately from the above (which describes the original Phase 12
+session's gap for the *full* record→transcribe→diarize→extract chain),
+this follow-up session specifically re-verified the **fact-extraction
+leg against a real external Ollama instance**, since that is exactly the
+part of the pipeline this GA-blocker fix changes:
+
+1. Brought up the full VocaDox stack fresh from the now-Ollama-less
+   `deploy/docker-compose.yml`: `docker compose down -v` → `docker
+   compose build --no-cache` → `docker compose up -d`. Confirmed no
+   `ollama` service/container/volume exists anywhere in the running
+   stack (`docker compose config -q` and `docker ps` both confirm).
+2. Stood up a real, throwaway Ollama instance **outside** VocaDox's own
+   Compose stack entirely (`docker run -d -p 21434:11434 ollama/ollama:
+   0.33.2`, unmanaged by any VocaDox file) — deliberately mirroring what
+   an admin following `docs/admin/llm-provider.md` would do.
+3. Pulled the exact model VocaDox is configured to use into that
+   instance: `docker exec <container> ollama pull qwen2.5:14b` —
+   confirmed present via `ollama list` / `GET /api/tags`.
+4. Set `VOCADOX_LLM_PROVIDER=ollama` and
+   `VOCADOX_LLM_BASE_URL=http://host.docker.internal:21434` (the
+   external instance's address, reachable from inside the Compose
+   network) and restarted `worker-extraction`.
+5. Created a real org/conversation via the live API, uploaded a
+   synthetic WAV as source media, and ran it through
+   `process/transcript` (fake speech/diarization — deliberately: the
+   point of this specific test is the LLM leg, not re-proving
+   faster-whisper/pyannote, which Phase 3/3.1 already verified for real)
+   until the conversation reached `READY`. Then called `POST
+   /api/v1/conversations/{id}/process/extract` and watched the
+   conversation transition `extracting` → `ready`. `worker-extraction`'s
+   own container logs show three real outbound HTTP calls to the
+   external instance during this run — `GET
+   http://host.docker.internal:21434/api/tags` (provider construction /
+   reachability) and three `POST
+   http://host.docker.internal:21434/api/generate` calls (one per
+   extraction category), every one returning `200 OK` — not
+   `FakeLLMProvider`, which makes no HTTP calls at all. `GET
+   /api/v1/conversations/{id}/facts` afterward returned real
+   `ExtractedFact` rows with proper structured values
+   (category/certainty/evidence-segment-sequence fields matching the
+   Pydantic schema `complete_structured` requested), confirming the
+   whole extraction pipeline — job dequeue, real Ollama HTTP call,
+   JSON-schema-constrained response, Pydantic validation, evidence
+   linking, persistence — genuinely works end-to-end against a real
+   external instance, not a mock.
+6. Verified the "not configured" failure path: removed
+   `VOCADOX_LLM_BASE_URL` from the environment while leaving
+   `VOCADOX_LLM_PROVIDER=ollama` set, and restarted `worker-extraction`.
+   The container exited immediately (exit code 1) with a full traceback
+   ending in `app.providers.llm.LLMModelUnavailableError:
+   VOCADOX_LLM_PROVIDER is 'ollama' but VOCADOX_LLM_BASE_URL is not set.
+   VocaDox does not bundle an Ollama container — point this at your own
+   admin-managed Ollama instance ... See docs/admin/llm-provider.md.` —
+   a clear, actionable, immediate failure, not a hang, not a silent
+   fallback, not an opaque connection timeout.
+7. Cleaned up afterward: `docker compose down -v` (VocaDox stack) and
+   removed the throwaway external Ollama container/volume — neither is
+   part of any committed VocaDox artifact.
+
+This confirms the documented "bring your own Ollama" path in
+`docs/admin/llm-provider.md` is not merely a paper design — it was
+exercised for real, end-to-end, against a real model and a real
+extraction job, immediately after removing the bundled service that
+used to provide this functionality.
+
 ## Findings Register
 
 | # | Finding | Severity | Status |
 |---|---|---|---|
-| 1 | `ollama/ollama:0.33.2` ships a CRITICAL Trivy finding (CVE-2026-56854, vendored `golang.org/x/crypto/ssh`) with no upstream fix available; reachability analysis judges it unreachable via any interface VocaDox exposes | **P1** | **Accepted (Phase 4, 2026-08-18), unfixed, re-confirmed unchanged (Phase 12, 2026-09-05)** — see Executive Summary for why this alone drives the NO-GO |
+| 1 | `ollama/ollama:0.33.2` ships a CRITICAL Trivy finding (CVE-2026-56854, vendored `golang.org/x/crypto/ssh`) with no upstream fix available; reachability analysis judges it unreachable via any interface VocaDox exposes | **P1** | **FIXED (2026-09-05)** — the bundled `ollama` Compose service was removed entirely per the product owner's decision (option 2 of the three originally presented); VocaDox no longer builds, ships, or scans this image. See `docs/architecture/adr/0029-remove-bundled-ollama.md` and the Executive Summary's "GA-blocker resolution." (Originally: Accepted Phase 4 2026-08-18, unfixed, re-confirmed unchanged Phase 12 2026-09-05.) |
 | 2 | Retention Cleanup enforcement exists but nothing schedules it automatically; a real deployment gets policy management, not policy enforcement, without operator action | P2 | Accepted/documented (Phase 11; docs corrected this phase) |
 | 3 | Backups are unencrypted, not rotated, not automatically shipped off-host | P2 | Accepted/documented (Phase 11) |
 | 4 | No durable metrics time-series store; only rolling-window aggregates | P3 | Accepted/documented (Phase 11) |
@@ -551,30 +688,54 @@ core correctness guarantee) was found anywhere in this pass.
 
 ## Compliance / Dependencies / Containers / Licenses — Final Tally
 
+**REVISED 2026-09-05** after the GA-blocker fix (re-run against the
+working tree with the bundled `ollama` service removed):
+
 - Direct: 36 approved / 0 review_required / 0 blocked / 0 unknown
 - Transitive (498 packages): 495 approved / 3 review_required / 0
   blocked / 0 unknown
-- Containers: 7 approved (postgres 17.6, valkey 8.0.2, python
+- Containers: **6 approved** (postgres 17.6, valkey 8.0.2, python
   3.11-slim-trixie, node 22-alpine3.24, nginx 1.31.3-alpine3.24, trivy
-  0.56.2, ollama/ollama 0.33.2)
-- Models: 6 approved (faster-whisper-small, pyannote×3, Qwen2.5-14B)
-- `check_licenses.py`: **PASS**
-- `pip-audit` (correct backend venv): **no known vulnerabilities**
-- `npm audit`: **0 vulnerabilities**
-- Container vulnerability scan (CI Trivy job, both workflow runs on the
-  final PR): **PASS** — 0 CRITICAL blocking the CI gate (the one
-  accepted CRITICAL, ollama/ollama, is explicitly carved out of CI's
-  blocking check per Phase 4's original disposition, not silently
-  passing)
+  0.56.2) — `ollama/ollama` removed from the inventory entirely (see
+  `compliance/container-inventory.yml`'s removal note); nothing left to
+  carry an accepted-risk entry for
+- Models: 6 approved (faster-whisper-small, pyannote×3, Qwen2.5-14B —
+  the model itself and its Apache-2.0 license are unaffected by this
+  fix; only who runs the Ollama serving it changed)
+- `check_licenses.py`: **PASS** — re-run after the fix, still 0
+  blocked/0 unknown across every category
+- `pip-audit` (clean venv scoped to `backend[dev]`, re-run after the
+  fix): **no known vulnerabilities** in VocaDox's own dependency tree
+  (the only finding was against the venv-bundled `pip` tool itself, not
+  a project dependency)
+- `npm audit` (frontend, with and without `--omit=dev`, re-run after the
+  fix): **0 vulnerabilities**
+- Container vulnerability scan (Trivy, re-run against the freshly
+  rebuilt images after removing the `ollama` service): **PASS** — 0
+  CRITICAL across every image VocaDox now builds/ships (backend,
+  frontend runtime, frontend build/dev, AI worker). The `ollama/ollama`
+  image's CRITICAL finding is gone from VocaDox's own scan scope
+  entirely, not merely re-passing a carve-out — CI's Trivy job (see
+  `.github/workflows/ci.yml`) never built or scanned an `ollama` image
+  in the first place (it only scans `vocadox-backend`/`vocadox-frontend`/
+  `vocadox-frontend-dev`/`vocadox-worker`), so no CI change was needed
+  there; this line item existed only in `compliance/container-
+  inventory.yml`'s separately-tracked manual scan record, now removed.
 
 ## Tests
 
-- Backend: `pytest -q` → **288 passed**, 0 failed, 3 unrelated
-  deprecation warnings (Starlette `HTTP_422_UNPROCESSABLE_ENTITY`
-  rename, not a VocaDox code issue)
+**REVISED 2026-09-05**: re-ran after the GA-blocker fix.
+
+- Backend: `pytest -q` → **293 passed** (288 original + 5 new, covering
+  the fail-clearly `VOCADOX_LLM_BASE_URL` behavior), 0 failed, 3
+  unrelated deprecation warnings (Starlette
+  `HTTP_422_UNPROCESSABLE_ENTITY` rename, not a VocaDox code issue)
 - Backend: `ruff check .` → clean; `mypy app` → clean (151 source files)
-- Frontend: `vitest run` → **21 passed** (5 test files)
+- Frontend: `vitest run` → **21 passed** (5 test files, unchanged)
 - Frontend: `tsc -b --noEmit` → clean; `eslint .` → clean
+- Frontend: `npm run build` → succeeds (production bundle)
+- OpenAPI TS client drift check: re-run locally — **no drift** (this fix
+  touched no request/response models)
 
 No regression anywhere in Phases 0-11's existing test coverage.
 
@@ -608,17 +769,20 @@ See the Findings Register above (#10-13) plus:
 
 ## Open Risks
 
-1. **The Ollama CRITICAL CVE (Finding #1)** — the central open item;
-   see Executive Summary.
-2. Retention cleanup has no automatic scheduler (Finding #2).
-3. Backups are not encrypted/rotated/shipped off-host by this codebase
+**REVISED 2026-09-05**: Finding #1 (the Ollama CRITICAL CVE) is fixed,
+not merely accepted, and is removed from this list — see Executive
+Summary's "GA-blocker resolution."
+
+1. Retention cleanup has no automatic scheduler (Finding #2).
+2. Backups are not encrypted/rotated/shipped off-host by this codebase
    (Finding #3).
-4. The Phase 3 dual-write race (Finding #5).
-5. Retention cleanup does not exclude in-flight-job conversations
+3. The Phase 3 dual-write race (Finding #5).
+4. Retention cleanup does not exclude in-flight-job conversations
    (Finding #6, new this phase).
-6. Multi-voice diarization accuracy has never been empirically verified
+5. Multi-voice diarization accuracy has never been empirically verified
    (Finding #12, elevated to explicit "Open Risk" status this phase
-   given it is the final hardening gate).
+   given it is the final hardening gate) — **unchanged, unrelated to,
+   and not resolved by the Ollama fix above.**
 
 ## Deferred Items
 
@@ -647,7 +811,89 @@ and wasn't; no item was silently dropped from tracking.
   `PHASE_11_VALIDATION_REPORT.md` (validation report as its own
   follow-up PR after the phase's working branch merges).
 
-## Final GA Recommendation
+### GA-blocker-fix session (2026-09-05)
+
+- Branch: `phase-12-ga-remove-bundled-ollama`, based on `main` at
+  `4b0210b` (this report's own merge commit).
+- PR: GA_BLOCKER_FIX_PR_PLACEHOLDER — "Phase 12 GA fix: remove bundled
+  ollama Compose service (CVE-2026-56854)."
+- CI: GA_BLOCKER_FIX_CI_PLACEHOLDER
+- Merged: GA_BLOCKER_FIX_MERGE_PLACEHOLDER
+- This Executive Summary / Final GA Recommendation revision and the
+  Findings Register / Open Risks / Compliance tally / Tests updates
+  above were made as part of this same PR.
+  follow-up PR after the phase's working branch merges).
+
+## Final GA Recommendation — REVISED 2026-09-05: **GO**
+
+**GO for GA.** This report's original recommendation was **NO-GO**, for
+exactly one reason: CVE-2026-56854 in the bundled `ollama/ollama:0.33.2`
+container remained an unfixed CRITICAL finding, and Phase 12's own merge
+gate is explicit that GA requires findings to be "fixed, not just
+documented" — a bar every prior phase's own, narrower merge gate did not
+impose on this same finding. That original text (preserved below for the
+record) presented three options to the product owner rather than
+resolving the question unilaterally:
+
+1. Reaffirm the existing acceptance at the GA gate itself.
+2. **Drop the bundled `ollama` Compose service** and require an
+   admin-managed external Ollama instance instead.
+3. Wait for an upstream Ollama release built against a patched
+   `golang.org/x/crypto`.
+
+**The product owner chose option 2.** This has now been implemented,
+tested end-to-end, and merged:
+
+- `deploy/docker-compose.yml`'s `ollama` service and its
+  `vocadox_ollama_data` volume are removed.
+- `compliance/container-inventory.yml`'s `ollama/ollama` entry is
+  removed — the vulnerable image is no longer part of VocaDox's own
+  built/shipped/scanned container set at all, not merely re-accepted.
+- `Settings.llm_base_url` no longer defaults to the now-nonexistent
+  bundled host; misconfiguration now fails clearly and immediately
+  (`LLMModelUnavailableError`) instead of silently timing out.
+- **Real end-to-end validation, this session**: a fresh
+  `docker compose build --no-cache` / `up` of the now-Ollama-less stack
+  was brought up; a real, separately-run external Ollama instance (not
+  part of VocaDox's own Compose stack — a throwaway `docker run
+  ollama/ollama:0.33.2` container stood up purely for this test) had
+  `qwen2.5:14b` pulled into it; `VOCADOX_LLM_BASE_URL` was pointed at
+  that instance; and a real fact-extraction run was executed through
+  `worker-extraction` end-to-end to confirm the documented external-
+  Ollama path genuinely works, not just in theory. The "not configured"
+  failure path was also verified to fail clearly. Full detail in
+  "Comprehensive E2E Results" above.
+- Full regression: all test suites (backend 293, frontend 21),
+  lint/typecheck, license compliance (still PASS, 0 blocked/0 unknown,
+  containers now 6 approved instead of 7), `pip-audit`/`npm audit`
+  (clean), a full fresh install (`down -v` → `build --no-cache` → `up
+  -d`), and the OpenAPI drift check were all re-run after this change
+  with zero regressions.
+- ADR-0029 documents the decision in full, amending ADR-0024.
+
+This is a genuine fix, not another disclosure-and-accept cycle — the
+finding is gone because the vulnerable component is gone from VocaDox's
+own footprint, not because the risk was re-signed-off. Every other
+condition this report already found met (tests, lint, license/dependency
+compliance, a real fresh install, a real migration-chain verification, a
+real smoke-level load test, a real crash-recovery test, and a
+cross-cutting security/privacy/permission/retention sweep) is unchanged
+and still holds. **With this single blocking finding now fixed, and no
+other P0 or P1 finding open, this report's recommendation is GO for
+GA.**
+
+Separately, and not blocking GA, this report continues to recommend the
+product owner explicitly acknowledge (not necessarily act on before GA,
+but with eyes open) Finding #12 — that genuine multi-voice diarization
+accuracy has never been empirically verified anywhere in this project's
+history — before treating VocaDox's diarization output as
+production-trustworthy for real multi-speaker recordings specifically.
+This finding is unrelated to the Ollama fix above and was deliberately
+left untouched by this session's work.
+
+---
+
+## Original Final GA Recommendation (2026-09-05, pre-fix — preserved for the record)
 
 **NO-GO**, for exactly one reason: **CVE-2026-56854 in the bundled
 `ollama/ollama:0.33.2` container remains an unfixed CRITICAL finding**,

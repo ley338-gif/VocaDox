@@ -215,34 +215,23 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-  # Phase 4: local LLM inference server for fact extraction (see
-  # docs/admin/llm-provider.md and
-  # docs/architecture/adr/0024-llm-provider-selection.md). Never a
-  # cloud/hosted LLM endpoint — conversation content stays inside this
-  # compose network. Not pre-loaded with any model: an admin pulls one
-  # explicitly (`docker compose exec ollama ollama pull qwen2.5:14b`),
-  # matching the Phase 3 "no silent multi-GB downloads" policy for
-  # speech/diarization models. Only this container ever gets GPU access
-  # for LLM inference — worker-extraction talks to it over plain HTTP and
-  # needs no GPU itself.
-  ollama:
-    image: ollama/ollama:0.33.2@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
-    ports:
-      - "${OLLAMA_PORT:-11434}:11434"
-    volumes:
-      - vocadox_ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+  # Phase 4 bundled a local `ollama` Compose service here for LLM
+  # inference. Removed for GA (Phase 12 GA-blocker resolution — see
+  # PHASE_12_VALIDATION_REPORT.md and
+  # docs/architecture/adr/0029-remove-bundled-ollama.md): the pinned
+  # `ollama/ollama:0.33.2` image carried CVE-2026-56854 (CRITICAL,
+  # SSH-auth-bypass in a vendored Go crypto library) with no fixed
+  # upstream release available, and Phase 12's GA gate requires a finding
+  # to be genuinely FIXED, not just accepted/documented, to ship. Rather
+  # than keep re-accepting the same unfixed CRITICAL every phase, the
+  # product owner chose to drop the bundled container from VocaDox's own
+  # shipped footprint entirely — VocaDox now always talks to an
+  # admin-managed EXTERNAL Ollama instance over VOCADOX_LLM_BASE_URL
+  # (already fully supported; see docs/admin/llm-provider.md), which is
+  # simply never started, built, or scanned as part of this project. This
+  # trades away the one-command bundled-LLM convenience but is the only
+  # option that actually removes the vulnerable component rather than
+  # re-disclosing it.
 
   worker-extraction:
     build:
@@ -256,10 +245,16 @@ services:
       VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
       VOCADOX_VALKEY_URL: ${VOCADOX_VALKEY_URL:-valkey://valkey:6379/0}
       # "fake" by default, same policy as speech/diarization — set to
-      # "ollama" only once a model has actually been pulled into the
-      # `ollama` service (see docs/admin/llm-provider.md).
+      # "ollama" only once you have your own external Ollama instance
+      # reachable and VOCADOX_LLM_BASE_URL points at it (see
+      # docs/admin/llm-provider.md). There is deliberately no default for
+      # VOCADOX_LLM_BASE_URL any more (no bundled `ollama` service exists
+      # to default to) — if VOCADOX_LLM_PROVIDER=ollama is set without an
+      # explicit VOCADOX_LLM_BASE_URL, worker-extraction fails clearly and
+      # immediately at startup (LLMModelUnavailableError) instead of
+      # silently trying to reach a host that isn't there.
       VOCADOX_LLM_PROVIDER: ${VOCADOX_LLM_PROVIDER:-fake}
-      VOCADOX_LLM_BASE_URL: ${VOCADOX_LLM_BASE_URL:-http://ollama:11434}
+      VOCADOX_LLM_BASE_URL: ${VOCADOX_LLM_BASE_URL:-}
       VOCADOX_LLM_MODEL: ${VOCADOX_LLM_MODEL:-qwen2.5:14b}
     volumes:
       - vocadox_backend_data:/app/data
@@ -390,9 +385,9 @@ volumes:
   # re-downloaded on `docker compose restart`/`up` (models persist here
   # across container recreation, only `down -v` clears them).
   vocadox_models_data:
-  # Ollama's own model-weight storage (Phase 4) — separate from
-  # vocadox_models_data (the Phase 3 speech/diarization model volume) since
-  # Ollama manages its own storage layout under /root/.ollama. Same
-  # warning applies: never re-downloaded on `docker compose restart`/`up`,
-  # only `down -v` clears it (see docs/admin/llm-provider.md).
-  vocadox_ollama_data:
+  # Phase 4 added a `vocadox_ollama_data` volume here for the bundled
+  # Ollama container's own model-weight storage. Removed along with the
+  # `ollama` Compose service itself as part of the Phase 12 GA-blocker fix
+  # (CVE-2026-56854 — see docs/architecture/adr/0029-remove-bundled-ollama.md):
+  # an admin-managed external Ollama instance manages its own storage
+  # entirely outside VocaDox's Compose stack.
