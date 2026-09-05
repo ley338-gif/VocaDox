@@ -176,6 +176,30 @@ class Settings(BaseSettings):
         "processing jobs for the same conversation.",
     )
 
+    # -- Operations: Backup/Restore, Retention Cleanup (Phase 11) -----------
+    backup_root: str = Field(
+        default="./data/backups",
+        description="Filesystem root each backup is written under, as its own "
+        "`<backup_root>/<backup_id>/` directory (database.dump + media.tar). Deliberately "
+        "separate from media_storage_root/model_volume_root (same 'don't mix storage "
+        "purposes' principle as ADR-0011/Phase 3.1) — a real deployment should point this "
+        "at a distinct volume/mount, ideally off-host, per docs/operations/disaster-recovery.md.",
+    )
+    pg_dump_path: str = Field(
+        default="pg_dump", description="Path to the pg_dump binary (PostgreSQL License)."
+    )
+    pg_restore_path: str = Field(
+        default="pg_restore", description="Path to the pg_restore binary (PostgreSQL License)."
+    )
+    psql_path: str = Field(
+        default="psql", description="Path to the psql binary (PostgreSQL License)."
+    )
+    retention_cleanup_batch_size: int = Field(
+        default=500,
+        description="Max conversations evaluated per retention-cleanup run, to bound a single "
+        "run's duration/lock footprint on a large deployment.",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

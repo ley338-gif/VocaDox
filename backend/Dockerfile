@@ -33,6 +33,16 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
+# Phase 11: postgresql-client (pg_dump/pg_restore/psql) for Backup/Restore
+# (app.operations.backup_service, app.cli.backup). PostgreSQL License
+# (permissive, MIT/BSD-style — see compliance/dependency-inventory.yml).
+# A prebuilt Debian package, no build toolchain pulled in (same "no
+# build-essential" precedent above still holds).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
 # Same idea for pip's own bundled setuptools/wheel (installed by
 # ensurepip when the base image was built, independent of the
 # setuptools>=83.0 build-system requirement in pyproject.toml, which only

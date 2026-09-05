@@ -87,6 +87,12 @@ WEBHOOK_EVENT_TYPES: frozenset[str] = frozenset(
         "review.required",
         "document.created",
         "document.approved",
+        # Phase 11 (spec §64/§56/§57): operations events — an admin can
+        # wire an external alerting system to a real backup/retention-
+        # cleanup run without polling the admin UI.
+        "backup.created",
+        "retention_cleanup.run",
+        "retention_cleanup.item_deleted",
     }
 )
 
@@ -110,6 +116,17 @@ _SAFE_PAYLOAD_KEYS = frozenset(
         "fact_count",
         "run_type",
         "reprocess",
+        # Phase 11
+        "backup_id",
+        "database_dump_bytes",
+        "media_archive_bytes",
+        "run_id",
+        "dry_run",
+        "conversations_evaluated",
+        "items_deleted",
+        "bytes_freed",
+        "action",
+        "reason",
     }
 )
 

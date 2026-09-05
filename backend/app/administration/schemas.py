@@ -135,6 +135,7 @@ class RetentionPolicyResponse(BaseModel):
     retention_days: int | None
     delete_source_media: bool
     delete_derived_media: bool
+    delete_transcript: bool
     active: bool
     created_at: datetime
 
@@ -146,6 +147,7 @@ class RetentionPolicyCreateRequest(BaseModel):
     retention_days: int | None = None
     delete_source_media: bool = False
     delete_derived_media: bool = False
+    delete_transcript: bool = False
     active: bool = True
 
 
@@ -154,6 +156,7 @@ class RetentionPolicyUpdateRequest(BaseModel):
     retention_days: int | None = None
     delete_source_media: bool | None = None
     delete_derived_media: bool | None = None
+    delete_transcript: bool | None = None
     active: bool | None = None
 
 
