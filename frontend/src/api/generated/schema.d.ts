@@ -2014,6 +2014,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/operations/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Operations Metrics Endpoint */
+        get: operations["operations_metrics_endpoint_api_v1_admin_operations_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/operations/model-storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model Storage Endpoint */
+        get: operations["model_storage_endpoint_api_v1_admin_operations_model_storage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/operations/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Backups Endpoint */
+        get: operations["list_backups_endpoint_api_v1_admin_operations_backups_get"];
+        put?: never;
+        /** Create Backup Endpoint */
+        post: operations["create_backup_endpoint_api_v1_admin_operations_backups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/operations/retention-cleanup/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Retention Cleanup Runs Endpoint */
+        get: operations["list_retention_cleanup_runs_endpoint_api_v1_admin_operations_retention_cleanup_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/operations/retention-cleanup/runs/{run_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Retention Cleanup Items Endpoint */
+        get: operations["list_retention_cleanup_items_endpoint_api_v1_admin_operations_retention_cleanup_runs__run_id__items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/operations/retention-cleanup/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Retention Cleanup Endpoint
+         * @description `payload.dry_run` defaults to `true` (see RetentionCleanupRunRequest)
+         *     — an admin must explicitly pass `dry_run: false` to perform real
+         *     deletions. Every run, dry or real, is recorded and audited.
+         */
+        post: operations["run_retention_cleanup_endpoint_api_v1_admin_operations_retention_cleanup_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2093,6 +2201,31 @@ export interface components {
         AvailableScopesResponse: {
             /** Scopes */
             scopes: string[];
+        };
+        /** BackupResponse */
+        BackupResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Status */
+            status: string;
+            /** Database Dump Bytes */
+            database_dump_bytes: number | null;
+            /** Media Archive Bytes */
+            media_archive_bytes: number | null;
+            /** Media File Count */
+            media_file_count: number | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Completed At */
+            completed_at: string | null;
         };
         /** Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post */
         Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post: {
@@ -2621,6 +2754,19 @@ export interface components {
              */
             updated_at: string;
         };
+        /** GpuMetrics */
+        GpuMetrics: {
+            /** Cuda Available */
+            cuda_available: boolean;
+            /** Device Name */
+            device_name: string | null;
+            /** Total Vram Mb */
+            total_vram_mb: number | null;
+            /** Free Vram Mb */
+            free_vram_mb: number | null;
+            /** Utilization Percent */
+            utilization_percent: number | null;
+        };
         /** GroupCreateRequest */
         GroupCreateRequest: {
             /** Name */
@@ -3078,6 +3224,22 @@ export interface components {
              */
             created_at: string;
         };
+        /** ModelStorageEntry */
+        ModelStorageEntry: {
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** ModelStorageResponse */
+        ModelStorageResponse: {
+            /** Model Volume Root */
+            model_volume_root: string;
+            /** Total Bytes */
+            total_bytes: number;
+            /** Models */
+            models: components["schemas"]["ModelStorageEntry"][];
+        };
         /**
          * ModelsOverviewResponse
          * @description Aggregates the three provider status checks Phase 3/4 already built
@@ -3139,6 +3301,13 @@ export interface components {
             content?: string | null;
             /** Timestamp Ms */
             timestamp_ms?: number | null;
+        };
+        /** OperationsMetricsResponse */
+        OperationsMetricsResponse: {
+            /** Workers */
+            workers: components["schemas"]["WorkerMetrics"][];
+            gpu: components["schemas"]["GpuMetrics"];
+            queue: components["schemas"]["QueueMetrics"];
         };
         /**
          * OrganizationCreateRequest
@@ -3599,6 +3768,34 @@ export interface components {
             /** Failed */
             failed: number;
         };
+        /** QueueDepthByType */
+        QueueDepthByType: {
+            /** Job Type */
+            job_type: string;
+            /** Queued */
+            queued: number;
+            /** Running */
+            running: number;
+        };
+        /** QueueMetrics */
+        QueueMetrics: {
+            /** Depth By Job Type */
+            depth_by_job_type: components["schemas"]["QueueDepthByType"][];
+            /** Throughput Hourly */
+            throughput_hourly: components["schemas"]["QueueThroughputBucket"][];
+        };
+        /** QueueThroughputBucket */
+        QueueThroughputBucket: {
+            /**
+             * Hour Start
+             * Format: date-time
+             */
+            hour_start: string;
+            /** Succeeded */
+            succeeded: number;
+            /** Failed */
+            failed: number;
+        };
         /** ReadinessResponse */
         ReadinessResponse: {
             /** Status */
@@ -3625,6 +3822,75 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** RetentionCleanupItemResponse */
+        RetentionCleanupItemResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Retention Policy Id */
+            retention_policy_id: string | null;
+            /** Action */
+            action: string;
+            /** Media Asset Id */
+            media_asset_id: string | null;
+            /** Transcript Id */
+            transcript_id: string | null;
+            /** Bytes Freed */
+            bytes_freed: number | null;
+            /** Segments Deleted */
+            segments_deleted: number | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** RetentionCleanupRunRequest */
+        RetentionCleanupRunRequest: {
+            /**
+             * Dry Run
+             * @default true
+             */
+            dry_run: boolean;
+        };
+        /** RetentionCleanupRunResponse */
+        RetentionCleanupRunResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Status */
+            status: string;
+            /** Conversations Evaluated */
+            conversations_evaluated: number;
+            /** Items Deleted */
+            items_deleted: number;
+            /** Bytes Freed */
+            bytes_freed: number;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Completed At */
+            completed_at: string | null;
+        };
         /** RetentionPolicyCreateRequest */
         RetentionPolicyCreateRequest: {
             /** Name */
@@ -3641,6 +3907,11 @@ export interface components {
              * @default false
              */
             delete_derived_media: boolean;
+            /**
+             * Delete Transcript
+             * @default false
+             */
+            delete_transcript: boolean;
             /**
              * Active
              * @default true
@@ -3662,6 +3933,8 @@ export interface components {
             delete_source_media: boolean;
             /** Delete Derived Media */
             delete_derived_media: boolean;
+            /** Delete Transcript */
+            delete_transcript: boolean;
             /** Active */
             active: boolean;
             /**
@@ -3680,6 +3953,8 @@ export interface components {
             delete_source_media?: boolean | null;
             /** Delete Derived Media */
             delete_derived_media?: boolean | null;
+            /** Delete Transcript */
+            delete_transcript?: boolean | null;
             /** Active */
             active?: boolean | null;
         };
@@ -4363,6 +4638,31 @@ export interface components {
             end_ms: number;
             /** Confidence */
             confidence: number;
+        };
+        /** WorkerMetrics */
+        WorkerMetrics: {
+            /** Role */
+            role: string;
+            /** Job Types */
+            job_types: string[];
+            /** Running Jobs */
+            running_jobs: number;
+            /** Queued Jobs */
+            queued_jobs: number;
+            /** Active Worker Ids */
+            active_worker_ids: string[];
+            /** Last Activity At */
+            last_activity_at: string | null;
+            /** Succeeded Last 1H */
+            succeeded_last_1h: number;
+            /** Succeeded Last 24H */
+            succeeded_last_24h: number;
+            /** Failed Last 24H */
+            failed_last_24h: number;
+            /** Avg Duration Seconds Last 24H */
+            avg_duration_seconds_last_24h: number | null;
+            /** Sample Count Last 24H */
+            sample_count_last_24h: number;
         };
         /**
          * WorkerRoleStatus
@@ -8626,6 +8926,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateResponse"][];
+                };
+            };
+        };
+    };
+    operations_metrics_endpoint_api_v1_admin_operations_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationsMetricsResponse"];
+                };
+            };
+        };
+    };
+    model_storage_endpoint_api_v1_admin_operations_model_storage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelStorageResponse"];
+                };
+            };
+        };
+    };
+    list_backups_endpoint_api_v1_admin_operations_backups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupResponse"][];
+                };
+            };
+        };
+    };
+    create_backup_endpoint_api_v1_admin_operations_backups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupResponse"];
+                };
+            };
+        };
+    };
+    list_retention_cleanup_runs_endpoint_api_v1_admin_operations_retention_cleanup_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionCleanupRunResponse"][];
+                };
+            };
+        };
+    };
+    list_retention_cleanup_items_endpoint_api_v1_admin_operations_retention_cleanup_runs__run_id__items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionCleanupItemResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_retention_cleanup_endpoint_api_v1_admin_operations_retention_cleanup_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetentionCleanupRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetentionCleanupRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

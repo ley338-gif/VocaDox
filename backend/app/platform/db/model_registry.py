@@ -42,6 +42,7 @@ from app.intelligence import models as _intelligence_models  # noqa: F401,E402
 # extracted_facts.id, users.id — imported after intelligence/conversations.
 from app.longitudinal import models as _longitudinal_models  # noqa: F401,E402
 from app.media import models as _media_models  # noqa: F401,E402
+from app.operations import models as _operations_models  # noqa: F401,E402
 from app.organizations import models as _organizations_models  # noqa: F401
 
 # Phase 3: processing_runs must be imported before transcription/diarization

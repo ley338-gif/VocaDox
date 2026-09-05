@@ -332,6 +332,7 @@ export interface RetentionPolicy {
   retention_days: number | null;
   delete_source_media: boolean;
   delete_derived_media: boolean;
+  delete_transcript: boolean;
   active: boolean;
   created_at: string;
 }
@@ -346,6 +347,7 @@ export function createRetentionPolicy(
     retention_days?: number | null;
     delete_source_media?: boolean;
     delete_derived_media?: boolean;
+    delete_transcript?: boolean;
     active?: boolean;
   },
   csrfToken: string
@@ -360,11 +362,125 @@ export function updateRetentionPolicy(
     retention_days: number | null;
     delete_source_media: boolean;
     delete_derived_media: boolean;
+    delete_transcript: boolean;
     active: boolean;
   }>,
   csrfToken: string
 ): Promise<RetentionPolicy> {
   return request(`/admin/retention-policies/${policyId}`, jsonInit("PATCH", payload, csrfToken));
+}
+
+// -- Phase 11: Operations (Worker/GPU/Queue Metrics, Backup, Retention
+// Cleanup, Model Storage) --------------------------------------------------
+
+export interface WorkerMetrics {
+  role: string;
+  job_types: string[];
+  running_jobs: number;
+  queued_jobs: number;
+  active_worker_ids: string[];
+  last_activity_at: string | null;
+  succeeded_last_1h: number;
+  succeeded_last_24h: number;
+  failed_last_24h: number;
+  avg_duration_seconds_last_24h: number | null;
+  sample_count_last_24h: number;
+}
+
+export interface GpuMetrics {
+  cuda_available: boolean;
+  device_name: string | null;
+  total_vram_mb: number | null;
+  free_vram_mb: number | null;
+  utilization_percent: number | null;
+}
+
+export interface QueueMetrics {
+  depth_by_job_type: { job_type: string; queued: number; running: number }[];
+  throughput_hourly: { hour_start: string; succeeded: number; failed: number }[];
+}
+
+export interface OperationsMetrics {
+  workers: WorkerMetrics[];
+  gpu: GpuMetrics;
+  queue: QueueMetrics;
+}
+
+export function getOperationsMetrics(): Promise<OperationsMetrics> {
+  return request("/admin/operations/metrics");
+}
+
+export interface ModelStorageOverview {
+  model_volume_root: string;
+  total_bytes: number;
+  models: { name: string; size_bytes: number }[];
+}
+
+export function getModelStorageOverview(): Promise<ModelStorageOverview> {
+  return request("/admin/operations/model-storage");
+}
+
+export interface BackupRecord {
+  id: string;
+  status: string;
+  database_dump_bytes: number | null;
+  media_archive_bytes: number | null;
+  media_file_count: number | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export function listBackups(): Promise<BackupRecord[]> {
+  return request("/admin/operations/backups");
+}
+
+export function createBackup(csrfToken: string): Promise<BackupRecord> {
+  return request("/admin/operations/backups", jsonInit("POST", {}, csrfToken));
+}
+
+export interface RetentionCleanupRun {
+  id: string;
+  dry_run: boolean;
+  status: string;
+  conversations_evaluated: number;
+  items_deleted: number;
+  bytes_freed: number;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface RetentionCleanupItem {
+  id: string;
+  run_id: string;
+  conversation_id: string | null;
+  retention_policy_id: string | null;
+  action: string;
+  media_asset_id: string | null;
+  transcript_id: string | null;
+  bytes_freed: number | null;
+  segments_deleted: number | null;
+  reason: string;
+  created_at: string;
+}
+
+export function listRetentionCleanupRuns(): Promise<RetentionCleanupRun[]> {
+  return request("/admin/operations/retention-cleanup/runs");
+}
+
+export function listRetentionCleanupItems(runId: string): Promise<RetentionCleanupItem[]> {
+  return request(`/admin/operations/retention-cleanup/runs/${runId}/items`);
+}
+
+export function runRetentionCleanup(
+  dryRun: boolean,
+  csrfToken: string
+): Promise<RetentionCleanupRun> {
+  return request(
+    "/admin/operations/retention-cleanup/run",
+    jsonInit("POST", { dry_run: dryRun }, csrfToken)
+  );
 }
 
 // -- About & Licenses -----------------------------------------------------

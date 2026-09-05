@@ -111,6 +111,18 @@ PERMISSIONS: dict[str, str] = {
     "service-account:write": "Create, rotate, and revoke service accounts.",
     "webhook:read": "View webhooks and their delivery logs.",
     "webhook:write": "Create, update, and delete webhooks.",
+    # Phase 11 (spec §56/§57/§64, roadmap §73): Worker/GPU/Queue metrics,
+    # Model Storage view, Backup, and Retention Cleanup. Deliberately
+    # narrow and NOT default-granted broadly — backup/retention-cleanup
+    # trigger real, operationally significant (retention cleanup:
+    # IRREVERSIBLE) actions, so only System Admin gets the *:trigger
+    # codes below (see ROLES); Manager/Auditor get read-only visibility.
+    "operations:read": "View worker/GPU/queue metrics and model storage usage.",
+    "backup:trigger": "Create a real backup (PostgreSQL dump + media archive).",
+    "retention-cleanup:trigger": (
+        "Run the retention cleanup worker (dry-run or, explicitly, real deletion)."
+    ),
+    "retention-cleanup:read": "View past retention cleanup runs and their audit trail.",
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -164,6 +176,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "service-account:write",
             "webhook:read",
             "webhook:write",
+            "operations:read",
+            "retention-cleanup:read",
         ],
     ),
     "Template Manager": (
@@ -258,6 +272,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "document:read",
             "timeline:read",
             "task:read",
+            "operations:read",
+            "retention-cleanup:read",
         ],
     ),
     "API Service Account": (

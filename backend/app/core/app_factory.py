@@ -22,6 +22,7 @@ from app.integrations.router import admin_router as integrations_admin_router
 from app.integrations.router import api_router as integrations_api_router
 from app.intelligence.router import router as intelligence_router
 from app.longitudinal.router import router as longitudinal_router
+from app.operations.router import router as operations_router
 from app.organizations.router import router as organizations_router
 from app.platform.config import get_settings
 from app.platform.db import model_registry  # noqa: F401 - registers all domain models
@@ -77,5 +78,6 @@ def create_app() -> FastAPI:
     app.include_router(longitudinal_router, prefix=settings.api_prefix)
     app.include_router(integrations_admin_router, prefix=settings.api_prefix)
     app.include_router(integrations_api_router, prefix=settings.api_prefix)
+    app.include_router(operations_router, prefix=settings.api_prefix)
 
     return app

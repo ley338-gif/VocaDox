@@ -33,6 +33,37 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
+# Phase 11: pg_dump/pg_restore/psql for Backup/Restore
+# (app.operations.backup_service, app.cli.backup). PostgreSQL License
+# (permissive, MIT/BSD-style — see compliance/dependency-inventory.yml).
+#
+# NOT a plain `apt-get install postgresql-client` (found via a real
+# Trivy scan of the built image, not by inspection): the
+# `postgresql-client` metapackage pulls in `postgresql-client-common`,
+# whose `/usr/bin/pg_dump`/`pg_restore`/`psql` are themselves Perl
+# scripts (`pg_wrapper`, for selecting among multiple installed major
+# versions — irrelevant here, exactly one version is ever installed).
+# That silently reintroduced the entire `perl`/`perl-base` CRITICAL-CVE
+# family this same file already deliberately purged from the base image
+# above — a real regression a Trivy re-scan caught, not a hypothetical.
+# The real `pg_dump`/`pg_restore`/`psql` ELF binaries underneath
+# (`/usr/lib/postgresql/<ver>/bin/*`, confirmed via `ldd` to have zero
+# Perl dependency — only `libpq`/`libssl`/`libgssapi_krb5`/etc.) are
+# copied out to `/usr/local/bin` BEFORE the whole postgresql-client*
+# package family (and Perl) is purged again, and `libpq5` is kept
+# (marked manual so `autoremove` doesn't take it too) since the copied
+# binaries still dynamically link it at runtime.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && for bin in pg_dump pg_restore psql; do \
+         cp "$(ls /usr/lib/postgresql/*/bin/$bin)" /usr/local/bin/"$bin"; \
+       done \
+    && apt-mark manual libpq5 \
+    && apt-get remove -y --purge --allow-remove-essential \
+         perl perl-base 'perl-modules-*' 'libperl5.*' 'postgresql-client*' \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
 # Same idea for pip's own bundled setuptools/wheel (installed by
 # ensurepip when the base image was built, independent of the
 # setuptools>=83.0 build-system requirement in pyproject.toml, which only
@@ -76,7 +107,14 @@ RUN useradd --create-home --uid 10001 vocadox
 # --no-cache && up -d`), not assumed. The actual persistent data lives in
 # a named volume mounted at /app/data (see deploy/docker-compose.yml), so
 # this only needs to own the mount point, not pre-populate real content.
-RUN mkdir -p /app/data/media /app/data/tmp-uploads && chown -R vocadox:vocadox /app/data
+#
+# Phase 11: same reasoning applies to /app/backups (settings.backup_root's
+# default `VOCADOX_BACKUP_ROOT=/app/backups`, its own named volume in
+# deploy/docker-compose.yml) — found the exact same way, via a real
+# `docker compose run --rm backup create` against fresh infrastructure,
+# which failed with a real PermissionError before this line was added.
+RUN mkdir -p /app/data/media /app/data/tmp-uploads /app/backups \
+    && chown -R vocadox:vocadox /app/data /app/backups
 
 USER vocadox
 

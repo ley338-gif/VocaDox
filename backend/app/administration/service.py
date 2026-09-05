@@ -51,6 +51,7 @@ async def create_retention_policy(
     retention_days: int | None,
     delete_source_media: bool,
     delete_derived_media: bool,
+    delete_transcript: bool = False,
     active: bool,
 ) -> RetentionPolicy:
     policy = RetentionPolicy(
@@ -58,6 +59,7 @@ async def create_retention_policy(
         retention_days=retention_days,
         delete_source_media=delete_source_media,
         delete_derived_media=delete_derived_media,
+        delete_transcript=delete_transcript,
         active=active,
     )
     session.add(policy)
@@ -73,6 +75,7 @@ async def update_retention_policy(
     retention_days: int | None = None,
     delete_source_media: bool | None = None,
     delete_derived_media: bool | None = None,
+    delete_transcript: bool | None = None,
     active: bool | None = None,
     _fields_set: set[str] | None = None,
 ) -> RetentionPolicy:
@@ -85,6 +88,8 @@ async def update_retention_policy(
         policy.delete_source_media = delete_source_media
     if delete_derived_media is not None:
         policy.delete_derived_media = delete_derived_media
+    if delete_transcript is not None:
+        policy.delete_transcript = delete_transcript
     if active is not None:
         policy.active = active
     await session.flush()
@@ -202,7 +207,7 @@ async def worker_role_status(
 # -- Storage ------------------------------------------------------------
 
 
-def _directory_size_bytes(root: str | Path) -> int:
+def directory_size_bytes(root: str | Path) -> int:
     """Real recursive size of everything under `root` — not fabricated,
     not sampled. Acceptable to walk the full tree for an admin-triggered,
     infrequent call (narrow scope, matching Phase 3's "avoid building a
@@ -241,8 +246,8 @@ def _disk_usage_of_nearest_existing_ancestor(root: str | Path) -> tuple[int, int
 
 
 def storage_usage(*, media_storage_root: str, model_volume_root: str) -> dict[str, object]:
-    media_used = _directory_size_bytes(media_storage_root)
-    model_used = _directory_size_bytes(model_volume_root)
+    media_used = directory_size_bytes(media_storage_root)
+    model_used = directory_size_bytes(model_volume_root)
 
     try:
         media_total, media_free = _disk_usage_of_nearest_existing_ancestor(media_storage_root)

@@ -24,8 +24,20 @@
 # real-time-factor numbers).
 
 services:
+  # Phase 11: bumped 16.6 -> 17.6 to match the `postgresql-client` package
+  # Debian trixie's apt repo actually ships (17.x) — found via a REAL
+  # restore-into-fresh-infrastructure test: pg_dump 17.x (from the
+  # backend image's postgresql-client) emits `SET transaction_timeout =
+  # 0;` in its custom-format dump header (a GUC introduced in Postgres
+  # 17), which a 16.x server's pg_restore rejects with "unrecognized
+  # configuration parameter" — a real client/server major-version
+  # mismatch, not a hypothetical one. Matching the server to the client
+  # trixie ships is simpler and lower-risk than pinning postgresql-client
+  # to 16.x via the third-party apt.postgresql.org repository (extra
+  # supply-chain trust) or copying cross-distro binaries (fragile shared
+  # library ABI assumptions) — see PHASE_11_VALIDATION_REPORT.md, Restore.
   postgres:
-    image: postgres:16.6-alpine3.20@sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc
+    image: postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-vocadox}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
@@ -103,6 +115,15 @@ services:
       # api never loads a real speech/diarization provider itself (it only
       # enqueues jobs) — kept at the safe "fake" default here regardless;
       # only the worker services below set these to the real providers.
+      # Phase 11: separate volume from media/model storage (ADR-0018's
+      # "don't mix storage purposes" principle applied a third time) —
+      # backups must never live on the same volume as the data they back
+      # up, so a `docker compose down -v` (or any single-volume failure)
+      # can't take both out at once in a real deployment. This IS the same
+      # single Docker host in local dev, though — see
+      # docs/operations/disaster-recovery.md for the real-deployment
+      # off-host recommendation.
+      VOCADOX_BACKUP_ROOT: /app/backups
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -112,6 +133,7 @@ services:
       # just an in-place restart (verified as part of the Phase 2
       # restart-persistence validation).
       - vocadox_backend_data:/app/data
+      - vocadox_backups_data:/app/backups
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -284,6 +306,61 @@ services:
     volumes:
       - vocadox_models_data:/app/data/models
 
+  # Phase 11: admin-facing backup/restore CLI (see
+  # backend/app/cli/backup.py and docs/operations/disaster-recovery.md).
+  # `create`/`list` also exist as HTTP endpoints
+  # (POST/GET /admin/operations/backups); `restore` is CLI-only —
+  # deliberately not a button, see app.operations.backup_service's module
+  # docstring for why.
+  #
+  #   docker compose run --rm backup create
+  #   docker compose run --rm backup list
+  #   docker compose run --rm backup restore <backup_id>
+  #
+  # Uses the `backend` image (has postgresql-client — see
+  # backend/Dockerfile) rather than the worker image; needs neither GPU
+  # nor ffmpeg.
+  backup:
+    profiles: ["tools"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "app.cli.backup"]
+    command: ["list"]
+    environment:
+      VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
+      VOCADOX_BACKUP_ROOT: /app/backups
+    volumes:
+      - vocadox_backend_data:/app/data
+      - vocadox_backups_data:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Phase 11: the automated Retention Cleanup Worker (see
+  # backend/app/cli/retention_cleanup.py). Dry-run by default — pass
+  # `--execute` for REAL, IRREVERSIBLE deletion:
+  #
+  #   docker compose run --rm retention-cleanup run
+  #   docker compose run --rm retention-cleanup run --execute
+  #
+  # Intended to also be invoked on a schedule (host cron/k8s CronJob)
+  # independent of the admin UI.
+  retention-cleanup:
+    profiles: ["tools"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "app.cli.retention_cleanup"]
+    command: ["run"]
+    environment:
+      VOCADOX_DATABASE_URL: ${VOCADOX_DATABASE_URL:-postgresql+asyncpg://vocadox:changeme@postgres:5432/vocadox}
+    volumes:
+      - vocadox_backend_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   frontend:
     build:
       context: ../frontend
@@ -302,6 +379,11 @@ volumes:
   vocadox_postgres_data:
   vocadox_valkey_data:
   vocadox_backend_data:
+  # Phase 11: Backup/Restore artifacts (pg_dump + media tar per backup),
+  # deliberately separate from vocadox_backend_data (conversation media)
+  # and vocadox_models_data (installed AI models) — see the `backend`
+  # service's VOCADOX_BACKUP_ROOT comment above.
+  vocadox_backups_data:
   # Persistent model volume, deliberately separate from
   # vocadox_backend_data (conversation media) — see
   # docs/architecture/adr/0018-model-installation-strategy.md. Never

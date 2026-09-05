@@ -256,6 +256,16 @@ class RetentionPolicy(Base):
     retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     delete_source_media: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     delete_derived_media: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Phase 11 (spec §56/§57): the "zero retention" pattern (Audio ->
+    # Processing -> Document -> Audio DELETE -> Transcript DELETE) needs a
+    # transcript-deletion trigger that Phase 2's original three flags don't
+    # cover. Added here rather than a redesign, per the phase brief's
+    # explicit guidance to extend the existing simple model rather than
+    # force a richer per-artifact-status state machine
+    # (DELETE_AFTER_PROCESSING/DELETE_AFTER_APPROVAL/...) it doesn't
+    # already have. Default False so every pre-Phase-11 policy row keeps
+    # its exact prior behavior (no transcript deletion) after migration.
+    delete_transcript: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
