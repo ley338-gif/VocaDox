@@ -239,12 +239,16 @@ dependencies:
     approval_status: approved
     notes: >
       info.license = BSD-3-Clause (PyPI JSON, version 0.28.1). Originally a
-      `[dev]`-only test dependency (httpx.AsyncClient/TestClient); Phase 4
-      also lists it under the backend `[ai]` extra so the
-      worker-extraction image gets it — it is the HTTP client
-      OllamaLLMProvider (app/providers/llm.py) uses to talk to a local
-      Ollama server. Never installed in the api/frontend images beyond
-      what `[dev]` already required for tests.
+      `[dev]`-only test dependency (httpx.AsyncClient/TestClient) and later
+      also listed under the backend `[ai]` extra for the worker-extraction
+      image. Moved into the core `dependencies` list (post-Phase-12 fix)
+      because OllamaLLMProvider.status() (app/providers/llm.py) — the
+      Admin LLM Provider page's live health check — runs in the `backend`
+      API process itself, not only in the worker images; with httpx
+      confined to `[ai]`, the backend process lacked it entirely and every
+      status check failed with "Ollama server unreachable:
+      ModuleNotFoundError" regardless of how the Ollama host was
+      configured.
 
   # Phase 4 note: Ollama itself (the local LLM inference server) was never
   # a Python dependency — it was a separate bundled container image (see
