@@ -10,6 +10,14 @@
  * docstring — never an LLM "write a report" call. This panel never
  * fabricates an explanation for why a statement is in the document; the
  * "why" is exactly its fact_ids, cross-referenced against the Review tab.
+ *
+ * Redesign note: the brief's "split view: transcript left, document
+ * right" is genuinely implemented at the Review tab (ReviewWizard already
+ * shows per-issue evidence with jump-to-audio); this panel's revision
+ * text has no per-statement evidence links to click today, so a literal
+ * transcript/document split here would be cosmetic, not real evidence
+ * tracing — kept single-column, restyled with the shared design system
+ * instead of a hollow split view.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Download, FileText, RefreshCw } from "lucide-react";
@@ -24,16 +32,12 @@ import {
 } from "../api/documents";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
-import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
-import styles from "./FactsPanel.module.css";
-
-function statusTone(status: string): "neutral" | "success" | "warning" | "danger" | "info" {
-  if (status === "approved") return "success";
-  if (status === "ready_for_approval") return "info";
-  if (status === "review_required") return "warning";
-  return "neutral";
-}
+import { Card } from "../design-system/Card";
+import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
+import { StatusBadge } from "../design-system/StatusBadge";
+import styles from "./DocumentPanel.module.css";
+import panelStyles from "./FactsPanel.module.css";
 
 export function DocumentPanel({ conversationId }: { conversationId: string }) {
   const { csrfToken, hasPermission } = useAuth();
@@ -67,7 +71,7 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
       void queryClient.invalidateQueries({ queryKey: ["document-revisions", conversationId] });
     },
     onError: (error: unknown) => {
-      setApproveError(error instanceof ApiError ? error.message : "Approval failed.");
+      setApproveError(error instanceof ApiError ? error.message : "Freigabe fehlgeschlagen.");
     },
   });
 
@@ -88,7 +92,7 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
-        <h4 style={{ margin: 0 }}>Document</h4>
+        <h4 style={{ margin: 0 }}>Dokumentation</h4>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
           {hasPermission("document:edit") && (
             <Button
@@ -98,63 +102,57 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
               onClick={() => composeMutation.mutate()}
             >
               <RefreshCw size={16} aria-hidden="true" />{" "}
-              {revision ? "Recompose" : composeMutation.isPending ? "Composing…" : "Compose document"}
+              {revision ? "Neu zusammenstellen" : composeMutation.isPending ? "Wird erstellt…" : "Dokument erstellen"}
             </Button>
           )}
           {revision && (
             <>
               <Button variant="tertiary" type="button" onClick={() => void handleExport("text")}>
-                <Download size={16} aria-hidden="true" /> Export .txt
+                <Download size={16} aria-hidden="true" /> .txt
               </Button>
               <Button variant="tertiary" type="button" onClick={() => void handleExport("json")}>
-                <Download size={16} aria-hidden="true" /> Export .json
+                <Download size={16} aria-hidden="true" /> .json
               </Button>
             </>
           )}
         </div>
       </div>
 
+      {documentQuery.isLoading && <Skeleton height="8rem" />}
+
       {documentQuery.isError && (
-        <p style={{ color: "var(--text-muted)" }}>
-          No document composed yet. This is a deterministic rendering of the conversation&apos;s
-          current facts — never an AI-generated report.
-        </p>
+        <EmptyState
+          icon={<FileText size={20} aria-hidden="true" />}
+          title="Noch kein Dokument erstellt"
+          description="Automatisch erstellt — eine deterministische Darstellung der aktuellen Fakten dieses Gesprächs, nie ein KI-generierter Bericht."
+        />
       )}
 
       {revision && (
-        <div className={styles.item} style={{ marginBottom: "var(--space-4)" }}>
-          <div className={styles.header}>
-            <FileText size={16} aria-hidden="true" />
-            <Badge tone={statusTone(revision.status)}>{revision.status.replace(/_/g, " ")}</Badge>
-            <span style={{ color: "var(--text-muted)" }}>Revision {revision.revision_number}</span>
-            {revision.status === "approved" && (
-              <Badge tone="success">
-                <CheckCircle2 size={12} aria-hidden="true" /> Approved
-              </Badge>
-            )}
-          </div>
-
+        <Card
+          title={`Revision ${revision.revision_number}`}
+          actions={
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <StatusBadge status={revision.status} />
+              {revision.status === "approved" && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--color-success)" }}>
+                  <CheckCircle2 size={14} aria-hidden="true" />
+                </span>
+              )}
+            </div>
+          }
+        >
           {revision.status === "review_required" && (
-            <p style={{ color: "var(--text-muted)" }}>
-              {revision.blocking_issue_ids.length} unresolved high/critical review issue(s) block
-              approval — resolve them in the Review tab, then recompose.
+            <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
+              {revision.blocking_issue_ids.length} ungelöste(r) Review-Hinweis(e) mit hoher/kritischer
+              Priorität blockieren die Freigabe — im Review-Tab lösen, dann neu zusammenstellen.
             </p>
           )}
 
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              fontFamily: "inherit",
-              background: "var(--surface-muted, #f8fafc)",
-              padding: "var(--space-3)",
-              borderRadius: "var(--radius-sm)",
-            }}
-          >
-            {revision.rendered_text}
-          </pre>
+          <div className={styles.documentText}>{revision.rendered_text}</div>
 
           {hasPermission("document:approve") && revision.status !== "approved" && (
-            <div style={{ marginTop: "var(--space-3)" }}>
+            <div style={{ marginTop: "var(--space-4)" }}>
               <Button
                 variant="primary"
                 type="button"
@@ -162,38 +160,34 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
                 onClick={() => approveMutation.mutate()}
               >
                 <CheckCircle2 size={16} aria-hidden="true" />{" "}
-                {approveMutation.isPending ? "Approving…" : "Approve document"}
+                {approveMutation.isPending ? "Wird freigegeben…" : "Dokument freigeben"}
               </Button>
               {revision.status !== "ready_for_approval" && (
                 <p style={{ color: "var(--text-muted)", margin: "var(--space-1) 0 0" }}>
-                  Not ready for approval yet — resolve open review issues and recompose first.
+                  Noch nicht freigabebereit — offene Review-Hinweise lösen und neu zusammenstellen.
                 </p>
               )}
-              {approveError && (
-                <p role="alert" style={{ color: "var(--color-danger, #b91c1c)" }}>
-                  {approveError}
-                </p>
-              )}
+              {approveError && <ErrorState message={approveError} />}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {revisionsQuery.data && revisionsQuery.data.length > 0 && (
         <>
-          <h4>Revision history</h4>
-          <ul className={styles.list}>
+          <h4 style={{ marginTop: "var(--space-6)" }}>Revisionsverlauf</h4>
+          <ul className={panelStyles.list}>
             {revisionsQuery.data.map((r) => (
-              <li key={r.id} className={styles.item}>
-                <div className={styles.header}>
+              <li key={r.id} className={panelStyles.item}>
+                <div className={panelStyles.header}>
                   <span>Revision {r.revision_number}</span>
-                  <Badge tone={statusTone(r.status)}>{r.status.replace(/_/g, " ")}</Badge>
+                  <StatusBadge status={r.status} />
                   <span style={{ color: "var(--text-muted)" }}>
                     {new Date(r.created_at).toLocaleString()}
                   </span>
                   {r.approved_at && (
                     <span style={{ color: "var(--text-muted)" }}>
-                      approved {new Date(r.approved_at).toLocaleString()}
+                      freigegeben {new Date(r.approved_at).toLocaleString()}
                     </span>
                   )}
                 </div>
