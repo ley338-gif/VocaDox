@@ -19,13 +19,9 @@ import { useAuth } from "../auth/useAuth";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { TextInput } from "../design-system/FormControls";
+import { EmptyState, Skeleton } from "../design-system/States";
+import { StatusBadge } from "../design-system/StatusBadge";
 import styles from "./FactsPanel.module.css";
-
-function statusTone(status: FollowUpStatus): "neutral" | "success" | "warning" {
-  if (status === "done") return "success";
-  if (status === "dismissed") return "neutral";
-  return "warning";
-}
 
 function TaskRow({
   task,
@@ -40,22 +36,22 @@ function TaskRow({
     <li className={styles.item}>
       <div className={styles.header}>
         <Badge tone={task.source === "ai_extracted" ? "info" : "neutral"}>
-          {task.source === "ai_extracted" ? "AI-extracted" : "User-created"}
+          {task.source === "ai_extracted" ? "Automatisch erstellt" : "Manuell erstellt"}
         </Badge>
-        <Badge tone={statusTone(task.status)}>{task.status}</Badge>
+        <StatusBadge status={task.status} />
         <span>{task.description}</span>
       </div>
       <div style={{ color: "var(--text-muted)", marginTop: "var(--space-1)" }}>
-        {task.assignee && <span>Assignee: {task.assignee} · </span>}
-        {task.due_date && <span>Due: {task.due_date}</span>}
+        {task.assignee && <span>Verantwortlich: {task.assignee} · </span>}
+        {task.due_date && <span>Fällig: {task.due_date}</span>}
       </div>
       {canUpdate && task.status === "open" && (
         <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
           <Button variant="secondary" type="button" onClick={() => onUpdateStatus("done")}>
-            Mark done
+            Erledigt
           </Button>
           <Button variant="tertiary" type="button" onClick={() => onUpdateStatus("dismissed")}>
-            Dismiss
+            Verwerfen
           </Button>
         </div>
       )}
@@ -101,8 +97,8 @@ export function TasksPanel({ conversationId }: { conversationId: string }) {
 
   return (
     <div>
-      {tasksQuery.isLoading && <p>Loading tasks…</p>}
-      {tasksQuery.data && tasksQuery.data.length === 0 && <p>No follow-ups/tasks yet.</p>}
+      {tasksQuery.isLoading && <Skeleton height="4rem" />}
+      {tasksQuery.data && tasksQuery.data.length === 0 && <EmptyState title="Noch keine Aufgaben" />}
       <ul className={styles.list}>
         {tasksQuery.data?.map((task) => (
           <TaskRow
@@ -116,21 +112,21 @@ export function TasksPanel({ conversationId }: { conversationId: string }) {
       {canCreate && (
         <div style={{ marginTop: "var(--space-4)", display: "grid", gap: "var(--space-2)" }}>
           <TextInput
-            placeholder="Follow-up description"
-            aria-label="Task description"
+            placeholder="Beschreibung der Aufgabe"
+            aria-label="Aufgabenbeschreibung"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
           />
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <TextInput
-              placeholder="Assignee (optional)"
-              aria-label="Task assignee"
+              placeholder="Verantwortlich (optional)"
+              aria-label="Verantwortliche Person"
               value={assignee}
               onChange={(event) => setAssignee(event.target.value)}
             />
             <TextInput
-              placeholder="Due date (optional)"
-              aria-label="Task due date"
+              placeholder="Fällig am (optional)"
+              aria-label="Fälligkeitsdatum"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
             />
@@ -140,7 +136,7 @@ export function TasksPanel({ conversationId }: { conversationId: string }) {
               disabled={!description.trim()}
               onClick={() => createMutation.mutate()}
             >
-              Add task
+              Hinzufügen
             </Button>
           </div>
         </div>

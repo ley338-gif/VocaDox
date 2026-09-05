@@ -7,24 +7,11 @@
   gap: var(--space-3);
 }
 
-.item {
-  padding: var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle, #e5e7eb);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.itemActive {
-  border-color: var(--text-link, #4f46e5);
-}
-
 .comparisonRow {
   padding: var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -38,5 +25,5 @@
 
 .comparisonValues {
   color: var(--text-muted);
-  font-size: var(--font-body-sm-size, 0.875rem);
+  font-size: var(--font-body-sm-size);
 }

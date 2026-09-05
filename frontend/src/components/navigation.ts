@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
+  ClipboardList,
   Cpu,
   FileText,
   Info,
@@ -36,6 +37,7 @@ export const APP_SECTIONS: NavSection[] = [
     items: [
       { to: "/app", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/conversations", label: "Gespräche", icon: MessagesSquare },
+      { to: "/app/tasks", label: "Aufgaben", icon: ClipboardList, permission: "task:read" },
     ],
   },
   {
