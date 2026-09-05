@@ -116,13 +116,6 @@
   margin-top: 0;
 }
 
-.summaryPreview {
-  color: var(--text-secondary);
-  font-size: var(--font-body-sm-size);
-  line-height: var(--font-body-lg-line);
-  margin: 0;
-}
-
 .sidebarSubheading {
   margin: var(--space-3) 0 var(--space-2);
   font-size: var(--font-caption-size);
