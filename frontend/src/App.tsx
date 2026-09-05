@@ -14,6 +14,7 @@ import { AdminEvaluationLabPage } from "./pages/AdminEvaluationLabPage";
 import { AdminGroupsPage } from "./pages/AdminGroupsPage";
 import { AdminJobsPage } from "./pages/AdminJobsPage";
 import { AdminModelsPage } from "./pages/AdminModelsPage";
+import { AdminOperationsPage } from "./pages/AdminOperationsPage";
 import { AdminOrganizationsPage } from "./pages/AdminOrganizationsPage";
 import { AdminProfilesPage } from "./pages/AdminProfilesPage";
 import { AdminPromptsPage } from "./pages/AdminPromptsPage";
@@ -188,6 +189,14 @@ export function App() {
             element={
               <RequirePermission code="retention:read">
                 <AdminRetentionPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/admin/operations"
+            element={
+              <RequirePermission code="operations:read">
+                <AdminOperationsPage />
               </RequirePermission>
             }
           />

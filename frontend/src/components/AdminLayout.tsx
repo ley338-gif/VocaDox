@@ -57,6 +57,7 @@ const SECTIONS: NavSection[] = [
       { to: "/admin/workers", label: "Workers", permission: "system:admin" },
       { to: "/admin/storage", label: "Storage", permission: "system:admin" },
       { to: "/admin/retention", label: "Retention", permission: "retention:read" },
+      { to: "/admin/operations", label: "Operations", permission: "operations:read" },
       { to: "/admin/analytics", label: "Analytics", permission: "analytics:read" },
       { to: "/admin/evaluation", label: "Evaluation Lab", permission: "analytics:read" },
     ],
