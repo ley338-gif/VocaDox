@@ -150,6 +150,14 @@ export function listConversations(params: {
   return request(`/conversations?${q.toString()}`);
 }
 
+export interface ConversationStats {
+  counts: Record<string, number>;
+}
+
+export function getConversationStats(): Promise<ConversationStats> {
+  return request("/conversations/stats");
+}
+
 export function getConversation(id: string): Promise<Conversation> {
   return request(`/conversations/${id}`);
 }

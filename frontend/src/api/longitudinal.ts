@@ -106,6 +106,11 @@ export function listConversationTasks(conversationId: string): Promise<FollowUpT
   return request<FollowUpTask[]>(`/conversations/${conversationId}/tasks`);
 }
 
+export function listTasks(statusFilter?: FollowUpStatus): Promise<FollowUpTask[]> {
+  const qs = statusFilter ? `?status=${statusFilter}` : "";
+  return request<FollowUpTask[]>(`/tasks${qs}`);
+}
+
 export function createConversationTask(
   conversationId: string,
   body: { description: string; assignee?: string; due_date?: string },

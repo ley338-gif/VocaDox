@@ -70,6 +70,10 @@ class ConversationListResponse(BaseModel):
     offset: int
 
 
+class ConversationStatsResponse(BaseModel):
+    counts: dict[str, int]
+
+
 class MediaAssetResponse(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID

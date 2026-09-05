@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import (
@@ -96,6 +96,26 @@ async def list_conversations(
     stmt = stmt.order_by(Conversation.created_at.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars().all()), total
+
+
+async def conversation_status_counts(
+    session: AsyncSession, *, organization_ids: set[uuid.UUID] | None
+) -> dict[str, int]:
+    """Real per-status conversation counts (GROUP BY, never fabricated) for
+    the app dashboard's KPI cards — mirrors the existing
+    `app.administration.service.queue_counts()` aggregate-query pattern.
+    Excludes DELETED conversations, matching `list_conversations`'s default
+    scope. Statuses with zero conversations are simply absent from the
+    returned dict rather than included as 0."""
+    stmt = (
+        select(Conversation.status, func.count())
+        .where(Conversation.status != ConversationStatus.DELETED.value)
+        .group_by(Conversation.status)
+    )
+    if organization_ids is not None:
+        stmt = stmt.where(Conversation.organization_id.in_(organization_ids))
+    result = await session.execute(stmt)
+    return {status_value: int(count) for status_value, count in result.all()}
 
 
 async def soft_delete_conversation(

@@ -169,6 +169,28 @@ async def list_tasks_for_conversation(
     return list(result.scalars().all())
 
 
+async def list_tasks_for_organizations(
+    session: AsyncSession,
+    *,
+    organization_ids: set[uuid.UUID] | None,
+    status_filter: str | None = None,
+) -> list[FollowUpTask]:
+    """Cross-conversation task listing for the org-wide "Aufgaben" nav
+    entry — reads already-persisted FollowUpTask rows directly (no
+    per-conversation AI-extraction sync here, unlike
+    `list_tasks_for_conversation`; that sync happens when a conversation's
+    own Tasks tab is viewed). `organization_ids=None` means system:admin
+    (no org filter), matching the scoping convention used by
+    `app.conversations.service.list_conversations`."""
+    stmt = select(FollowUpTask).order_by(FollowUpTask.created_at.desc())
+    if organization_ids is not None:
+        stmt = stmt.where(FollowUpTask.organization_id.in_(organization_ids))
+    if status_filter:
+        stmt = stmt.where(FollowUpTask.status == status_filter)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
 async def create_user_task(
     session: AsyncSession,
     *,
