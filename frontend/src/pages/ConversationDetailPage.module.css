@@ -1,17 +1,7 @@
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: var(--space-6);
-}
-
-.meta {
-  display: flex;
-  gap: var(--space-3);
+.metaItem {
+  display: inline-flex;
   align-items: center;
-  color: var(--text-muted);
-  font-size: var(--font-body-sm-size);
-  margin-top: var(--space-2);
+  gap: 4px;
 }
 
 .layout {
@@ -66,4 +56,44 @@
   display: flex;
   gap: var(--space-2);
   margin-top: var(--space-3);
+}
+
+.summaryPreview {
+  color: var(--text-secondary);
+  font-size: var(--font-body-sm-size);
+  line-height: var(--font-body-lg-line);
+  margin: 0;
+}
+
+.sidebarSubheading {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--font-caption-size);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.speakerBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.taskPreviewList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.taskPreviewItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--font-body-sm-size);
+  color: var(--text-secondary);
 }

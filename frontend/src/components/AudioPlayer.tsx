@@ -1,4 +1,4 @@
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, Volume2 } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type MouseEvent } from "react";
 
 import type { Marker } from "../api/conversations";
@@ -88,6 +88,7 @@ export const AudioPlayer = forwardRef<
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [volume, setVolume] = useState(1);
   const peaks = useWaveformPeaks(src);
 
   useEffect(() => {
@@ -112,6 +113,10 @@ export const AudioPlayer = forwardRef<
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = playbackRate;
   }, [playbackRate]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -237,6 +242,19 @@ export const AudioPlayer = forwardRef<
                 title={marker.label ?? `Marker bei ${formatTime(marker.timestamp_ms / 1000)}`}
               />
             ))}
+        </div>
+        <div className={styles.volumeWrap}>
+          <Volume2 size={16} aria-hidden="true" className={styles.volumeIcon} />
+          <input
+            type="range"
+            className={styles.volumeSlider}
+            min={0}
+            max={1}
+            step={0.05}
+            value={volume}
+            aria-label="Lautstärke"
+            onChange={(event) => setVolume(Number(event.target.value))}
+          />
         </div>
         <Select
           aria-label="Wiedergabegeschwindigkeit"

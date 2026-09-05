@@ -9,7 +9,7 @@
  * ProcessingJob rows to one of five honest stages.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -24,14 +24,16 @@ import {
   transcriptExportUrl,
   type DetectedSpeaker,
   type ProcessingJob,
-  type TranscriptSegment,
 } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { TextInput } from "../design-system/FormControls";
+import { Modal } from "../design-system/Modal";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { speakerColor } from "../lib/speakerColor";
+import { SpeakerBadge } from "./SpeakerBadge";
 import type { AudioPlayerHandle } from "./AudioPlayer";
+import { TranscriptTurn } from "./TranscriptTurn";
 import styles from "./TranscriptPanel.module.css";
 
 type Stage = "idle" | "preparing" | "transcribing" | "diarizing" | "aligning" | "ready" | "failed";
@@ -65,13 +67,6 @@ const STAGE_LABELS: Record<Stage, string> = {
   failed: "Fehlgeschlagen",
 };
 
-function formatTs(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
 function speakerLabel(speakers: DetectedSpeaker[], speakerId: string | null): string {
   if (!speakerId) return "Unbekannter Sprecher";
   const speaker = speakers.find((s) => s.id === speakerId);
@@ -79,18 +74,9 @@ function speakerLabel(speakers: DetectedSpeaker[], speakerId: string | null): st
   return speaker.display_label ?? speaker.internal_label;
 }
 
-function segmentSpeakerColor(speakers: DetectedSpeaker[], speakerId: string | null): string {
+function speakerColorKeyFor(speakers: DetectedSpeaker[], speakerId: string | null): string {
   const speaker = speakers.find((s) => s.id === speakerId);
-  return speakerColor(speaker?.internal_label ?? "unknown");
-}
-
-function qualityBadge(segment: TranscriptSegment) {
-  if (!segment.review_flag) return null;
-  return (
-    <span className={styles.flag} role="img" aria-label={`Review nötig: ${segment.review_flag_reason ?? ""}`}>
-      <AlertTriangle size={14} aria-hidden="true" /> prüfen
-    </span>
-  );
+  return speaker?.internal_label ?? "unknown";
 }
 
 export function TranscriptPanel({
@@ -107,6 +93,8 @@ export function TranscriptPanel({
   const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [search, setSearch] = useState("");
+  const [speakerFilter, setSpeakerFilter] = useState<string | null>(null);
+  const [showSpeakerManager, setShowSpeakerManager] = useState(false);
   // Optional hint for the diarization model — real testing showed
   // pyannote's own automatic speaker-count guess can genuinely
   // undercount on real (non-synthetic) multi-speaker recordings; telling
@@ -184,9 +172,11 @@ export function TranscriptPanel({
   const stage = stageFromJobs(processingQuery.data?.jobs ?? [], transcriptQuery.data?.status);
   const stages: Stage[] = ["preparing", "transcribing", "diarizing", "aligning", "ready"];
 
+  const allSegments = segmentsQuery.data ?? [];
+  const segments = speakerFilter ? allSegments.filter((s) => s.speaker_id === speakerFilter) : allSegments;
+
   const activeSegmentId = useMemo(() => {
-    const segments = segmentsQuery.data ?? [];
-    const match = segments.find((s) => activeMs >= s.start_ms && activeMs < s.end_ms);
+    const match = (segmentsQuery.data ?? []).find((s) => activeMs >= s.start_ms && activeMs < s.end_ms);
     return match?.id ?? null;
   }, [segmentsQuery.data, activeMs]);
 
@@ -250,7 +240,6 @@ export function TranscriptPanel({
     );
   }
 
-  const segments = segmentsQuery.data ?? [];
   const speakers = speakersQuery.data ?? [];
 
   return (
@@ -275,18 +264,29 @@ export function TranscriptPanel({
         </div>
       </div>
 
-      {speakers.length > 0 && hasPermission("speaker:assign") && (
-        <div className={styles.speakerList}>
+      {speakers.length > 0 && (
+        <div className={styles.speakerFilterRow}>
           {speakers.map((speaker) => (
-            <SpeakerChip key={speaker.id} speaker={speaker} onRename={(label) => assignSpeakerMutation.mutate({ speakerId: speaker.id, label })} />
+            <SpeakerBadge
+              key={speaker.id}
+              colorKey={speaker.internal_label}
+              label={speaker.display_label ?? speaker.internal_label}
+              active={speakerFilter === speaker.id}
+              onClick={() => setSpeakerFilter((current) => (current === speaker.id ? null : speaker.id))}
+            />
           ))}
+          {hasPermission("speaker:assign") && (
+            <Button variant="tertiary" type="button" onClick={() => setShowSpeakerManager(true)}>
+              <Users size={14} aria-hidden="true" /> Sprecher verwalten
+            </Button>
+          )}
         </div>
       )}
 
       {hasPermission("transcript:process") && (
         <div className={styles.speakerHintRow}>
           <span className={styles.muted}>
-            Falsche Sprecheranzahl ({speakers.length} erkannt)? Mit Hinweis neu verarbeiten:
+            Falsche Sprecheranzahl ({speakers.length} erkannt)?
           </span>
           <TextInput
             aria-label="Erwartete Sprecheranzahl für die erneute Verarbeitung"
@@ -299,7 +299,7 @@ export function TranscriptPanel({
             placeholder="auto"
           />
           <Button
-            variant="secondary"
+            variant="tertiary"
             type="button"
             disabled={processMutation.isPending}
             onClick={() => processMutation.mutate({ reprocess: true })}
@@ -311,68 +311,41 @@ export function TranscriptPanel({
 
       <ul className={styles.segmentList}>
         {segments.map((segment) => (
-          <li
+          <TranscriptTurn
             key={segment.id}
-            className={`${styles.segment} ${segment.id === activeSegmentId ? styles.segmentActive : ""}`}
-          >
-            <button
-              type="button"
-              className={styles.timestamp}
-              onClick={() => audioPlayerRef.current?.seekToMs(segment.start_ms)}
-              aria-label={`Jump to ${formatTs(segment.start_ms)}`}
-            >
-              {formatTs(segment.start_ms)}
-            </button>
-            <div className={styles.segmentBody}>
-              <div className={styles.segmentMeta}>
-                <span
-                  className={styles.speakerName}
-                  style={{ color: segmentSpeakerColor(speakers, segment.speaker_id) }}
-                >
-                  {speakerLabel(speakers, segment.speaker_id)}
-                </span>
-                {segment.confidence !== null && (
-                  <span className={styles.muted}>{Math.round(segment.confidence * 100)}%</span>
-                )}
-                {qualityBadge(segment)}
-              </div>
-              {editingSegmentId === segment.id ? (
-                <div className={styles.editRow}>
-                  <TextInput
-                    aria-label="Korrigierter Text"
-                    value={editValue}
-                    onChange={(event) => setEditValue(event.target.value)}
-                  />
-                  <Button
-                    variant="primary"
-                    type="button"
-                    onClick={() => correctMutation.mutate({ segmentId: segment.id, text: editValue })}
-                  >
-                    Speichern
-                  </Button>
-                  <Button variant="tertiary" type="button" onClick={() => setEditingSegmentId(null)}>
-                    Abbrechen
-                  </Button>
-                </div>
-              ) : (
-                <p
-                  onClick={() => {
-                    if (!hasPermission("transcript:correct")) return;
-                    setEditingSegmentId(segment.id);
-                    setEditValue(segment.corrected_text ?? segment.original_text);
-                  }}
-                  className={hasPermission("transcript:correct") ? styles.editable : undefined}
-                >
-                  {segment.corrected_text ?? segment.original_text}
-                </p>
-              )}
-              {segment.corrected_text && (
-                <p className={styles.originalText}>Original: {segment.original_text}</p>
-              )}
-            </div>
-          </li>
+            segment={segment}
+            speakerColorKey={speakerColorKeyFor(speakers, segment.speaker_id)}
+            speakerName={speakerLabel(speakers, segment.speaker_id)}
+            active={segment.id === activeSegmentId}
+            editing={editingSegmentId === segment.id}
+            editValue={editValue}
+            canCorrect={hasPermission("transcript:correct")}
+            onSeek={() => audioPlayerRef.current?.seekToMs(segment.start_ms)}
+            onStartEdit={() => {
+              setEditingSegmentId(segment.id);
+              setEditValue(segment.corrected_text ?? segment.original_text);
+            }}
+            onEditValueChange={setEditValue}
+            onSaveEdit={() => correctMutation.mutate({ segmentId: segment.id, text: editValue })}
+            onCancelEdit={() => setEditingSegmentId(null)}
+          />
         ))}
+        {segments.length === 0 && speakerFilter && (
+          <EmptyState title="Keine Segmente für diesen Sprecher" />
+        )}
       </ul>
+
+      <Modal open={showSpeakerManager} onClose={() => setShowSpeakerManager(false)} title="Sprecher verwalten">
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {speakers.map((speaker) => (
+            <SpeakerChip
+              key={speaker.id}
+              speaker={speaker}
+              onRename={(label) => assignSpeakerMutation.mutate({ speakerId: speaker.id, label })}
+            />
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

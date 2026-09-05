@@ -11,13 +11,14 @@ import { EmptyState, ErrorState } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { DataTable, type DataTableColumn } from "../design-system/Table";
 import { Pagination } from "../design-system/Pagination";
+import { CONVERSATION_TYPE_LABELS } from "../lib/conversationLabels";
 import styles from "./ConversationsListPage.module.css";
 
 const PAGE_SIZE = 20;
 
 const COLUMNS: DataTableColumn<Conversation>[] = [
   { key: "title", header: "Titel", render: (row) => row.title, sortable: true, sortValue: (row) => row.title },
-  { key: "type", header: "Typ", render: (row) => row.conversation_type },
+  { key: "type", header: "Typ", render: (row) => CONVERSATION_TYPE_LABELS[row.conversation_type] },
   { key: "status", header: "Status", render: (row) => <StatusBadge status={row.status} /> },
   {
     key: "privacy",
