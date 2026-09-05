@@ -66,20 +66,6 @@
   flex-wrap: wrap;
 }
 
-.speakerChip {
-  min-width: 160px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.speakerDot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
 .speakerHintRow {
   display: flex;
   align-items: center;

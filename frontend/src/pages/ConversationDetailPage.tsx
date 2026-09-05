@@ -7,6 +7,7 @@ import {
   History,
   Info,
   Link2,
+  RefreshCw,
   Sparkles,
   StickyNote,
   Trash2,
@@ -34,7 +35,7 @@ import {
 import { getDocument } from "../api/documents";
 import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
 import { listFacts } from "../api/intelligence";
-import { getProcessingStatus, listSpeakers } from "../api/transcription";
+import { assignSpeaker, getProcessingStatus, listSpeakers, processTranscript } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
 import { DocumentPanel } from "../components/DocumentPanel";
@@ -42,6 +43,7 @@ import { FactsPanel } from "../components/FactsPanel";
 import { LongitudinalPanel } from "../components/LongitudinalPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
 import { ReviewWizard } from "../components/ReviewWizard";
+import { SpeakerAssignRow } from "../components/SpeakerAssignRow";
 import { SpeakerBadge } from "../components/SpeakerBadge";
 import { TasksPanel } from "../components/TasksPanel";
 import { TranscriptPanel } from "../components/TranscriptPanel";
@@ -49,6 +51,7 @@ import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
+import { Modal } from "../design-system/Modal";
 import { NavCard } from "../design-system/NavCard";
 import { PageHeader } from "../design-system/PageHeader";
 import { SidePanelCard } from "../design-system/SidePanelCard";
@@ -99,6 +102,8 @@ export function ConversationDetailPage() {
   const [showRecorder, setShowRecorder] = useState(Boolean(location.state?.startRecording));
   const audioPlayerRef = useRef<AudioPlayerHandle | null>(null);
   const [activeMs, setActiveMs] = useState(0);
+  const [showSpeakerManager, setShowSpeakerManager] = useState(false);
+  const [expectedSpeakers, setExpectedSpeakers] = useState("");
 
   const conversationId = id ?? "";
 
@@ -222,6 +227,32 @@ export function ConversationDetailPage() {
     onSuccess: () => navigate("/app/conversations"),
   });
 
+  const assignSpeakerMutation = useMutation({
+    mutationFn: (vars: { speakerId: string; participantId: string | null; label: string | null }) =>
+      assignSpeaker(
+        conversationId,
+        vars.speakerId,
+        { participant_id: vars.participantId, display_label: vars.label },
+        csrfToken ?? ""
+      ),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] }),
+  });
+
+  const reprocessMutation = useMutation({
+    mutationFn: () => {
+      const n = Number.parseInt(expectedSpeakers, 10);
+      const hint = Number.isInteger(n) && n > 0 ? { min_speakers: n, max_speakers: n } : {};
+      return processTranscript(conversationId, { diarize: true, reprocess: true, ...hint }, csrfToken ?? "");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["processing-status", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["conversation-processing", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["transcript", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["transcript-segments", conversationId] });
+    },
+  });
+
   if (conversationQuery.isLoading) {
     return <Skeleton height="8rem" />;
   }
@@ -289,9 +320,31 @@ export function ConversationDetailPage() {
       <Tabs idPrefix="conv" items={tabItems} activeId={tab} onChange={(id) => setTab(id as Tab)} />
 
       <div className={styles.layout}>
-        <div>
+        <div className={styles.mainColumn}>
           {tab === "overview" && (
             <div>
+              <div className={styles.overviewSummary}>
+                <div className={styles.overviewSummaryHeader}>
+                  <h2 className={styles.overviewSummaryTitle}>
+                    <Sparkles size={16} aria-hidden="true" /> Kurzfassung
+                  </h2>
+                  {documentPreview && (
+                    <Button variant="tertiary" type="button" onClick={() => setTab("document")}>
+                      Vollständig
+                    </Button>
+                  )}
+                </div>
+                {documentQuery.isLoading && <Skeleton height="3rem" />}
+                {!documentQuery.isLoading && !documentPreview && (
+                  <EmptyState
+                    icon={<FileText size={18} aria-hidden="true" />}
+                    title="Noch keine Dokumentation"
+                    description="Automatisch erstellt, sobald ein Dokument zusammengestellt wurde."
+                  />
+                )}
+                {documentPreview && <p className={styles.summaryPreview}>{documentPreview}</p>}
+              </div>
+
               {conversation.description && (
                 <p style={{ marginBottom: "var(--space-4)", color: "var(--text-secondary)" }}>
                   {conversation.description}
@@ -408,11 +461,13 @@ export function ConversationDetailPage() {
                   />
                 </div>
               )}
-              <TranscriptPanel
-                conversationId={conversationId}
-                audioPlayerRef={audioPlayerRef}
-                activeMs={activeMs}
-              />
+              <div className={styles.sideCard}>
+                <TranscriptPanel
+                  conversationId={conversationId}
+                  audioPlayerRef={audioPlayerRef}
+                  activeMs={activeMs}
+                />
+              </div>
             </div>
           )}
 
@@ -601,32 +656,6 @@ export function ConversationDetailPage() {
         </div>
 
         <aside className={styles.sidebar}>
-          <SidePanelCard
-            icon={<Sparkles size={14} aria-hidden="true" />}
-            title="Kurzfassung"
-            action={
-              documentPreview && (
-                <Button variant="tertiary" type="button" onClick={() => setTab("document")}>
-                  Vollständig
-                </Button>
-              )
-            }
-          >
-            {documentQuery.isLoading && <Skeleton height="3rem" />}
-            {!documentQuery.isLoading && !documentPreview && (
-              <EmptyState
-                icon={<FileText size={18} aria-hidden="true" />}
-                title="Noch keine Dokumentation"
-                description="Automatisch erstellt, sobald ein Dokument zusammengestellt wurde."
-              />
-            )}
-            {documentPreview && (
-              <p className={styles.summaryPreview}>
-                {documentPreview.length > 320 ? `${documentPreview.slice(0, 320)}…` : documentPreview}
-              </p>
-            )}
-          </SidePanelCard>
-
           <Card title="Marker">
             {markersQuery.data && markersQuery.data.length === 0 && (
               <EmptyState title="Noch keine Marker" />
@@ -720,7 +749,7 @@ export function ConversationDetailPage() {
             )}
             {(speakersQuery.data ?? []).length > 0 && (
               <>
-                <p className={styles.sidebarSubheading}>Sprecherzuordnung</p>
+                <p className={styles.sidebarSubheading}>Sprecher verwalten</p>
                 <div className={styles.speakerBadgeRow}>
                   {speakersQuery.data?.map((speaker) => (
                     <SpeakerBadge
@@ -731,9 +760,33 @@ export function ConversationDetailPage() {
                   ))}
                 </div>
                 {hasPermission("speaker:assign") && (
-                  <Button variant="tertiary" type="button" onClick={() => setTab("transcript")}>
-                    Sprecherzuordnung bearbeiten
+                  <Button variant="tertiary" type="button" onClick={() => setShowSpeakerManager(true)}>
+                    Sprecher verwalten
                   </Button>
+                )}
+                {hasPermission("transcript:process") && (
+                  <div className={styles.speakerHintRow}>
+                    <span className={styles.speakerHintText}>
+                      Falsche Sprecheranzahl ({speakersQuery.data?.length ?? 0} erkannt)?
+                    </span>
+                    <TextInput
+                      aria-label="Erwartete Sprecheranzahl für die erneute Verarbeitung"
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={expectedSpeakers}
+                      onChange={(event) => setExpectedSpeakers(event.target.value)}
+                      placeholder="auto"
+                    />
+                    <Button
+                      variant="tertiary"
+                      type="button"
+                      disabled={reprocessMutation.isPending}
+                      onClick={() => reprocessMutation.mutate()}
+                    >
+                      <RefreshCw size={14} aria-hidden="true" /> Neu verarbeiten
+                    </Button>
+                  </div>
                 )}
               </>
             )}
@@ -765,6 +818,22 @@ export function ConversationDetailPage() {
           )}
         </aside>
       </div>
+
+      <Modal open={showSpeakerManager} onClose={() => setShowSpeakerManager(false)} title="Sprecher verwalten">
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {(speakersQuery.data ?? []).map((speaker) => (
+            <SpeakerAssignRow
+              key={speaker.id}
+              speaker={speaker}
+              participants={participantsQuery.data ?? []}
+              onAssign={({ participantId, label }) =>
+                assignSpeakerMutation.mutate({ speakerId: speaker.id, participantId, label })
+              }
+            />
+          ))}
+          {(speakersQuery.data ?? []).length === 0 && <EmptyState title="Noch keine Sprecher erkannt" />}
+        </div>
+      </Modal>
     </div>
   );
 }
