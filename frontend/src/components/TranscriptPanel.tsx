@@ -27,9 +27,10 @@ import {
   type TranscriptSegment,
 } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
-import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { TextInput } from "../design-system/FormControls";
+import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
+import { speakerColor } from "../lib/speakerColor";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import styles from "./TranscriptPanel.module.css";
 
@@ -55,13 +56,13 @@ function stageFromJobs(jobs: ProcessingJob[], transcriptStatus: string | undefin
 }
 
 const STAGE_LABELS: Record<Stage, string> = {
-  idle: "Not started",
-  preparing: "Preparing audio…",
-  transcribing: "Transcribing…",
-  diarizing: "Detecting speakers…",
-  aligning: "Aligning transcript…",
-  ready: "Ready",
-  failed: "Failed",
+  idle: "Nicht gestartet",
+  preparing: "Audio wird vorbereitet…",
+  transcribing: "Transkription läuft…",
+  diarizing: "Sprechererkennung läuft…",
+  aligning: "Transkript wird ausgerichtet…",
+  ready: "Bereit",
+  failed: "Fehlgeschlagen",
 };
 
 function formatTs(ms: number): string {
@@ -72,16 +73,21 @@ function formatTs(ms: number): string {
 }
 
 function speakerLabel(speakers: DetectedSpeaker[], speakerId: string | null): string {
-  if (!speakerId) return "Unknown speaker";
+  if (!speakerId) return "Unbekannter Sprecher";
   const speaker = speakers.find((s) => s.id === speakerId);
-  if (!speaker) return "Unknown speaker";
+  if (!speaker) return "Unbekannter Sprecher";
   return speaker.display_label ?? speaker.internal_label;
+}
+
+function segmentSpeakerColor(speakers: DetectedSpeaker[], speakerId: string | null): string {
+  const speaker = speakers.find((s) => s.id === speakerId);
+  return speakerColor(speaker?.internal_label ?? "unknown");
 }
 
 function qualityBadge(segment: TranscriptSegment) {
   if (!segment.review_flag) return null;
   return (
-    <span className={styles.flag} role="img" aria-label={`Needs review: ${segment.review_flag_reason ?? ""}`}>
+    <span className={styles.flag} role="img" aria-label={`Review nötig: ${segment.review_flag_reason ?? ""}`}>
       <AlertTriangle size={14} aria-hidden="true" /> prüfen
     </span>
   );
@@ -185,17 +191,17 @@ export function TranscriptPanel({
   }, [segmentsQuery.data, activeMs]);
 
   if (transcriptQuery.isLoading || processingQuery.isLoading) {
-    return <p>Loading transcript status…</p>;
+    return <Skeleton height="6rem" />;
   }
 
   if (stage === "idle") {
     return (
       <div className={styles.empty}>
-        <p>No transcript yet.</p>
+        <EmptyState title="Noch kein Transkript" />
         {hasPermission("transcript:process") && (
           <div className={styles.speakerHintRow}>
             <label htmlFor="expected-speakers" className={styles.muted}>
-              Expected speakers (optional)
+              Erwartete Sprecheranzahl (optional)
             </label>
             <TextInput
               id="expected-speakers"
@@ -219,18 +225,11 @@ export function TranscriptPanel({
   if (stage === "failed") {
     const failedJob = processingQuery.data?.jobs.find((j) => j.status === "failed");
     return (
-      <div className={styles.empty} role="alert">
-        <p>
-          Transcription failed
-          {failedJob?.error_code ? ` — ${failedJob.error_code}` : ""}.
-        </p>
-        {failedJob?.error_message_safe && <p className={styles.muted}>{failedJob.error_message_safe}</p>}
-        {hasPermission("processing:retry") && (
-          <Button variant="secondary" type="button" onClick={() => retryMutation.mutate()}>
-            <RefreshCw size={14} aria-hidden="true" /> Retry
-          </Button>
-        )}
-      </div>
+      <ErrorState
+        title={`Transkription fehlgeschlagen${failedJob?.error_code ? ` — ${failedJob.error_code}` : ""}`}
+        message={failedJob?.error_message_safe ?? undefined}
+        onRetry={hasPermission("processing:retry") ? () => retryMutation.mutate() : undefined}
+      />
     );
   }
 
@@ -245,7 +244,7 @@ export function TranscriptPanel({
           ))}
         </ol>
         <p className={styles.muted}>
-          Processing runs in the background — this page updates automatically.
+          Die Verarbeitung läuft im Hintergrund — diese Seite aktualisiert sich automatisch.
         </p>
       </div>
     );
@@ -258,8 +257,8 @@ export function TranscriptPanel({
     <div>
       <div className={styles.toolbar}>
         <TextInput
-          placeholder="Search transcript…"
-          aria-label="Search transcript"
+          placeholder="Transkript durchsuchen…"
+          aria-label="Transkript durchsuchen"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -287,10 +286,10 @@ export function TranscriptPanel({
       {hasPermission("transcript:process") && (
         <div className={styles.speakerHintRow}>
           <span className={styles.muted}>
-            Wrong speaker count ({speakers.length} detected)? Reprocess with a hint:
+            Falsche Sprecheranzahl ({speakers.length} erkannt)? Mit Hinweis neu verarbeiten:
           </span>
           <TextInput
-            aria-label="Expected speakers for reprocessing"
+            aria-label="Erwartete Sprecheranzahl für die erneute Verarbeitung"
             type="number"
             min={1}
             max={20}
@@ -305,7 +304,7 @@ export function TranscriptPanel({
             disabled={processMutation.isPending}
             onClick={() => processMutation.mutate({ reprocess: true })}
           >
-            <RefreshCw size={14} aria-hidden="true" /> Reprocess
+            <RefreshCw size={14} aria-hidden="true" /> Neu verarbeiten
           </Button>
         </div>
       )}
@@ -326,7 +325,12 @@ export function TranscriptPanel({
             </button>
             <div className={styles.segmentBody}>
               <div className={styles.segmentMeta}>
-                <Badge tone="neutral">{speakerLabel(speakers, segment.speaker_id)}</Badge>
+                <span
+                  className={styles.speakerName}
+                  style={{ color: segmentSpeakerColor(speakers, segment.speaker_id) }}
+                >
+                  {speakerLabel(speakers, segment.speaker_id)}
+                </span>
                 {segment.confidence !== null && (
                   <span className={styles.muted}>{Math.round(segment.confidence * 100)}%</span>
                 )}
@@ -335,7 +339,7 @@ export function TranscriptPanel({
               {editingSegmentId === segment.id ? (
                 <div className={styles.editRow}>
                   <TextInput
-                    aria-label="Corrected text"
+                    aria-label="Korrigierter Text"
                     value={editValue}
                     onChange={(event) => setEditValue(event.target.value)}
                   />
@@ -344,10 +348,10 @@ export function TranscriptPanel({
                     type="button"
                     onClick={() => correctMutation.mutate({ segmentId: segment.id, text: editValue })}
                   >
-                    Save
+                    Speichern
                   </Button>
                   <Button variant="tertiary" type="button" onClick={() => setEditingSegmentId(null)}>
-                    Cancel
+                    Abbrechen
                   </Button>
                 </div>
               ) : (
@@ -383,8 +387,13 @@ function SpeakerChip({
   const [value, setValue] = useState(speaker.display_label ?? "");
   return (
     <div className={styles.speakerChip}>
+      <span
+        className={styles.speakerDot}
+        style={{ background: speakerColor(speaker.internal_label) }}
+        aria-hidden="true"
+      />
       <TextInput
-        aria-label={`Rename ${speaker.internal_label}`}
+        aria-label={`${speaker.internal_label} umbenennen`}
         placeholder={speaker.internal_label}
         value={value}
         onChange={(event) => setValue(event.target.value)}

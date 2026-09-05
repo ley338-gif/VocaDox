@@ -67,6 +67,16 @@
 
 .speakerChip {
   min-width: 160px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.speakerDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
 .speakerHintRow {
@@ -83,31 +93,35 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
 }
 
 .segment {
   display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3);
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-2);
   border-radius: var(--radius-sm);
-  border: 1px solid transparent;
+  border-left: 3px solid transparent;
 }
 
 .segmentActive {
-  background: var(--surface-accent, #eef2ff);
-  border-color: var(--border-accent, #6366f1);
+  background: var(--accent-subtle);
+  border-left-color: var(--accent);
 }
 
 .timestamp {
   flex: none;
   font-variant-numeric: tabular-nums;
-  color: var(--text-link, #4f46e5);
+  color: var(--text-muted);
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
   height: fit-content;
+  font-size: var(--font-caption-size);
+}
+
+.timestamp:hover {
+  color: var(--accent);
 }
 
 .segmentBody {
@@ -120,6 +134,11 @@
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-1);
+}
+
+.speakerName {
+  font-weight: 700;
+  font-size: var(--font-body-sm-size);
 }
 
 .flag {
