@@ -3,10 +3,31 @@ import { useQuery } from "@tanstack/react-query";
 import { getModelsOverview } from "../api/admin";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
-function statusBadge(installed: boolean) {
-  return <Badge tone={installed ? "success" : "warning"}>{installed ? "installed" : "not installed"}</Badge>;
+interface ModelRow {
+  role: string;
+  provider: string;
+  model: string;
+  installed: boolean;
+  detail: string;
 }
+
+const COLUMNS: DataTableColumn<ModelRow>[] = [
+  { key: "role", header: "Rolle", render: (row) => row.role },
+  { key: "provider", header: "Anbieter", render: (row) => row.provider },
+  { key: "model", header: "Modell", render: (row) => row.model },
+  {
+    key: "status",
+    header: "Status",
+    render: (row) => (
+      <Badge tone={row.installed ? "success" : "warning"}>
+        {row.installed ? "installiert" : "nicht installiert"}
+      </Badge>
+    ),
+  },
+  { key: "detail", header: "Detail", render: (row) => <span style={{ color: "var(--text-secondary)" }}>{row.detail}</span> },
+];
 
 /**
  * Phase 7 Admin Portal Models page: real status for speech/diarization/LLM
@@ -19,52 +40,41 @@ export function AdminModelsPage() {
   const overviewQuery = useQuery({ queryKey: ["admin", "models"], queryFn: getModelsOverview });
   const overview = overviewQuery.data;
 
+  const rows: ModelRow[] = overview
+    ? [
+        {
+          role: "Sprache (STT)",
+          provider: String(overview.speech.provider),
+          model: String(overview.speech.model),
+          installed: Boolean(overview.speech.installed),
+          detail: String(overview.speech.detail ?? ""),
+        },
+        {
+          role: "Diarisierung",
+          provider: String(overview.diarization.provider),
+          model: String(overview.diarization.model),
+          installed: Boolean(overview.diarization.installed),
+          detail: String(overview.diarization.detail ?? ""),
+        },
+        {
+          role: "LLM (Extraktion)",
+          provider: overview.llm.provider,
+          model: overview.llm.model,
+          installed: overview.llm.installed,
+          detail: overview.llm.detail ?? "",
+        },
+      ]
+    : [];
+
   return (
     <AdminLayout>
-      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Models</h1>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        To install or update a model, use the <code>model-manager</code> CLI
-        (see <code>docs/admin/model-installation.md</code>) — this page shows
-        real, live-checked status only.
+      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Modelle</h1>
+      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)", marginBottom: "var(--space-6)" }}>
+        Zur Installation oder Aktualisierung eines Modells das <code>model-manager</code>-CLI
+        verwenden (siehe <code>docs/admin/model-installation.md</code>) — diese Seite zeigt nur
+        echten, live geprüften Status.
       </p>
-      {overview && (
-        <table style={{ width: "100%", marginTop: "var(--space-6)", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-              <th>Role</th>
-              <th>Provider</th>
-              <th>Model</th>
-              <th>Status</th>
-              <th>Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <td>Speech-to-text</td>
-              <td>{String(overview.speech.provider)}</td>
-              <td>{String(overview.speech.model)}</td>
-              <td>{statusBadge(Boolean(overview.speech.installed))}</td>
-              <td style={{ color: "var(--text-secondary)" }}>{String(overview.speech.detail ?? "")}</td>
-            </tr>
-            <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <td>Diarization</td>
-              <td>{String(overview.diarization.provider)}</td>
-              <td>{String(overview.diarization.model)}</td>
-              <td>{statusBadge(Boolean(overview.diarization.installed))}</td>
-              <td style={{ color: "var(--text-secondary)" }}>
-                {String(overview.diarization.detail ?? "")}
-              </td>
-            </tr>
-            <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <td>LLM (extraction)</td>
-              <td>{overview.llm.provider}</td>
-              <td>{overview.llm.model}</td>
-              <td>{statusBadge(overview.llm.installed)}</td>
-              <td style={{ color: "var(--text-secondary)" }}>{overview.llm.detail ?? ""}</td>
-            </tr>
-          </tbody>
-        </table>
-      )}
+      <DataTable columns={COLUMNS} rows={rows} keyExtractor={(row) => row.role} loading={overviewQuery.isLoading} />
     </AdminLayout>
   );
 }

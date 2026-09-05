@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { createUser, getUser, listGroups, listUsers, updateUser } from "../api/admin";
@@ -6,7 +7,19 @@ import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { FormField } from "../design-system/FormField";
 import { TextInput } from "../design-system/FormControls";
+import { Modal } from "../design-system/Modal";
+import { ErrorState } from "../design-system/States";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
+
+interface UserRow {
+  id: string;
+  username: string;
+  display_name: string;
+  email: string | null;
+  is_active: boolean;
+}
 
 /**
  * Phase 7 Admin Portal Users page: list/view/create/deactivate users and
@@ -41,7 +54,7 @@ export function AdminUsersPage() {
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to create user");
+      setError(err instanceof Error ? err.message : "Benutzer konnte nicht erstellt werden.");
     }
   }
 
@@ -53,92 +66,60 @@ export function AdminUsersPage() {
 
   const groupNameById = new Map((groupsQuery.data ?? []).map((g) => [g.id, g.name]));
 
+  const columns: DataTableColumn<UserRow>[] = [
+    { key: "username", header: "Benutzername", render: (row) => row.username, sortable: true, sortValue: (row) => row.username },
+    { key: "display_name", header: "Anzeigename", render: (row) => row.display_name },
+    { key: "email", header: "E-Mail", render: (row) => row.email ?? "—" },
+    { key: "groups", header: "Gruppen", render: (row) => <UserGroups userId={row.id} groupNameById={groupNameById} /> },
+    {
+      key: "status",
+      header: "Status",
+      render: (row) => <Badge tone={row.is_active ? "success" : "neutral"}>{row.is_active ? "Aktiv" : "Deaktiviert"}</Badge>,
+    },
+  ];
+
   return (
     <AdminLayout>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Users</h1>
-        <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
-          {showCreate ? "Cancel" : "New user"}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Benutzer</h1>
+        <Button variant="primary" onClick={() => setShowCreate(true)}>
+          <Plus size={16} aria-hidden="true" /> Neuer Benutzer
         </Button>
       </div>
 
-      {showCreate && (
-        <div
-          style={{
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-            display: "grid",
-            gap: "var(--space-3)",
-            maxWidth: "420px",
-          }}
-        >
-          <TextInput
-            placeholder="Username"
-            value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.target.value })}
-          />
-          <TextInput
-            placeholder="Display name"
-            value={form.display_name}
-            onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-          />
-          <TextInput
-            placeholder="Email (optional)"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-          <TextInput
-            placeholder="Password"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
-          {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
+      <DataTable
+        columns={columns}
+        rows={usersQuery.data ?? []}
+        keyExtractor={(row) => row.id}
+        loading={usersQuery.isLoading}
+        rowActions={(row) => (
+          <Button variant="secondary" onClick={() => void handleToggleActive(row.id, row.is_active)}>
+            {row.is_active ? "Deaktivieren" : "Reaktivieren"}
+          </Button>
+        )}
+        empty={<p style={{ color: "var(--text-muted)" }}>Keine Benutzer.</p>}
+      />
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Neuer Benutzer">
+        <div style={{ display: "grid", gap: "var(--space-3)" }}>
+          <FormField label="Benutzername" required>
+            <TextInput value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+          </FormField>
+          <FormField label="Anzeigename" required>
+            <TextInput value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
+          </FormField>
+          <FormField label="E-Mail (optional)">
+            <TextInput value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </FormField>
+          <FormField label="Passwort" required>
+            <TextInput type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          </FormField>
+          {error && <ErrorState message={error} />}
           <Button variant="primary" onClick={() => void handleCreate()}>
-            Create
+            Erstellen
           </Button>
         </div>
-      )}
-
-      <table style={{ width: "100%", marginTop: "var(--space-6)", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-            <th>Username</th>
-            <th>Display name</th>
-            <th>Email</th>
-            <th>Groups</th>
-            <th>Status</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {usersQuery.data?.map((user) => (
-            <tr key={user.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <td>{user.username}</td>
-              <td>{user.display_name}</td>
-              <td>{user.email ?? "—"}</td>
-              <td>
-                <UserGroups userId={user.id} groupNameById={groupNameById} />
-              </td>
-              <td>
-                <Badge tone={user.is_active ? "success" : "neutral"}>
-                  {user.is_active ? "active" : "deactivated"}
-                </Badge>
-              </td>
-              <td>
-                <Button
-                  variant="secondary"
-                  onClick={() => void handleToggleActive(user.id, user.is_active)}
-                >
-                  {user.is_active ? "Deactivate" : "Reactivate"}
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      </Modal>
     </AdminLayout>
   );
 }

@@ -1,11 +1,19 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { listTemplateVersions, listTemplates, publishTemplateVersion } from "../api/templates";
+import {
+  listTemplateVersions,
+  listTemplates,
+  publishTemplateVersion,
+  type TemplateVersion,
+} from "../api/templates";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { Card } from "../design-system/Card";
+import { StatusBadge } from "../design-system/StatusBadge";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
 /**
  * Phase 6's admin-facing Template Engine surface (spec §42's Template
@@ -40,36 +48,41 @@ export function AdminTemplatesPage() {
 
   const canWrite = hasPermission("template:write");
 
+  const versionColumns = (templateId: string): DataTableColumn<TemplateVersion>[] => [
+    { key: "version", header: "Version", render: (v) => `v${v.version_number}` },
+    { key: "status", header: "Status", render: (v) => <StatusBadge status={v.status} /> },
+    { key: "categories", header: "Kategorien", render: (v) => v.extraction_categories.map((c) => c.key).join(", ") },
+    {
+      key: "actions",
+      header: "",
+      render: (v) =>
+        canWrite && v.status === "draft" ? (
+          <Button variant="primary" onClick={() => void handlePublish(templateId, v.id)}>
+            Veröffentlichen
+          </Button>
+        ) : null,
+    },
+  ];
+
   return (
     <AdminLayout>
-      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
-        Templates
-      </h1>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        Templates define what gets extracted from a conversation and how a
-        composed document is organized.
+      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Vorlagen</h1>
+      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)", marginBottom: "var(--space-6)" }}>
+        Vorlagen definieren, was aus einem Gespräch extrahiert wird und wie ein zusammengestelltes
+        Dokument aufgebaut ist.
       </p>
 
-      <section style={{ marginTop: "var(--space-8)" }}>
-        <h2 style={{ fontSize: "var(--font-h2-size)" }}>Templates</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {templatesQuery.data?.map((template) => (
-          <div
-            key={template.id}
-            style={{
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4)",
-              marginTop: "var(--space-3)",
-            }}
-          >
+          <Card key={template.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <strong>{template.name}</strong>{" "}
                 <code style={{ color: "var(--text-muted)" }}>({template.key})</code>{" "}
                 {template.current_published_version_id ? (
-                  <Badge tone="success">published</Badge>
+                  <Badge tone="success">veröffentlicht</Badge>
                 ) : (
-                  <Badge tone="neutral">draft only</Badge>
+                  <Badge tone="neutral">nur Entwurf</Badge>
                 )}
               </div>
               <Button
@@ -78,7 +91,7 @@ export function AdminTemplatesPage() {
                   setExpandedTemplateId(expandedTemplateId === template.id ? null : template.id)
                 }
               >
-                {expandedTemplateId === template.id ? "Hide versions" : "Show versions"}
+                {expandedTemplateId === template.id ? "Versionen ausblenden" : "Versionen anzeigen"}
               </Button>
             </div>
             <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)" }}>
@@ -86,45 +99,17 @@ export function AdminTemplatesPage() {
             </p>
 
             {expandedTemplateId === template.id && versionsQuery.data && (
-              <table style={{ width: "100%", marginTop: "var(--space-4)" }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left" }}>Version</th>
-                    <th style={{ textAlign: "left" }}>Status</th>
-                    <th style={{ textAlign: "left" }}>Categories</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {versionsQuery.data.map((version) => (
-                    <tr key={version.id}>
-                      <td>v{version.version_number}</td>
-                      <td>
-                        <Badge tone={version.status === "published" ? "success" : "neutral"}>
-                          {version.status}
-                        </Badge>
-                      </td>
-                      <td>
-                        {version.extraction_categories.map((c) => c.key).join(", ")}
-                      </td>
-                      <td>
-                        {canWrite && version.status === "draft" && (
-                          <Button
-                            variant="primary"
-                            onClick={() => void handlePublish(template.id, version.id)}
-                          >
-                            Publish
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <DataTable
+                  columns={versionColumns(template.id)}
+                  rows={versionsQuery.data}
+                  keyExtractor={(v) => v.id}
+                />
+              </div>
             )}
-          </div>
+          </Card>
         ))}
-      </section>
+      </div>
     </AdminLayout>
   );
 }

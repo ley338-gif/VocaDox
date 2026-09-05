@@ -1,11 +1,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { createGroup, getGroup, listGroups, listRoles, updateGroup } from "../api/admin";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Button } from "../design-system/Button";
+import { Card } from "../design-system/Card";
+import { FormField } from "../design-system/FormField";
 import { Checkbox, TextInput } from "../design-system/FormControls";
+import { Modal } from "../design-system/Modal";
 
 /**
  * Phase 7 Admin Portal Groups page: manage groups and their role
@@ -34,45 +38,14 @@ export function AdminGroupsPage() {
 
   return (
     <AdminLayout>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Groups</h1>
-        <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
-          {showCreate ? "Cancel" : "New group"}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Gruppen</h1>
+        <Button variant="primary" onClick={() => setShowCreate(true)}>
+          <Plus size={16} aria-hidden="true" /> Neue Gruppe
         </Button>
       </div>
 
-      {showCreate && (
-        <div
-          style={{
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-            maxWidth: "420px",
-          }}
-        >
-          <TextInput placeholder="Group name" value={name} onChange={(e) => setName(e.target.value)} />
-          <p style={{ marginTop: "var(--space-3)", fontWeight: 600 }}>Roles</p>
-          {rolesQuery.data?.map((role) => (
-            <label key={role.id} style={{ display: "block", marginTop: "var(--space-1)" }}>
-              <Checkbox
-                checked={selectedRoleIds.includes(role.id)}
-                onChange={(e) =>
-                  setSelectedRoleIds((prev) =>
-                    e.target.checked ? [...prev, role.id] : prev.filter((id) => id !== role.id)
-                  )
-                }
-              />{" "}
-              {role.name}
-            </label>
-          ))}
-          <Button variant="primary" style={{ marginTop: "var(--space-3)" }} onClick={() => void handleCreate()}>
-            Create
-          </Button>
-        </div>
-      )}
-
-      <div style={{ marginTop: "var(--space-6)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {groupsQuery.data?.map((group) => (
           <GroupRow
             key={group.id}
@@ -86,6 +59,33 @@ export function AdminGroupsPage() {
           />
         ))}
       </div>
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Neue Gruppe">
+        <div style={{ display: "grid", gap: "var(--space-3)" }}>
+          <FormField label="Gruppenname" required>
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+          </FormField>
+          <div>
+            <p style={{ marginBottom: "var(--space-2)", fontWeight: 600 }}>Rollen</p>
+            {rolesQuery.data?.map((role) => (
+              <label key={role.id} style={{ display: "block", marginTop: "var(--space-1)" }}>
+                <Checkbox
+                  checked={selectedRoleIds.includes(role.id)}
+                  onChange={(e) =>
+                    setSelectedRoleIds((prev) =>
+                      e.target.checked ? [...prev, role.id] : prev.filter((id) => id !== role.id)
+                    )
+                  }
+                />{" "}
+                {role.name}
+              </label>
+            ))}
+          </div>
+          <Button variant="primary" onClick={() => void handleCreate()}>
+            Erstellen
+          </Button>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 }
@@ -121,18 +121,11 @@ function GroupRow({
   }
 
   return (
-    <div
-      style={{
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-md)",
-        padding: "var(--space-4)",
-        marginTop: "var(--space-3)",
-      }}
-    >
+    <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <strong>{groupName}</strong>
         <Button variant="secondary" onClick={onToggleEdit}>
-          {editing ? "Hide roles" : "Manage roles"}
+          {editing ? "Rollen ausblenden" : "Rollen verwalten"}
         </Button>
       </div>
       {editing && detailQuery.data && (
@@ -147,10 +140,10 @@ function GroupRow({
             </label>
           ))}
           <p style={{ marginTop: "var(--space-3)", color: "var(--text-secondary)" }}>
-            Members: {detailQuery.data.member_ids.length}
+            Mitglieder: {detailQuery.data.member_ids.length}
           </p>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
