@@ -203,15 +203,24 @@ containers:
       exposes only its own HTTP REST API on :11434), so this specific code
       path is dead weight in the shipped binary, not reachable via any
       interface VocaDox's `worker-extraction`/`ollama` services actually
-      expose. Documented here rather than silently waived: **this is
-      flagged as an open risk in PHASE_4_VALIDATION_REPORT.md pending the
-      product owner's explicit accept/reject decision** — VocaDox cannot
-      patch a third-party vendor's statically-linked Go binary itself, and
-      no newer upstream release removes the finding. If the owner rejects
-      the risk, the only remedies are: wait for an upstream Ollama release
-      built against a patched golang.org/x/crypto, or drop the `ollama`
-      Compose service and require an admin-managed external Ollama
-      instance instead (still fully supported via `VOCADOX_LLM_BASE_URL`).
+      expose. Documented here rather than silently waived: **flagged as an
+      open risk in PHASE_4_VALIDATION_REPORT.md, accepted by the product
+      owner on 2026-08-18** on the strength of the reachability analysis
+      above — VocaDox cannot patch a third-party vendor's statically-linked
+      Go binary itself, and no newer upstream release removes the finding.
+      **Re-verified during Phase 12 (2026-09-05)**: latest upstream
+      `ollama/ollama` is now 0.33.3 (released 2026-09-02) but still pins
+      `golang.org/x/crypto v0.43.0` — the upstream fix for CVE-2026-56854
+      (tracked at golang/go#80213) remains unreleased ("FixPending") as of
+      this date, so no newer tag would resolve the finding either. The
+      reachability analysis is unchanged and reconfirmed: `ollama serve`
+      exposes only its HTTP API on :11434, never an SSH listener. If a
+      future owner review reverses this acceptance, the only remedies
+      remain: wait for an upstream Ollama release built against a patched
+      golang.org/x/crypto, or drop the `ollama` Compose service and require
+      an admin-managed external Ollama instance instead (still fully
+      supported via `VOCADOX_LLM_BASE_URL`). See
+      PHASE_12_VALIDATION_REPORT.md for the full Phase 12 re-review.
 
 # Summary (verified against license-policy.yml):
 #   approved: 7
@@ -228,4 +237,4 @@ containers:
 #   vocadox-backend            (python:3.11-slim-trixie):  0 CRITICAL, 8 HIGH (documented/accepted)
 #   vocadox-frontend (runtime) (nginx:1.31.3-alpine3.24):   0 CRITICAL, 0 HIGH
 #   frontend build/dev image   (node:22-alpine3.24):        0 CRITICAL, 3 HIGH (documented/accepted)
-#   ollama/ollama              (0.33.2, Phase 4):           1 CRITICAL (documented, believed unreachable, NOT waived — owner decision pending), 42 HIGH (vendored Go deps, documented/accepted)
+#   ollama/ollama              (0.33.2, Phase 4):           1 CRITICAL (documented, unreachable via any exposed interface, accepted by product owner 2026-08-18, re-confirmed Phase 12 2026-09-05 — no upstream fix yet exists), 42 HIGH (vendored Go deps, documented/accepted)

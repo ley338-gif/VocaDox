@@ -2,26 +2,30 @@
 
 **On-premise, evidence-based conversation documentation.**
 
-> **Status: Phase 3.1 — Hardening & Real-World Validation.** Local
-> authentication, permission-based RBAC, Valkey-backed sessions, CSRF
-> protection, organizations, and audit logging (Phase 1); conversations,
-> browser/upload audio capture, immutable SHA-256-verified source media,
-> participants/markers/notes, and organization-scoped authorization
-> (Phase 2); real local speech-to-text (faster-whisper) and speaker
-> diarization (pyannote.audio), deterministic transcript alignment, and a
-> reviewable transcript UI (Phase 3); and a hardened, reproducible
-> fresh-install lifecycle, a real administrator-facing model-management
-> command, a Transactional Outbox for job queueing, and real (not just
-> code-reviewed) diarization/offline-runtime validation (Phase 3.1) are
-> all implemented. Summarization and Evidence/document generation
-> (Phase 4+) are still not implemented — deliberately: this remains a
-> transcript-source layer, no LLM/intelligence features anywhere in this
-> codebase. See [`PHASE_0_VALIDATION_REPORT.md`](PHASE_0_VALIDATION_REPORT.md),
-> [`PHASE_1_VALIDATION_REPORT.md`](PHASE_1_VALIDATION_REPORT.md),
-> [`PHASE_2_VALIDATION_REPORT.md`](PHASE_2_VALIDATION_REPORT.md),
-> [`PHASE_3_VALIDATION_REPORT.md`](PHASE_3_VALIDATION_REPORT.md), and
-> [`PHASE_3_1_VALIDATION_REPORT.md`](PHASE_3_1_VALIDATION_REPORT.md) for
-> the full validation reports and GO/NO-GO recommendations.
+> **Status: Phase 12 — Hardening / RC (final phase of the 12-phase
+> roadmap, complete).** Local authentication, permission-based RBAC,
+> Valkey-backed sessions, CSRF protection, organizations, and audit
+> logging (Phase 1); conversations, browser/upload audio capture,
+> immutable SHA-256-verified source media, participants/markers/notes,
+> and organization-scoped authorization (Phase 2); real local
+> speech-to-text (faster-whisper) and speaker diarization
+> (pyannote.audio), deterministic transcript alignment, and a reviewable
+> transcript UI (Phase 3, hardened in Phase 3.1); a local LLM provider
+> (Ollama) with structured, evidence-linked fact extraction (Phase 4);
+> Review Wizard, document composition, and an immutable approval workflow
+> (Phase 5); versioned Templates and Processing/Model Profiles (Phase 6);
+> a full Admin Portal (users/groups/organizations/models/jobs/storage/
+> retention/audit) (Phase 7); technical/quality analytics and an
+> Evaluation Lab (Phase 8); longitudinal (cross-conversation) comparison
+> and follow-up tasks (Phase 9); Service Accounts, scoped API keys, and
+> webhooks (Phase 10); operational metrics, backup/restore, and retention
+> cleanup (Phase 11); and a final security/privacy/dependency/load/
+> failure-recovery hardening audit with a GA readiness determination
+> (Phase 12) are all implemented. See
+> [`PHASE_12_VALIDATION_REPORT.md`](PHASE_12_VALIDATION_REPORT.md) for the
+> final GA (General Availability) recommendation, and the other
+> `PHASE_*_VALIDATION_REPORT.md` files at the repo root for each phase's
+> own detailed validation record.
 
 ## What VocaDox is
 
