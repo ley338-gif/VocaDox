@@ -82,7 +82,9 @@ async def test_execute_zero_retention_deletes_audio_and_transcript_for_real(db_s
         delete_transcript=True,
     )
     conv = await make_conversation(db_session, org, retention_policy=policy, age_days=1)
-    source_asset = await attach_media_asset(db_session, storage, conv, kind=MediaKind.SOURCE_AUDIO.value)
+    source_asset = await attach_media_asset(
+        db_session, storage, conv, kind=MediaKind.SOURCE_AUDIO.value
+    )
     derived_asset = await attach_media_asset(
         db_session, storage, conv, kind=MediaKind.NORMALIZED_AUDIO.value
     )
@@ -206,14 +208,18 @@ async def test_already_deleted_asset_is_never_deleted_twice(db_session, storage)
     org = await make_organization(db_session)
     policy = await make_retention_policy(db_session, retention_days=0, delete_source_media=True)
     conv = await make_conversation(db_session, org, retention_policy=policy, age_days=1)
-    asset = await attach_media_asset(db_session, storage, conv)
+    await attach_media_asset(db_session, storage, conv)
     await db_session.commit()
 
-    first = await run_retention_cleanup(db_session, storage, dry_run=False, triggered_by_user_id=None)
+    first = await run_retention_cleanup(
+        db_session, storage, dry_run=False, triggered_by_user_id=None
+    )
     await db_session.commit()
     assert first.items_deleted == 1
 
-    second = await run_retention_cleanup(db_session, storage, dry_run=False, triggered_by_user_id=None)
+    second = await run_retention_cleanup(
+        db_session, storage, dry_run=False, triggered_by_user_id=None
+    )
     await db_session.commit()
     assert second.items_deleted == 0
 

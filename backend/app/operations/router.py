@@ -91,17 +91,20 @@ async def operations_metrics_endpoint(
     for role, job_types in _WORKER_ROLES:
         base = await worker_role_status(db, role=role, job_types=job_types)
         throughput = await worker_throughput(db, job_types=job_types)
-        workers.append(WorkerMetrics(**base, **throughput))
+        workers.append(WorkerMetrics.model_validate({**base, **throughput}))
 
     queue = QueueMetrics(
         depth_by_job_type=[
-            QueueDepthByType(**row) for row in await queue_depth_by_job_type(db)
+            QueueDepthByType.model_validate(row) for row in await queue_depth_by_job_type(db)
         ],
         throughput_hourly=[
-            QueueThroughputBucket(**row) for row in await queue_throughput_hourly(db)
+            QueueThroughputBucket.model_validate(row)
+            for row in await queue_throughput_hourly(db)
         ],
     )
-    return OperationsMetricsResponse(workers=workers, gpu=GpuMetrics(**gpu_metrics()), queue=queue)
+    return OperationsMetricsResponse(
+        workers=workers, gpu=GpuMetrics.model_validate(gpu_metrics()), queue=queue
+    )
 
 
 # -- Model Storage ----------------------------------------------------------

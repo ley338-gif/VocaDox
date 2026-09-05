@@ -128,16 +128,22 @@ async def create_backup(
             "--no-privileges",
             f"--file={dump_path}",
         )
-        record.database_dump_bytes = dump_path.stat().st_size
+        record.database_dump_bytes = await asyncio.to_thread(lambda: dump_path.stat().st_size)
 
         media_root = Path(media_storage_root)
-        media_bytes, media_files = _directory_size_and_count(media_root)
+        # All synchronous filesystem work (tree walk, existence check, tar
+        # creation, stat) runs on a background thread — real media volumes
+        # can be large; never block the event loop.
+        _media_bytes, media_files = await asyncio.to_thread(
+            _directory_size_and_count, media_root
+        )
         archive_path = dest_dir / "media.tar"
-        if media_root.exists():
-            # Synchronous tar creation on a background thread — real media
-            # volumes can be large; never block the event loop.
+        media_root_exists = await asyncio.to_thread(media_root.exists)
+        if media_root_exists:
             await asyncio.to_thread(_create_media_tar, media_root, archive_path)
-            record.media_archive_bytes = archive_path.stat().st_size
+            record.media_archive_bytes = await asyncio.to_thread(
+                lambda: archive_path.stat().st_size
+            )
         else:
             record.media_archive_bytes = 0
         record.media_file_count = media_files

@@ -44,7 +44,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.conversations.models import Conversation, RetentionPolicy
-from app.media.models import MediaAsset, MediaKind
+from app.media.models import MediaKind
 from app.operations.models import RetentionCleanupItem, RetentionCleanupRun
 from app.providers.storage import StorageProvider
 from app.transcription.models import Transcript

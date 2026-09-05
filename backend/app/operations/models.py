@@ -97,7 +97,10 @@ class RetentionCleanupItem(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("retention_cleanup_runs.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid,
+        ForeignKey("retention_cleanup_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True

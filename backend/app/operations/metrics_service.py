@@ -24,7 +24,6 @@ from app.administration.service import directory_size_bytes
 from app.processing.models import ProcessingJob, ProcessingStatus
 from app.providers.device import DeviceCapabilities, detect_device_capabilities
 
-
 # -- Worker metrics -----------------------------------------------------
 
 
@@ -213,4 +212,8 @@ def model_storage_overview(model_volume_root: str) -> dict[str, object]:
                     {"name": child.name, "size_bytes": directory_size_bytes(child)}
                 )
     total_bytes = directory_size_bytes(root)
-    return {"model_volume_root": str(model_volume_root), "total_bytes": total_bytes, "models": entries}
+    return {
+        "model_volume_root": str(model_volume_root),
+        "total_bytes": total_bytes,
+        "models": entries,
+    }
