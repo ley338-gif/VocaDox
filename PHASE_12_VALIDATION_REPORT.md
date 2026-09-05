@@ -815,10 +815,12 @@ and wasn't; no item was silently dropped from tracking.
 
 - Branch: `phase-12-ga-remove-bundled-ollama`, based on `main` at
   `4b0210b` (this report's own merge commit).
-- PR: GA_BLOCKER_FIX_PR_PLACEHOLDER — "Phase 12 GA fix: remove bundled
-  ollama Compose service (CVE-2026-56854)."
-- CI: GA_BLOCKER_FIX_CI_PLACEHOLDER
-- Merged: GA_BLOCKER_FIX_MERGE_PLACEHOLDER
+- PR: [#23](https://github.com/ley338-gif/VocaDox/pull/23) — "Phase 12
+  GA fix: remove bundled ollama Compose service (CVE-2026-56854)."
+- CI: all 7 required checks green, both triggered workflow runs (Backend,
+  Frontend, Alembic migration, OpenAPI TS client drift check, License
+  compliance, Docker build, Container vulnerability scan/Trivy).
+- Merged: squash-merged to `main` as `c879183`.
 - This Executive Summary / Final GA Recommendation revision and the
   Findings Register / Open Risks / Compliance tally / Tests updates
   above were made as part of this same PR.
