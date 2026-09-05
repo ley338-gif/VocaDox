@@ -405,6 +405,14 @@ async def finalize_recording_endpoint(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.reason
         ) from exc
 
+    # Conversation.duration_ms was declared since Phase 2 but nothing ever
+    # set it — found stale ("—") in the Conversations list and Overview
+    # tab during manual testing, even for fully "ready" conversations
+    # whose SourceMedia.duration_ms was correctly known. Sync it from the
+    # source audio's own real (wave-header/ffprobe-derived) duration.
+    if media.duration_ms is not None:
+        conversation.duration_ms = media.duration_ms
+
     try:
         apply_status_transition(conversation, ConversationStatus.UPLOADED)
     except InvalidTransitionError:
@@ -469,6 +477,11 @@ async def upload_media_endpoint(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.reason
         ) from exc
+
+    # See the browser-recording finalize endpoint above for why this is
+    # here — same real gap, same fix, both source-audio ingestion paths.
+    if media.duration_ms is not None:
+        conversation.duration_ms = media.duration_ms
 
     try:
         apply_status_transition(conversation, ConversationStatus.UPLOADED)
