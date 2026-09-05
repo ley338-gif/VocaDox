@@ -4,6 +4,7 @@ import { AppShell } from "./components/AppShell";
 import { AuthProvider } from "./auth/AuthContext";
 import { RequireAuth, RequirePermission } from "./auth/RequireAuth";
 import { DesignSystemPage } from "./design-system/DesignSystemPage";
+import { ToastProvider } from "./design-system/Toast";
 import { AdminAboutPage } from "./pages/AdminAboutPage";
 import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
 import { AdminAuditPage } from "./pages/AdminAuditPage";
@@ -41,9 +42,10 @@ import { NewConversationPage } from "./pages/NewConversationPage";
  */
 export function App() {
   return (
-    <AuthProvider>
-      <AppShell>
-        <Routes>
+    <ToastProvider>
+      <AuthProvider>
+        <AppShell>
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/design-system" element={<DesignSystemPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -257,7 +259,8 @@ export function App() {
             }
           />
         </Routes>
-      </AppShell>
-    </AuthProvider>
+        </AppShell>
+      </AuthProvider>
+    </ToastProvider>
   );
 }

@@ -1,9 +1,37 @@
-import { FileText, Mic, Users } from "lucide-react";
+import { FileText, Inbox, Mic, Users } from "lucide-react";
+import { useState } from "react";
 
 import { Badge, StatusDot } from "./Badge";
 import { Button } from "./Button";
+import { Card, StatCard } from "./Card";
+import { DataTable, type DataTableColumn } from "./Table";
 import styles from "./DesignSystemPage.module.css";
-import { Checkbox, Radio, Select, TextInput } from "./FormControls";
+import { Drawer } from "./Drawer";
+import { FormField } from "./FormField";
+import { Checkbox, Radio, Select, Switch, Textarea, TextInput } from "./FormControls";
+import { Modal } from "./Modal";
+import { Pagination } from "./Pagination";
+import { EmptyState, ErrorState, Skeleton } from "./States";
+import { StatusBadge } from "./StatusBadge";
+import { TabPanel, Tabs } from "./Tabs";
+import { useToast } from "./useToast";
+
+interface DemoRow {
+  id: string;
+  name: string;
+  status: string;
+}
+
+const DEMO_ROWS: DemoRow[] = [
+  { id: "1", name: "Kardiologische Kontrolle", status: "ready" },
+  { id: "2", name: "Aufklärung OP", status: "review_required" },
+  { id: "3", name: "Diabetes Verlauf", status: "failed" },
+];
+
+const DEMO_COLUMNS: DataTableColumn<DemoRow>[] = [
+  { key: "name", header: "Gespräch", render: (row) => row.name, sortable: true, sortValue: (row) => row.name },
+  { key: "status", header: "Status", render: (row) => <StatusBadge status={row.status} /> },
+];
 
 const COLOR_GROUPS: Array<{ name: string; colors: Array<[string, string]> }> = [
   {
@@ -71,6 +99,13 @@ const SHADOWS: Array<[string, string]> = [
 ];
 
 export function DesignSystemPage() {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [switchOn, setSwitchOn] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const { showToast } = useToast();
+
   return (
     <div className={styles.page}>
       <div>
@@ -194,7 +229,122 @@ export function DesignSystemPage() {
           <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
             <Radio name="ds-radio" defaultChecked /> Radio
           </label>
+          <Switch checked={switchOn} onChange={setSwitchOn} aria-label="Beispiel-Switch" />
         </div>
+        <div className={styles.row} style={{ marginTop: "var(--space-2)" }}>
+          <Textarea placeholder="Textarea" rows={3} />
+        </div>
+        <div className={styles.row} style={{ maxWidth: 320 }}>
+          <FormField label="Titel" hint="Kurzer, beschreibender Titel." required>
+            <TextInput placeholder="z. B. Kardiologische Kontrolle" />
+          </FormField>
+          <FormField label="Externe Referenz" error="Dieses Feld ist erforderlich.">
+            <TextInput placeholder="Fallnummer" />
+          </FormField>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Cards &amp; Stat Cards</h2>
+        <div className={styles.row}>
+          <StatCard label="Aktive Gespräche" value={3} icon={<Mic size={18} aria-hidden="true" />} />
+          <StatCard
+            label="Offene Reviews"
+            value={8}
+            icon={<Inbox size={18} aria-hidden="true" />}
+            hint="warten auf Freigabe"
+          />
+          <Card title="Beispiel-Karte" actions={<Button variant="tertiary">Alle anzeigen</Button>}>
+            <p style={{ color: "var(--text-secondary)", fontSize: "var(--font-body-sm-size)" }}>
+              Card-Inhalt mit Titel und Aktion im Header.
+            </p>
+          </Card>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Tabs</h2>
+        <Tabs
+          idPrefix="ds-tabs"
+          activeId={activeTab}
+          onChange={setActiveTab}
+          items={[
+            { id: "overview", label: "Übersicht" },
+            { id: "details", label: "Details" },
+          ]}
+        />
+        <TabPanel id="overview" activeId={activeTab} idPrefix="ds-tabs">
+          <p style={{ color: "var(--text-secondary)" }}>Inhalt des Übersicht-Tabs.</p>
+        </TabPanel>
+        <TabPanel id="details" activeId={activeTab} idPrefix="ds-tabs">
+          <p style={{ color: "var(--text-secondary)" }}>Inhalt des Details-Tabs.</p>
+        </TabPanel>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Data Table</h2>
+        <DataTable columns={DEMO_COLUMNS} rows={DEMO_ROWS} keyExtractor={(row) => row.id} />
+        <Pagination offset={offset} limit={3} total={9} onOffsetChange={setOffset} />
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Empty / Loading / Error States</h2>
+        <div className={styles.row}>
+          <div className={styles.card}>
+            <EmptyState
+              icon={<Inbox size={20} aria-hidden="true" />}
+              title="Noch keine Gespräche"
+              description="Starten Sie ein neues Gespräch, um loszulegen."
+              action={<Button variant="primary">Gespräch starten</Button>}
+            />
+          </div>
+          <div className={styles.card} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <Skeleton height="1rem" />
+            <Skeleton height="1rem" width="80%" />
+            <Skeleton height="1rem" width="60%" />
+          </div>
+          <div className={styles.card}>
+            <ErrorState message="Transkription fehlgeschlagen." onRetry={() => undefined} />
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Modal, Drawer &amp; Toast</h2>
+        <div className={styles.row}>
+          <Button variant="secondary" onClick={() => setModalOpen(true)}>
+            Modal öffnen
+          </Button>
+          <Button variant="secondary" onClick={() => setDrawerOpen(true)}>
+            Drawer öffnen
+          </Button>
+          <Button variant="secondary" onClick={() => showToast("success", "Erfolgreich gespeichert.")}>
+            Erfolgs-Toast
+          </Button>
+          <Button variant="secondary" onClick={() => showToast("error", "Etwas ist schiefgelaufen.")}>
+            Fehler-Toast
+          </Button>
+        </div>
+        <Modal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title="Beispiel-Dialog"
+          footer={
+            <>
+              <Button variant="tertiary" onClick={() => setModalOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button variant="primary" onClick={() => setModalOpen(false)}>
+                Bestätigen
+              </Button>
+            </>
+          }
+        >
+          <p>Kurzer Bestätigungsdialog-Inhalt.</p>
+        </Modal>
+        <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Beispiel-Drawer">
+          <p style={{ color: "var(--text-secondary)" }}>Seitliches Panel für Detailinformationen.</p>
+        </Drawer>
       </section>
 
       <section className={styles.section}>
@@ -208,6 +358,15 @@ export function DesignSystemPage() {
           <Badge tone="purple">Purple</Badge>
           <Badge tone="teal">Teal</Badge>
           <StatusDot tone="success" /> <StatusDot tone="warning" /> <StatusDot tone="danger" />
+        </div>
+        <p style={{ color: "var(--text-muted)", marginTop: "var(--space-2)" }}>StatusBadge (app status vocabulary)</p>
+        <div className={styles.row} style={{ alignItems: "center" }}>
+          <StatusBadge status="recording" />
+          <StatusBadge status="normalizing" />
+          <StatusBadge status="ready" />
+          <StatusBadge status="review_required" />
+          <StatusBadge status="approved" />
+          <StatusBadge status="failed" />
         </div>
       </section>
 
