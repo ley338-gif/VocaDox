@@ -434,3 +434,24 @@ async def test_audit_events_recorded_for_conversation_lifecycle(
         event = result.scalars().first()
         assert event is not None
         assert "title" not in (event.event_metadata or {})
+
+
+async def test_conversation_stats_reflects_real_counts_scoped_to_own_org(
+    client: AsyncClient, seeded: dict
+) -> None:
+    alice_headers = await login(client, "alice", "a very strong password 123")
+    await _create_conversation(client, alice_headers, seeded["org_a"], title="Alice conv 1")
+    await _create_conversation(client, alice_headers, seeded["org_a"], title="Alice conv 2")
+
+    stats = await client.get("/api/v1/conversations/stats", headers=alice_headers)
+    assert stats.status_code == 200
+    assert stats.json()["counts"]["created"] == 2
+
+    bob_headers = await login(client, "bob", "another very strong pw 456")
+    await _create_conversation(client, bob_headers, seeded["org_b"], title="Bob conv 1")
+
+    # Bob's stats must not include Alice's org's conversations — same
+    # cross-org isolation rule as list_conversations.
+    bob_stats = await client.get("/api/v1/conversations/stats", headers=bob_headers)
+    assert bob_stats.status_code == 200
+    assert bob_stats.json()["counts"]["created"] == 1

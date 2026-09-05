@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +43,7 @@ from app.longitudinal.service import (
     create_user_task,
     get_timeline_conversations,
     list_tasks_for_conversation,
+    list_tasks_for_organizations,
     update_task_status,
 )
 from app.platform.db.session import get_session
@@ -159,6 +160,39 @@ async def get_external_reference_comparison_endpoint(
 
 
 # -- Follow-ups / Tasks ------------------------------------------------------
+
+
+@router.get("/tasks", response_model=list[FollowUpTaskResponse])
+async def list_tasks_endpoint(
+    status_filter: str | None = Query(default=None, alias="status"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+) -> list[FollowUpTaskResponse]:
+    """Cross-conversation task list for the org-wide "Aufgaben" nav entry —
+    same permission + org-scoping pattern as
+    `app.conversations.router.conversation_stats_endpoint`."""
+    from app.identity.rbac import get_user_permissions
+    from app.organizations.models import OrganizationMembership
+
+    permissions = await get_user_permissions(db, user.id)
+    if "task:read" not in permissions:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="permission denied")
+
+    org_ids: set[uuid.UUID] | None
+    if "system:admin" in permissions:
+        org_ids = None
+    else:
+        result = await db.execute(
+            select(OrganizationMembership.organization_id).where(
+                OrganizationMembership.user_id == user.id
+            )
+        )
+        org_ids = {row[0] for row in result.all()}
+
+    tasks = await list_tasks_for_organizations(
+        db, organization_ids=org_ids, status_filter=status_filter
+    )
+    return [FollowUpTaskResponse.model_validate(t) for t in tasks]
 
 
 @router.get("/conversations/{conversation_id}/tasks", response_model=list[FollowUpTaskResponse])

@@ -29,6 +29,7 @@ from app.conversations.schemas import (
     ConversationCreateRequest,
     ConversationListResponse,
     ConversationResponse,
+    ConversationStatsResponse,
     ConversationUpdateRequest,
     MarkerCreateRequest,
     MarkerResponse,
@@ -46,6 +47,7 @@ from app.conversations.service import (
     add_note,
     add_participant,
     apply_status_transition,
+    conversation_status_counts,
     create_conversation,
     list_conversations,
     soft_delete_conversation,
@@ -122,6 +124,36 @@ async def list_conversations_endpoint(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/stats", response_model=ConversationStatsResponse)
+async def conversation_stats_endpoint(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+) -> ConversationStatsResponse:
+    """Real per-status conversation counts for the app dashboard's KPI
+    cards — same permission/org-scoping as `list_conversations_endpoint`,
+    never a fabricated number."""
+    from app.identity.rbac import get_user_permissions
+    from app.organizations.models import OrganizationMembership
+
+    permissions = await get_user_permissions(db, user.id)
+    if "conversation:read" not in permissions:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="permission denied")
+
+    org_ids: set[uuid.UUID] | None
+    if "system:admin" in permissions:
+        org_ids = None
+    else:
+        result = await db.execute(
+            select(OrganizationMembership.organization_id).where(
+                OrganizationMembership.user_id == user.id
+            )
+        )
+        org_ids = {row[0] for row in result.all()}
+
+    counts = await conversation_status_counts(db, organization_ids=org_ids)
+    return ConversationStatsResponse(counts=counts)
 
 
 @router.post("", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)

@@ -161,3 +161,42 @@ async def test_update_task_rejects_invalid_status(client: AsyncClient, seeded) -
         f"/api/v1/tasks/{task_id}", json={"status": "not_a_real_status"}, headers=headers
     )
     assert resp.status_code == 422, resp.text
+
+
+async def test_list_tasks_is_cross_conversation_and_org_scoped(
+    client: AsyncClient, seeded  # noqa: ANN001
+) -> None:
+    """GET /tasks (the org-wide "Aufgaben" list) must return tasks across
+    every one of the caller's own conversations, and never another
+    organization's tasks — same isolation rule as every other cross-
+    conversation listing in this project."""
+    alice_headers = await login(client, "alice", "a very strong password 123")
+    org_a = seeded["org_a"]
+
+    conv1 = await client.post(
+        "/api/v1/conversations",
+        json={"title": "Visit 1", "organization_id": org_a},
+        headers=alice_headers,
+    )
+    conv2 = await client.post(
+        "/api/v1/conversations",
+        json={"title": "Visit 2", "organization_id": org_a},
+        headers=alice_headers,
+    )
+    for conv, description in ((conv1, "Task from visit 1"), (conv2, "Task from visit 2")):
+        resp = await client.post(
+            f"/api/v1/conversations/{conv.json()['id']}/tasks",
+            json={"description": description},
+            headers=alice_headers,
+        )
+        assert resp.status_code == 201, resp.text
+
+    resp = await client.get("/api/v1/tasks", headers=alice_headers)
+    assert resp.status_code == 200, resp.text
+    descriptions = {t["description"] for t in resp.json()}
+    assert descriptions == {"Task from visit 1", "Task from visit 2"}
+
+    bob_headers = await login(client, "bob", "another very strong pw 456")
+    bob_resp = await client.get("/api/v1/tasks", headers=bob_headers)
+    assert bob_resp.status_code == 200
+    assert bob_resp.json() == []
