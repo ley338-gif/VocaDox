@@ -411,3 +411,80 @@ to this list rather than building it opportunistically.
   interface — here, "subscribe to events + call the scoped REST API" —
   before any concrete implementation exists) rather than speculatively
   building FHIR/HL7 code with no real deployment to validate it against.
+
+## Phase 11 additions (Operations)
+
+- **No durable metrics-history/time-series store.** Worker throughput,
+  queue depth, and queue throughput (`app.operations.metrics_service`)
+  are real rolling-window aggregates computed on demand over
+  `ProcessingJob` rows — accurate for "what's happening now / in the
+  last 24h", but nothing is retained once a job row ages out of that
+  window, and a Grafana/Prometheus-style long-range trend view (weekly/
+  monthly throughput comparisons) isn't possible without a real
+  time-series backend. Deliberately deferred — this phase's merge gate
+  only requires real current numbers, not a metrics platform.
+
+- **GPU metrics are single-device.** `app.operations.metrics_service.
+  gpu_metrics` reuses Phase 3's `detect_device_capabilities` (one
+  primary device) plus a best-effort single-line `nvidia-smi` query. A
+  genuine multi-GPU deployment (several workers each pinned to a
+  different device) would need a real per-worker-process GPU-index
+  report, not a single host-level snapshot — out of scope until a real
+  multi-GPU deployment exists to validate against.
+
+- **Backup is not encrypted at rest or automatically shipped off-host.**
+  `create_backup` writes `database.dump`/`media.tar` to
+  `backup_root` in plaintext; nothing in this phase encrypts them or
+  copies them to remote/off-site storage (S3, rsync, etc.) —
+  `docs/operations/disaster-recovery.md` documents this as an operator
+  responsibility (mount `backup_root` on a separate, ideally off-host
+  volume) rather than building a cloud-storage integration this phase
+  has no real deployment target to validate against.
+
+- **No built-in backup retention/rotation.** Every `create_backup` call
+  writes a new `<backup_root>/<id>/` directory forever; nothing prunes
+  old backups. An operator (or a future phase) needs to add real
+  rotation (e.g. "keep last N" / "keep last 30 days") once there's a
+  real deployment with real retention requirements to size it against —
+  building a guessed policy now risks deleting the one backup an
+  operator actually needed.
+
+- **Retention Cleanup has no built-in scheduler.** `app.cli.
+  retention_cleanup` is designed to be invoked by an external scheduler
+  (host cron, a Kubernetes CronJob, `docker compose run --rm
+  retention-cleanup`) — this phase does not ship an in-process scheduler
+  (no APScheduler/Celery-beat-style loop). Consistent with this
+  project's existing "no in-process cron" precedent (Phase 3's workers
+  are also externally supervised, not self-scheduling) but worth calling
+  out explicitly given how consequential a missed or double-scheduled
+  retention run would be.
+
+- **Restore stays deliberately CLI-only, not just for this phase but as
+  a standing design decision.** `app.operations.backup_service`'s module
+  docstring lays out why (an in-process request handler cannot safely
+  `pg_restore --clean` its own connection pool's database while serving
+  other requests). A future "restore via a scheduled maintenance window
+  with the app fully stopped" HTTP-triggered flow is conceivable but
+  would need real operational process around it (maintenance-mode
+  banners, connection draining) this phase doesn't build.
+
+- **Postgres bumped 16.6 -> 17.6 mid-phase** after a real
+  backup/restore test surfaced a pg_dump/pg_restore client/server
+  version mismatch (see `deploy/docker-compose.yml`'s comment and
+  `compliance/container-inventory.yml`). The chosen fix (match the
+  server to what the base image's `postgresql-client` package already
+  provides) is simple but couples the server version to Debian trixie's
+  apt repository contents — a future base-image bump that changes which
+  Postgres client version trixie ships would silently reintroduce the
+  same class of mismatch. Pinning `postgresql-client` to a specific
+  major version via the official `apt.postgresql.org` repository would
+  decouple the two but adds a third-party apt source; deferred as a
+  Phase 12 hardening candidate rather than added speculatively here.
+
+- **Offline installation verification is still sandbox-level, not a
+  true network-namespace-isolated test**, same honest limitation Phase
+  3.1 already documented for the AI-model side; this phase's docs/
+  operations runbook consolidates the offline story (backend has no
+  additional runtime network dependencies beyond what Phase 3.1 already
+  covered) but does not newly achieve stronger isolation guarantees than
+  Phase 3.1's own report claimed.
