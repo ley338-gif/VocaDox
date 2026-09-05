@@ -101,7 +101,15 @@ transitive dependencies, none appear in a production runtime tree.
 | nginx:1.31.3-alpine3.24 | BSD-2-Clause (nginx license) | yes — frontend runtime image |
 | node:22-alpine3.24 | MIT (Node.js runtime); mixed OS-package licenses (Alpine base layer) | no — frontend build/dev stage only, discarded by the multi-stage build |
 | aquasec/trivy:0.56.2 | Apache-2.0 | no — vulnerability/SBOM scan tool only, never part of the deployed stack |
-| ollama/ollama:0.33.2 | MIT | yes (Phase 4) — local LLM inference server for fact extraction; see `docs/admin/llm-provider.md` and the open vulnerability disclosure in `compliance/container-inventory.yml` |
+
+`ollama/ollama:0.33.2` was bundled here as a shipped local LLM inference
+server through Phase 11. Removed as part of the Phase 12 GA-blocker fix
+(CVE-2026-56854, an unfixed CRITICAL vendored-dependency finding) — see
+`docs/architecture/adr/0029-remove-bundled-ollama.md`. VocaDox no longer
+ships, builds, or scans this image; fact extraction now talks to an
+admin-managed external Ollama instance (`docs/admin/llm-provider.md`),
+whose own third-party notices are that admin's responsibility, not
+VocaDox's.
 
 ## Fonts and icons
 
@@ -129,8 +137,10 @@ image:
 None bundled directly in any VocaDox image or repository — every
 speech/diarization model is downloaded by an admin, on request, into a
 persistent volume (see `docs/admin/model-installation.md`); the Phase 4
-LLM model is pulled by an admin into the `ollama` service's volume (see
-`docs/admin/llm-provider.md`). As of Phase 4,
+LLM model is pulled by an admin into their own, separately-run Ollama
+instance's storage (see `docs/admin/llm-provider.md`) — no longer a
+VocaDox-managed Compose volume as of the Phase 12 GA-blocker fix (see
+`docs/architecture/adr/0029-remove-bundled-ollama.md`).
 `compliance/model-inventory.yml` records 6 approved entries:
 
 | Model | License | Gated? | Role |

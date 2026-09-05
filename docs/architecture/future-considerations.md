@@ -110,13 +110,15 @@ lost and aren't quietly decided by accident later.
   document can be finalized — is not implemented; `ReviewIssueStatus` only
   has `OPEN`/`ACKNOWLEDGED` today as a placeholder for that later work.
 
-- **Container vulnerability scan coverage for `ollama/ollama`**: unlike
-  the Phase 0-audited backend/frontend images, the `ollama` image's Trivy
-  scan (this phase) found findings that could not be remediated by
-  VocaDox itself (vendored Go dependencies baked into an upstream binary,
-  including one CRITICAL — see `compliance/container-inventory.yml`).
-  Re-scan on every Ollama version bump going forward, and track whether
-  upstream ships a rebuild against patched dependencies.
+- ~~**Container vulnerability scan coverage for `ollama/ollama`**~~
+  **(resolved, Phase 12)**: the bundled `ollama` Compose service and its
+  container-inventory entry — which carried findings VocaDox itself could
+  not remediate, including one CRITICAL (CVE-2026-56854) in a vendored Go
+  dependency baked into the upstream binary — were removed entirely as
+  part of the Phase 12 GA-blocker fix. VocaDox now requires an
+  admin-managed external Ollama instance, which is outside VocaDox's own
+  container/vulnerability-scanning scope by design. See
+  `docs/architecture/adr/0029-remove-bundled-ollama.md`.
 
 - **Full pluggable Template Engine / template versions** (spec §6's target
   architecture): Phase 5's document composition uses one fixed, built-in

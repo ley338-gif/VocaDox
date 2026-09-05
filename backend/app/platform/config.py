@@ -135,12 +135,17 @@ class Settings(BaseSettings):
         "docs/admin/llm-provider.md). Never defaults to a real provider so a fresh checkout "
         "without Ollama running degrades safely.",
     )
-    llm_base_url: str = Field(
-        default="http://ollama:11434",
-        description="Base URL of the local Ollama server. Never a cloud/hosted endpoint — "
-        "conversation content must never leave the deployment (spec: local-first LLM "
-        "inference). Defaults to the Docker Compose service name; override with "
-        "http://localhost:11434 for a host-run Ollama outside Compose.",
+    llm_base_url: str | None = Field(
+        default=None,
+        description="Base URL of an admin-managed Ollama server. Never a cloud/hosted "
+        "endpoint — conversation content must never leave the deployment (spec: local-first "
+        "LLM inference). No default: VocaDox no longer bundles an `ollama` Compose service "
+        "(removed for GA — see docs/architecture/adr/0029-remove-bundled-ollama.md, "
+        "CVE-2026-56854) so there is no well-known host to default to any more. Set this "
+        "explicitly to your own Ollama instance's URL (e.g. http://localhost:11434 or "
+        "http://<host>:11434) — see docs/admin/llm-provider.md. If `llm_provider` is "
+        "'ollama' and this is left unset, `get_llm_provider` raises `LLMModelUnavailableError` "
+        "immediately (fail clearly, never silently default to a URL that will just time out).",
     )
     llm_model: str = Field(
         default="qwen2.5:14b",

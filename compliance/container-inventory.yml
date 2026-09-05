@@ -165,76 +165,55 @@ containers:
       PHASE_0_VALIDATION_REPORT.md, Security Findings, for results and the
       exact commands used (also wired into CI, see .github/workflows/ci.yml).
 
-  # Phase 4: local LLM inference server for fact extraction (never a
-  # cloud/hosted endpoint — see
-  # docs/architecture/adr/0024-llm-provider-selection.md). Ships no model
-  # weights of its own; an admin pulls a model explicitly into the
-  # container's persistent volume after `docker compose up` (see
-  # docs/admin/llm-provider.md) — the model itself (e.g. qwen2.5:14b) is
-  # recorded separately in model-inventory.yml with its own,
-  # independently-verified license.
-  - image: ollama/ollama
-    tag: "0.33.2"
-    digest: "sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2"
-    purpose: "Local LLM inference server for fact extraction (Phase 4)"
-    source: "docker.io/ollama/ollama (Ollama project, official image)"
-    license: "MIT"
-    pinned: true
-    approval_status: approved
-    notes: >
-      MIT license verified against the project's own LICENSE file
-      (https://raw.githubusercontent.com/ollama/ollama/main/LICENSE),
-      2026-09-03. Ships no model weights of its own. Trivy-scanned
-      2026-09-03 against this exact tag+digest (this was ollama's latest
-      GitHub release at research time — an earlier 0.5.13 tag was tried
-      first and scanned strictly worse: 2 CRITICAL / 41 HIGH): **1
-      CRITICAL, 42 HIGH** — see
-      compliance/_container-scan/ollama_0.33.2.json. ALL findings are in
-      Go stdlib or vendored Go modules statically compiled into the
-      `ollama` binary upstream (golang.org/x/crypto, x/net, x/mod,
-      x/image, x/text, github.com/buger/jsonparser, Go stdlib) — nothing
-      VocaDox's own build process controls, matching the same class of
-      finding already accepted for the backend/frontend images above.
-      **The single CRITICAL** (CVE-2026-56854,
-      golang.org/x/crypto/ssh — an SSH-server auth-bypass affecting
-      non-public-key auth callbacks with a source-address restriction) is
-      in the `ssh` sub-package of a vendored crypto library; `ollama
-      serve` never starts an SSH server or accepts SSH connections (it
-      exposes only its own HTTP REST API on :11434), so this specific code
-      path is dead weight in the shipped binary, not reachable via any
-      interface VocaDox's `worker-extraction`/`ollama` services actually
-      expose. Documented here rather than silently waived: **flagged as an
-      open risk in PHASE_4_VALIDATION_REPORT.md, accepted by the product
-      owner on 2026-08-18** on the strength of the reachability analysis
-      above — VocaDox cannot patch a third-party vendor's statically-linked
-      Go binary itself, and no newer upstream release removes the finding.
-      **Re-verified during Phase 12 (2026-09-05)**: latest upstream
-      `ollama/ollama` is now 0.33.3 (released 2026-09-02) but still pins
-      `golang.org/x/crypto v0.43.0` — the upstream fix for CVE-2026-56854
-      (tracked at golang/go#80213) remains unreleased ("FixPending") as of
-      this date, so no newer tag would resolve the finding either. The
-      reachability analysis is unchanged and reconfirmed: `ollama serve`
-      exposes only its HTTP API on :11434, never an SSH listener. If a
-      future owner review reverses this acceptance, the only remedies
-      remain: wait for an upstream Ollama release built against a patched
-      golang.org/x/crypto, or drop the `ollama` Compose service and require
-      an admin-managed external Ollama instance instead (still fully
-      supported via `VOCADOX_LLM_BASE_URL`). See
-      PHASE_12_VALIDATION_REPORT.md for the full Phase 12 re-review.
+  # REMOVED 2026-09-05 (Phase 12 GA-blocker resolution — product owner
+  # decision, see docs/architecture/adr/0029-remove-bundled-ollama.md and
+  # PHASE_12_VALIDATION_REPORT.md's revised Executive Summary/Final GA
+  # Recommendation):
+  #
+  #   - image: ollama/ollama
+  #     tag: "0.33.2"
+  #     digest: "sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2"
+  #
+  # This entry previously tracked the bundled `ollama` Compose service
+  # (Phase 4, local LLM inference for fact extraction). It carried ONE
+  # CRITICAL finding, CVE-2026-56854 (golang.org/x/crypto/ssh SSH-server
+  # auth-bypass, vendored into the ollama binary with no upstream fix
+  # available — see git history of this file for the full previous entry
+  # and reachability analysis) plus 42 HIGH, all in vendored Go
+  # dependencies. That finding was disclosed and accepted by the product
+  # owner in Phase 4 (2026-08-18) and re-confirmed unfixed at every
+  # subsequent phase through Phase 12 (2026-09-05) — Phase 12's own merge
+  # gate requires GA findings to be genuinely FIXED, not re-accepted, so
+  # it correctly returned NO-GO on this one open item.
+  #
+  # Rather than continue re-accepting the same unfixed CRITICAL, the
+  # product owner chose (2026-09-05) to drop the bundled `ollama` Compose
+  # service entirely — VocaDox now always talks to an admin-managed
+  # EXTERNAL Ollama instance via `VOCADOX_LLM_BASE_URL` (already fully
+  # supported; see docs/admin/llm-provider.md's "Bring your own Ollama"
+  # section, now the sole documented path). The `ollama/ollama` image is
+  # therefore no longer part of VocaDox's own shipped container set at
+  # all — it is never built, started, or scanned by this project — so its
+  # entry is removed here rather than kept as "accepted": there is nothing
+  # left for VocaDox to accept risk on. See
+  # deploy/docker-compose.yml (service removed) and
+  # backend/app/platform/config.py (`llm_base_url` no longer defaults to
+  # the now-nonexistent bundled host).
 
 # Summary (verified against license-policy.yml):
-#   approved: 7
+#   approved: 6
 #   review_required: 0
 #   blocked: 0
 #   unknown: 0
 #
-# Vulnerability summary (all three Phase 0 images actively remediated —
-# see PHASE_0_VALIDATION_REPORT.md, Security Findings, for the full
+# Vulnerability summary (all remaining shipped images actively remediated
+# — see PHASE_0_VALIDATION_REPORT.md, Security Findings, for the full
 # package-by-package breakdown and disposition of every CRITICAL/HIGH
-# finding, and ADR-0008 for the node image decision; the Phase 4 ollama
-# image is a genuinely NEW, currently-unresolved finding — see its own
-# notes above and PHASE_4_VALIDATION_REPORT.md's Open Risks):
+# finding, and ADR-0008 for the node image decision. The Phase 4
+# `ollama/ollama` image and its single CRITICAL, CVE-2026-56854, are no
+# longer part of VocaDox's shipped container set as of the Phase 12
+# GA-blocker fix — see the removed entry's note above and
+# docs/architecture/adr/0029-remove-bundled-ollama.md):
 #   vocadox-backend            (python:3.11-slim-trixie):  0 CRITICAL, 8 HIGH (documented/accepted)
 #   vocadox-frontend (runtime) (nginx:1.31.3-alpine3.24):   0 CRITICAL, 0 HIGH
 #   frontend build/dev image   (node:22-alpine3.24):        0 CRITICAL, 3 HIGH (documented/accepted)
-#   ollama/ollama              (0.33.2, Phase 4):           1 CRITICAL (documented, unreachable via any exposed interface, accepted by product owner 2026-08-18, re-confirmed Phase 12 2026-09-05 — no upstream fix yet exists), 42 HIGH (vendored Go deps, documented/accepted)

@@ -24,7 +24,13 @@ from app.providers.diarization import (
     PyannoteConfig,
     PyannoteDiarizationProvider,
 )
-from app.providers.llm import FakeLLMProvider, LLMProvider, OllamaConfig, OllamaLLMProvider
+from app.providers.llm import (
+    FakeLLMProvider,
+    LLMModelUnavailableError,
+    LLMProvider,
+    OllamaConfig,
+    OllamaLLMProvider,
+)
 from app.providers.speech_to_text import (
     FakeSpeechProvider,
     FasterWhisperConfig,
@@ -66,6 +72,21 @@ def get_diarization_provider() -> DiarizationProvider:
 def get_llm_provider() -> LLMProvider:
     settings = get_settings()
     if settings.llm_provider == "ollama":
+        if not settings.llm_base_url:
+            # VocaDox no longer bundles an `ollama` Compose service (removed
+            # for GA — see docs/architecture/adr/0029-remove-bundled-ollama.md,
+            # CVE-2026-56854), so there is no host to silently default to any
+            # more. Fail clearly and actionably here, at provider-construction
+            # time, rather than handing back a provider that will just time
+            # out against an unreachable/made-up URL (same "fail clearly, not
+            # silently misbehave" policy as SpeechModelUnavailableError /
+            # DiarizationModelUnavailableError — see app.processing.retry).
+            raise LLMModelUnavailableError(
+                "VOCADOX_LLM_PROVIDER is 'ollama' but VOCADOX_LLM_BASE_URL is not set. "
+                "VocaDox does not bundle an Ollama container — point this at your own "
+                "admin-managed Ollama instance (e.g. http://localhost:11434 or "
+                "http://<host>:11434). See docs/admin/llm-provider.md."
+            )
         return OllamaLLMProvider(
             OllamaConfig(
                 base_url=settings.llm_base_url,
@@ -86,6 +107,12 @@ def get_llm_provider_for_model_identifier(*, provider: str, model_identifier: st
     — this factory is the one place that's allowed to."""
     settings = get_settings()
     if provider == "ollama":
+        if not settings.llm_base_url:
+            raise LLMModelUnavailableError(
+                "ModelProfile requests provider 'ollama' but VOCADOX_LLM_BASE_URL is not "
+                "set. VocaDox does not bundle an Ollama container — point this at your own "
+                "admin-managed Ollama instance. See docs/admin/llm-provider.md."
+            )
         return OllamaLLMProvider(
             OllamaConfig(
                 base_url=settings.llm_base_url,

@@ -6,12 +6,15 @@ speech/diarization models, extended to Phase 4's LLM runtime and model.
 ## No silent network access
 
 `worker-extraction` never downloads a model itself. Pulling a model into
-the `ollama` service is an explicit admin action
-(`docker compose exec ollama ollama pull <tag>`, see
+the admin's own Ollama instance is an explicit admin action
+(`ollama pull <tag>`, run directly against that instance — VocaDox does
+not bundle an `ollama` Compose service, see
 `docs/admin/llm-provider.md`) — there is no API endpoint or code path that
 triggers an LLM model download at request time. `VOCADOX_LLM_PROVIDER`
 defaults to `fake`, so a fresh install never silently reaches out to pull
-a multi-gigabyte model.
+a multi-gigabyte model, and `VOCADOX_LLM_BASE_URL` has no default at all
+(see `docs/architecture/adr/0029-remove-bundled-ollama.md`), so there is
+no well-known host it could silently reach out to even if misconfigured.
 
 ## Local-only inference — no cloud/hosted LLM API
 
@@ -61,13 +64,18 @@ transcript before being trusted (`app.intelligence.service
 ._resolve_evidence`) — the model's output is data to be checked, never
 executed or trusted as-is. See ADR-0025.
 
-## Known gap: container vulnerability scan finding
+## Resolved gap: container vulnerability scan finding (Phase 12 GA fix)
 
-The `ollama/ollama:0.33.2` container image itself carries one open
-CRITICAL Trivy finding (CVE-2026-56854, an SSH-auth-bypass in a vendored
-Go crypto library that VocaDox's own build process does not control) —
-see `compliance/container-inventory.yml`'s `ollama/ollama` entry and
-PHASE_4_VALIDATION_REPORT.md's Open Risks for the full disposition and
-the "bring your own Ollama" mitigation
-(`docs/admin/llm-provider.md`). This is disclosed here rather than
-omitted.
+Earlier phases bundled an `ollama` Compose service (`ollama/ollama:0.33.2`)
+whose container image carried one open CRITICAL Trivy finding
+(CVE-2026-56854, an SSH-auth-bypass in a vendored Go crypto library that
+VocaDox's own build process did not control). Rather than continue
+carrying and re-accepting that finding, the Phase 12 GA-blocker fix
+removed the bundled `ollama` Compose service entirely — VocaDox no longer
+builds, ships, or scans that image at all. See
+`docs/architecture/adr/0029-remove-bundled-ollama.md` for the full
+decision record and PHASE_12_VALIDATION_REPORT.md for the re-validated
+GA determination. VocaDox now always talks to an admin-managed external
+Ollama instance (`docs/admin/llm-provider.md`), whose own container
+supply chain is the deploying admin's responsibility, outside VocaDox's
+build/scan scope.

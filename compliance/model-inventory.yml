@@ -205,8 +205,8 @@ models:
     sha256: null  # not yet computed for the locally-pulled GGUF blob — see Known Limitations, PHASE_4_VALIDATION_REPORT.md
     bundled: false
     downloaded_at_install: true
-    download_method: "Admin-initiated: `docker compose exec ollama ollama pull qwen2.5:14b` (or run directly against a host-installed Ollama). Never downloaded automatically by VocaDox's own code — the worker-extraction service only ever calls the already-running Ollama server over HTTP; see docs/admin/llm-provider.md."
+    download_method: "Admin-initiated: `ollama pull qwen2.5:14b` run directly against the admin's own external Ollama instance (VocaDox no longer bundles an `ollama` Compose service as of the Phase 12 GA-blocker fix — see docs/architecture/adr/0029-remove-bundled-ollama.md). Never downloaded automatically by VocaDox's own code — the worker-extraction service only ever calls the already-running, admin-managed Ollama server over HTTP (VOCADOX_LLM_BASE_URL); see docs/admin/llm-provider.md."
     bundled_with_product: false
     disk_size_mb: 9000
-    runtime_requirements: "Ollama >=0.5 (MIT, see container-inventory.yml) serving the model; ~10GB VRAM for GPU inference (Q4_K_M quantization) or CPU fallback (slow — see docs/admin/llm-provider.md for real measured tokens/sec on both paths)."
+    runtime_requirements: "An admin-managed external Ollama >=0.5 (MIT — no longer tracked in container-inventory.yml since VocaDox does not ship this container; see docs/admin/llm-provider.md) serving the model; ~10GB VRAM for GPU inference (Q4_K_M quantization) or CPU fallback (slow — see docs/admin/llm-provider.md for real measured tokens/sec on both paths)."
     approval_status: approved
