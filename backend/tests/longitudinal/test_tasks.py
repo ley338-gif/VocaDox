@@ -174,10 +174,14 @@ async def test_list_tasks_is_cross_conversation_and_org_scoped(
     org_a = seeded["org_a"]
 
     conv1 = await client.post(
-        "/api/v1/conversations", json={"title": "Visit 1", "organization_id": org_a}, headers=alice_headers
+        "/api/v1/conversations",
+        json={"title": "Visit 1", "organization_id": org_a},
+        headers=alice_headers,
     )
     conv2 = await client.post(
-        "/api/v1/conversations", json={"title": "Visit 2", "organization_id": org_a}, headers=alice_headers
+        "/api/v1/conversations",
+        json={"title": "Visit 2", "organization_id": org_a},
+        headers=alice_headers,
     )
     for conv, description in ((conv1, "Task from visit 1"), (conv2, "Task from visit 2")):
         resp = await client.post(
