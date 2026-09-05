@@ -19,6 +19,8 @@ import { getFactEvidence, listFacts, listReviewIssues, type ExtractedFact } from
 import { useAuth } from "../auth/useAuth";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { Textarea } from "../design-system/FormControls";
+import { EmptyState, Skeleton } from "../design-system/States";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import styles from "./FactsPanel.module.css";
 
@@ -101,16 +103,17 @@ export function ReviewWizard({
     },
   });
 
-  if (issuesQuery.isLoading || factsQuery.isLoading) return <p>Loading review items…</p>;
+  if (issuesQuery.isLoading || factsQuery.isLoading) return <Skeleton height="4rem" />;
 
   if (openIssues.length === 0) {
     return (
       <div>
         <h4>Review</h4>
-        <p style={{ color: "var(--text-muted)" }}>
-          <CheckCircle2 size={16} aria-hidden="true" /> No open review items. The document can be
-          composed/approved once ready.
-        </p>
+        <EmptyState
+          icon={<CheckCircle2 size={20} aria-hidden="true" />}
+          title="Keine offenen Review-Punkte"
+          description="Das Dokument kann jetzt zusammengestellt und freigegeben werden."
+        />
       </div>
     );
   }
@@ -136,7 +139,7 @@ export function ReviewWizard({
 
         {currentIssue.related_fact_ids.length > 1 && (
           <div style={{ marginBottom: "var(--space-2)" }}>
-            <span style={{ color: "var(--text-muted)" }}>Act on fact: </span>
+            <span style={{ color: "var(--text-muted)" }}>Fakt auswählen: </span>
             {currentIssue.related_fact_ids.map((fid) => (
               <button
                 key={fid}
@@ -146,7 +149,7 @@ export function ReviewWizard({
                   marginRight: "var(--space-2)",
                   fontWeight: fid === targetFactId ? 700 : 400,
                   background: "none",
-                  border: "1px solid var(--border-subtle, #e5e7eb)",
+                  border: "1px solid var(--border-default)",
                   borderRadius: "var(--radius-sm)",
                   padding: "2px 8px",
                   cursor: "pointer",
@@ -165,10 +168,10 @@ export function ReviewWizard({
         {/* "Warum steht das hier?" (spec §30) — real evidence only, never an
             LLM explanation. */}
         <div className={styles.evidence}>
-          <strong>Evidence:</strong>
+          <strong>Evidenz:</strong>
           {evidenceQuery.data && evidenceQuery.data.length === 0 && (
             <p style={{ color: "var(--text-muted)" }}>
-              No linked evidence — this fact could not be traced to a spoken segment.
+              Keine verknüpfte Evidenz — dieser Fakt konnte keinem gesprochenen Abschnitt zugeordnet werden.
             </p>
           )}
           {evidenceQuery.data?.map((ev) => (
@@ -216,15 +219,15 @@ export function ReviewWizard({
 
         {showCorrection && (
           <div style={{ marginTop: "var(--space-3)" }}>
-            <textarea
+            <Textarea
               value={correctionDraft}
               onChange={(event) => setCorrectionDraft(event.target.value)}
               rows={6}
               style={{ width: "100%", fontFamily: "monospace" }}
-              aria-label="Corrected value (JSON)"
+              aria-label="Korrigierter Wert (JSON)"
             />
             {formError && (
-              <p role="alert" style={{ color: "var(--color-danger, #b91c1c)" }}>
+              <p role="alert" style={{ color: "var(--color-danger)" }}>
                 {formError}
               </p>
             )}
@@ -238,11 +241,11 @@ export function ReviewWizard({
                   setFormError(null);
                   resolveMutation.mutate({ action: "correct", corrected_value: parsed });
                 } catch {
-                  setFormError("Invalid JSON — fix the corrected value before saving.");
+                  setFormError("Ungültiges JSON — bitte vor dem Speichern korrigieren.");
                 }
               }}
             >
-              Save correction
+              Korrektur speichern
             </Button>
           </div>
         )}

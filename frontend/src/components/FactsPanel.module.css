@@ -9,8 +9,9 @@
 
 .item {
   padding: var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--surface-raised);
 }
 
 .header {
@@ -43,5 +44,9 @@
   cursor: pointer;
   width: 100%;
   padding: var(--space-1) 0;
-  color: var(--text-link, #4f46e5);
+  color: var(--accent);
+}
+
+.evidenceItem:hover {
+  text-decoration: underline;
 }

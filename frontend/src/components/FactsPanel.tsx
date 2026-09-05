@@ -22,6 +22,7 @@ import {
 import { useAuth } from "../auth/useAuth";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { EmptyState, Skeleton } from "../design-system/States";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import styles from "./FactsPanel.module.css";
 
@@ -76,9 +77,9 @@ function FactRow({
       <p style={{ margin: "var(--space-1) 0" }}>{factSummary(fact)}</p>
       {expanded && (
         <div className={styles.evidence}>
-          {evidenceQuery.isLoading && <p>Loading evidence…</p>}
+          {evidenceQuery.isLoading && <Skeleton height="1rem" />}
           {evidenceQuery.data && evidenceQuery.data.length === 0 && (
-            <p style={{ color: "var(--text-muted)" }}>No linked evidence — this fact is unverified.</p>
+            <p style={{ color: "var(--text-muted)" }}>Keine verknüpfte Evidenz — dieser Fakt ist unverifiziert.</p>
           )}
           {evidenceQuery.data?.map((ev) => (
             <button
@@ -126,7 +127,7 @@ export function FactsPanel({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
-        <h4 style={{ margin: 0 }}>Extracted facts</h4>
+        <h4 style={{ margin: 0 }}>Extrahierte Fakten</h4>
         {hasPermission("fact:extract") && (
           <Button
             variant="primary"
@@ -135,27 +136,28 @@ export function FactsPanel({
             onClick={() => extractMutation.mutate()}
           >
             <Sparkles size={16} aria-hidden="true" />{" "}
-            {extractMutation.isPending ? "Extracting…" : "Extract facts"}
+            {extractMutation.isPending ? "Extrahiere…" : "Fakten extrahieren"}
           </Button>
         )}
       </div>
       <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-4)" }}>
-        Draft, machine-derived facts from this conversation&apos;s transcript. Every fact links back
-        to the exact spoken moment — click a fact to see its evidence. This is not a generated
-        document; see the review issues below for anything uncertain or possibly contradictory.
+        Automatisch erstellt — maschinell abgeleitete Fakten aus dem Transkript dieses Gesprächs.
+        Jeder Fakt verweist auf den genauen gesprochenen Moment — auf einen Fakt klicken, um die
+        Evidenz zu sehen. Dies ist kein generiertes Dokument; siehe die Review-Hinweise unten für
+        Unsicheres oder möglicherweise Widersprüchliches.
       </p>
 
-      {factsQuery.isLoading && <p>Loading facts…</p>}
-      {factsQuery.data && factsQuery.data.length === 0 && <p>No facts extracted yet.</p>}
+      {factsQuery.isLoading && <Skeleton height="4rem" />}
+      {factsQuery.data && factsQuery.data.length === 0 && <EmptyState title="Noch keine Fakten extrahiert" />}
       <ul className={styles.list}>
         {factsQuery.data?.map((fact) => (
           <FactRow key={fact.id} fact={fact} conversationId={conversationId} audioPlayerRef={audioPlayerRef} />
         ))}
       </ul>
 
-      <h4 style={{ marginTop: "var(--space-6)" }}>Review issues</h4>
+      <h4 style={{ marginTop: "var(--space-6)" }}>Review-Hinweise</h4>
       {issuesQuery.data && issuesQuery.data.length === 0 && (
-        <p style={{ color: "var(--text-muted)" }}>No open review issues.</p>
+        <p style={{ color: "var(--text-muted)" }}>Keine offenen Review-Hinweise.</p>
       )}
       <ul className={styles.list}>
         {issuesQuery.data?.map((issue) => (
