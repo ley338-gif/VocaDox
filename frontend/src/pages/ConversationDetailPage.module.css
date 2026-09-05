@@ -58,6 +58,17 @@
   margin-top: var(--space-3);
 }
 
+.addRow > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.addRow input,
+.addRow select {
+  width: 100%;
+  min-width: 0;
+}
+
 .addRowStacked {
   display: flex;
   flex-direction: column;
@@ -67,17 +78,6 @@
 
 .addRowStacked .addRow {
   margin-top: 0;
-}
-
-.addRowStacked input,
-.addRowStacked select {
-  min-width: 0;
-  width: 100%;
-}
-
-.addRowStacked .addRow > *:first-child {
-  flex: 1;
-  min-width: 0;
 }
 
 .summaryPreview {
