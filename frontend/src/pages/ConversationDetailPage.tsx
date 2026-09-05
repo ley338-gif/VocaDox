@@ -1,5 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckSquare, Clock, FileText, Sparkles, Trash2, Users } from "lucide-react";
+import {
+  Activity,
+  CheckSquare,
+  Clock,
+  FileText,
+  History,
+  Info,
+  Link2,
+  Sparkles,
+  StickyNote,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
@@ -20,7 +32,8 @@ import {
   uploadMedia,
 } from "../api/conversations";
 import { getDocument } from "../api/documents";
-import { listConversationTasks } from "../api/longitudinal";
+import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
+import { listFacts } from "../api/intelligence";
 import { getProcessingStatus, listSpeakers } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
@@ -36,6 +49,7 @@ import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
+import { NavCard } from "../design-system/NavCard";
 import { PageHeader } from "../design-system/PageHeader";
 import { SidePanelCard } from "../design-system/SidePanelCard";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
@@ -55,10 +69,11 @@ const TAB_LABELS: Record<Tab, string> = {
   related: "Verwandt",
   tasks: "Aufgaben",
   details: "Details",
-  participants: "Teilnehmer",
   notes: "Notizen",
   activity: "Aktivität",
 };
+
+const PRIMARY_TAB_IDS: Tab[] = ["overview", "transcript", "document", "review", "audio"];
 
 type Tab =
   | "overview"
@@ -71,7 +86,6 @@ type Tab =
   | "related"
   | "tasks"
   | "details"
-  | "participants"
   | "notes"
   | "activity";
 
@@ -116,7 +130,7 @@ export function ConversationDetailPage() {
   const processingQuery = useQuery({
     queryKey: ["conversation-processing", conversationId],
     queryFn: () => getProcessingStatus(conversationId),
-    enabled: Boolean(conversationId) && (tab === "timeline" || tab === "details"),
+    enabled: Boolean(conversationId),
   });
 
   // Sidebar summaries — deliberately read the SAME query keys the owning
@@ -138,6 +152,18 @@ export function ConversationDetailPage() {
     queryKey: ["conversation-tasks", conversationId],
     queryFn: () => listConversationTasks(conversationId),
     enabled: Boolean(conversationId) && hasPermission("task:read"),
+  });
+  const factsQuery = useQuery({
+    queryKey: ["facts", conversationId],
+    queryFn: () => listFacts(conversationId),
+    enabled: Boolean(conversationId),
+  });
+  const externalReference = conversationQuery.data?.external_reference;
+  const organizationId = conversationQuery.data?.organization_id;
+  const timelineQuery = useQuery({
+    queryKey: ["longitudinal-timeline", organizationId, externalReference],
+    queryFn: () => getExternalReferenceTimeline(externalReference ?? "", organizationId ?? ""),
+    enabled: Boolean(externalReference && organizationId),
   });
 
   const [participantName, setParticipantName] = useState("");
@@ -205,7 +231,7 @@ export function ConversationDetailPage() {
   const conversation = conversationQuery.data;
   const sourceMedia = mediaQuery.data?.find((m) => m.kind === "source_audio");
 
-  const tabItems: TabItem[] = (Object.keys(TAB_LABELS) as Tab[]).map((t) => ({ id: t, label: TAB_LABELS[t] }));
+  const tabItems: TabItem[] = PRIMARY_TAB_IDS.map((t) => ({ id: t, label: TAB_LABELS[t] }));
 
   const openTasks = (tasksQuery.data ?? []).filter((t) => t.status === "open");
   const documentPreview = documentQuery.data?.current_revision?.rendered_text ?? null;
@@ -265,14 +291,52 @@ export function ConversationDetailPage() {
       <div className={styles.layout}>
         <div>
           {tab === "overview" && (
-            <div className={styles.sideCard}>
-              <p>{conversation.description || "No description."}</p>
-              <p style={{ marginTop: "var(--space-3)", color: "var(--text-muted)" }}>
-                External reference: {conversation.external_reference || "—"}
-              </p>
-              <p style={{ color: "var(--text-muted)" }}>
-                Duration: {conversation.duration_ms ? `${Math.round(conversation.duration_ms / 1000)}s` : "—"}
-              </p>
+            <div>
+              {conversation.description && (
+                <p style={{ marginBottom: "var(--space-4)", color: "var(--text-secondary)" }}>
+                  {conversation.description}
+                </p>
+              )}
+              <div className={styles.dashboardGrid}>
+                <NavCard
+                  icon={<Sparkles size={18} aria-hidden="true" />}
+                  title="Fakten"
+                  description={`${factsQuery.data?.length ?? 0} extrahierte Fakten`}
+                  onClick={() => setTab("facts")}
+                />
+                <NavCard
+                  icon={<History size={18} aria-hidden="true" />}
+                  title="Verlauf"
+                  description={`${processingQuery.data?.jobs.length ?? 0} Verarbeitungsschritte`}
+                  onClick={() => setTab("timeline")}
+                />
+                {conversation.external_reference && (
+                  <NavCard
+                    icon={<Link2 size={18} aria-hidden="true" />}
+                    title="Verwandt"
+                    description={`${timelineQuery.data?.conversations.length ?? 0} verknüpfte Gespräche`}
+                    onClick={() => setTab("related")}
+                  />
+                )}
+                <NavCard
+                  icon={<Info size={18} aria-hidden="true" />}
+                  title="Details"
+                  description="Verarbeitungs-Provenienz"
+                  onClick={() => setTab("details")}
+                />
+                <NavCard
+                  icon={<StickyNote size={18} aria-hidden="true" />}
+                  title="Notizen"
+                  description={`${notesQuery.data?.length ?? 0} Notizen`}
+                  onClick={() => setTab("notes")}
+                />
+                <NavCard
+                  icon={<Activity size={18} aria-hidden="true" />}
+                  title="Aktivität"
+                  description="Zeitpunkte & Status"
+                  onClick={() => setTab("activity")}
+                />
+              </div>
             </div>
           )}
 
@@ -464,62 +528,6 @@ export function ConversationDetailPage() {
             </div>
           )}
 
-          {tab === "participants" && (
-            <div className={styles.sideCard}>
-              {participantsQuery.data && participantsQuery.data.length === 0 && (
-                <p>No participants yet.</p>
-              )}
-              <ul className={styles.list}>
-                {participantsQuery.data?.map((participant) => (
-                  <li key={participant.id} className={styles.listItem}>
-                    <span>
-                      {participant.display_name} ({participant.participant_type})
-                    </span>
-                    {hasPermission("conversation:manage-participants") && (
-                      <button
-                        type="button"
-                        aria-label={`Remove ${participant.display_name}`}
-                        onClick={() => removeParticipantMutation.mutate(participant.id)}
-                      >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              {hasPermission("conversation:manage-participants") && (
-                <div className={styles.addRow}>
-                  <TextInput
-                    placeholder="Person A"
-                    aria-label="Participant name"
-                    value={participantName}
-                    onChange={(event) => setParticipantName(event.target.value)}
-                  />
-                  <Select
-                    aria-label="Participant type"
-                    value={participantType}
-                    onChange={(event) => setParticipantType(event.target.value)}
-                  >
-                    <option value="unknown">Unknown</option>
-                    <option value="staff">Staff</option>
-                    <option value="patient">Patient</option>
-                    <option value="client">Client</option>
-                    <option value="guest">Guest</option>
-                    <option value="other">Other</option>
-                  </Select>
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    disabled={!participantName.trim()}
-                    onClick={() => addParticipantMutation.mutate()}
-                  >
-                    Add
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
           {tab === "notes" && (
             <div className={styles.sideCard}>
               {notesQuery.data && notesQuery.data.length === 0 && <p>No notes yet.</p>}
@@ -656,25 +664,60 @@ export function ConversationDetailPage() {
             )}
           </Card>
 
-          <SidePanelCard
-            icon={<Users size={14} aria-hidden="true" />}
-            title="Teilnehmer"
-            action={
-              <Button variant="tertiary" type="button" onClick={() => setTab("participants")}>
-                Alle
-              </Button>
-            }
-          >
+          <SidePanelCard icon={<Users size={14} aria-hidden="true" />} title="Teilnehmer">
             {participantsQuery.data && participantsQuery.data.length === 0 && (
               <EmptyState title="Noch keine Teilnehmer" />
             )}
             <ul className={styles.list}>
-              {participantsQuery.data?.slice(0, 5).map((participant) => (
+              {participantsQuery.data?.map((participant) => (
                 <li key={participant.id} className={styles.listItem}>
-                  <span>{participant.display_name}</span>
+                  <span>
+                    {participant.display_name} ({participant.participant_type})
+                  </span>
+                  {hasPermission("conversation:manage-participants") && (
+                    <button
+                      type="button"
+                      aria-label={`${participant.display_name} entfernen`}
+                      onClick={() => removeParticipantMutation.mutate(participant.id)}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
+            {hasPermission("conversation:manage-participants") && (
+              <div className={styles.addRowStacked}>
+                <TextInput
+                  placeholder="Person A"
+                  aria-label="Teilnehmername"
+                  value={participantName}
+                  onChange={(event) => setParticipantName(event.target.value)}
+                />
+                <div className={styles.addRow}>
+                  <Select
+                    aria-label="Teilnehmertyp"
+                    value={participantType}
+                    onChange={(event) => setParticipantType(event.target.value)}
+                  >
+                    <option value="unknown">Unbekannt</option>
+                    <option value="staff">Mitarbeiter</option>
+                    <option value="patient">Patient</option>
+                    <option value="client">Klient</option>
+                    <option value="guest">Gast</option>
+                    <option value="other">Sonstiges</option>
+                  </Select>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    disabled={!participantName.trim()}
+                    onClick={() => addParticipantMutation.mutate()}
+                  >
+                    Hinzufügen
+                  </Button>
+                </div>
+              </div>
+            )}
             {(speakersQuery.data ?? []).length > 0 && (
               <>
                 <p className={styles.sidebarSubheading}>Sprecherzuordnung</p>
