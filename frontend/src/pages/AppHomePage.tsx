@@ -4,13 +4,14 @@ import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 
 /**
- * Placeholder home for the future `/app` user workspace (Dashboard,
- * Conversations, ... land in later phases — see
- * docs/architecture/domain-model.md). Phase 1 only needs a logged-in
- * shell state and a working logout action.
+ * `/app` landing page. Was a Phase-1 placeholder ("the full conversation
+ * workspace ships in later phases") that never got updated once those
+ * phases actually shipped — found stale during a post-GA manual
+ * walkthrough. Real quick links only; no dashboard content duplicated
+ * from `/admin` (that's the admin's own Dashboard page).
  */
 export function AppHomePage() {
-  const { user, logout } = useAuth();
+  const { user, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -24,12 +25,26 @@ export function AppHomePage() {
         Welcome, {user?.displayName}
       </h1>
       <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        You are signed in as <strong>{user?.username}</strong>. The full
-        conversation workspace (recording, review, documents, ...) ships in
-        later phases.
+        Signed in as <strong>{user?.username}</strong>.
       </p>
-      <div style={{ marginTop: "var(--space-6)" }}>
-        <Button variant="secondary" onClick={handleLogout}>
+      <div
+        style={{
+          marginTop: "var(--space-6)",
+          display: "flex",
+          gap: "var(--space-3)",
+          flexWrap: "wrap",
+        }}
+      >
+        <Button onClick={() => navigate("/app/conversations/new")}>New conversation</Button>
+        <Button variant="secondary" onClick={() => navigate("/app/conversations")}>
+          View conversations
+        </Button>
+        {hasPermission("system:admin") && (
+          <Button variant="secondary" onClick={() => navigate("/admin")}>
+            Admin portal
+          </Button>
+        )}
+        <Button variant="tertiary" onClick={handleLogout}>
           Log out
         </Button>
       </div>
