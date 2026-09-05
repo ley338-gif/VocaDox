@@ -101,6 +101,13 @@ export function TranscriptPanel({
   const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [search, setSearch] = useState("");
+  // Optional hint for the diarization model — real testing showed
+  // pyannote's own automatic speaker-count guess can genuinely
+  // undercount on real (non-synthetic) multi-speaker recordings; telling
+  // it the expected count up front measurably improves accuracy. Kept as
+  // a raw string for a controlled numeric input; parsed only at submit
+  // time (see expectedSpeakersAsInt below).
+  const [expectedSpeakers, setExpectedSpeakers] = useState("");
 
   const processingQuery = useQuery({
     queryKey: ["processing-status", conversationId],
@@ -131,10 +138,20 @@ export function TranscriptPanel({
   });
 
   const processMutation = useMutation({
-    mutationFn: () => processTranscript(conversationId, { diarize: true }, csrfToken ?? ""),
+    mutationFn: (vars: { reprocess?: boolean } = {}) => {
+      const n = Number.parseInt(expectedSpeakers, 10);
+      const hint = Number.isInteger(n) && n > 0 ? { min_speakers: n, max_speakers: n } : {};
+      return processTranscript(
+        conversationId,
+        { diarize: true, reprocess: vars.reprocess, ...hint },
+        csrfToken ?? ""
+      );
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["processing-status", conversationId] });
       void queryClient.invalidateQueries({ queryKey: ["transcript", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["transcript-segments", conversationId] });
     },
   });
 
@@ -176,9 +193,24 @@ export function TranscriptPanel({
       <div className={styles.empty}>
         <p>No transcript yet.</p>
         {hasPermission("transcript:process") && (
-          <Button variant="primary" type="button" onClick={() => processMutation.mutate()}>
-            Transkription starten
-          </Button>
+          <div className={styles.speakerHintRow}>
+            <label htmlFor="expected-speakers" className={styles.muted}>
+              Expected speakers (optional)
+            </label>
+            <TextInput
+              id="expected-speakers"
+              type="number"
+              min={1}
+              max={20}
+              style={{ width: "5rem" }}
+              value={expectedSpeakers}
+              onChange={(event) => setExpectedSpeakers(event.target.value)}
+              placeholder="auto"
+            />
+            <Button variant="primary" type="button" onClick={() => processMutation.mutate({})}>
+              Transkription starten
+            </Button>
+          </div>
         )}
       </div>
     );
@@ -249,6 +281,32 @@ export function TranscriptPanel({
           {speakers.map((speaker) => (
             <SpeakerChip key={speaker.id} speaker={speaker} onRename={(label) => assignSpeakerMutation.mutate({ speakerId: speaker.id, label })} />
           ))}
+        </div>
+      )}
+
+      {hasPermission("transcript:process") && (
+        <div className={styles.speakerHintRow}>
+          <span className={styles.muted}>
+            Wrong speaker count ({speakers.length} detected)? Reprocess with a hint:
+          </span>
+          <TextInput
+            aria-label="Expected speakers for reprocessing"
+            type="number"
+            min={1}
+            max={20}
+            style={{ width: "5rem" }}
+            value={expectedSpeakers}
+            onChange={(event) => setExpectedSpeakers(event.target.value)}
+            placeholder="auto"
+          />
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={processMutation.isPending}
+            onClick={() => processMutation.mutate({ reprocess: true })}
+          >
+            <RefreshCw size={14} aria-hidden="true" /> Reprocess
+          </Button>
         </div>
       )}
 

@@ -219,6 +219,20 @@ async def test_reprocess_creates_new_transcript_and_deactivates_old(
     resp = await client.get(f"/api/v1/conversations/{conversation_id}/transcript", headers=headers)
     assert resp.json()["id"] == second_id
 
+    # Regression: GET .../speakers must reflect only the active
+    # transcript's diarization run, not every DetectedSpeaker ever
+    # created across both processing passes (found manually testing a
+    # real reprocess: a naive "all speakers for this conversation" query
+    # showed stale/duplicate speakers from the deactivated first run
+    # alongside the second run's real ones).
+    speakers_resp = await client.get(
+        f"/api/v1/conversations/{conversation_id}/speakers", headers=headers
+    )
+    assert speakers_resp.status_code == 200
+    # FakeDiarizationProvider always reports exactly 2 speakers per run —
+    # if stale rows from the first run leaked through, this would be 4.
+    assert len(speakers_resp.json()) == 2
+
 
 async def test_cross_organization_transcript_access_is_404_not_403(
     client, seeded, processing_env  # noqa: ANN001

@@ -64,9 +64,48 @@ async def persist_diarization_result(
 async def list_speakers(
     session: AsyncSession, *, conversation_id: uuid.UUID
 ) -> list[DetectedSpeaker]:
+    """Scoped to the diarization run(s) actually referenced by the
+    conversation's currently *active* Transcript's segments — not every
+    DetectedSpeaker ever created for this conversation.
+
+    Reprocessing (see app.processing.orchestrator.start_transcription)
+    never deletes prior DetectedSpeaker rows, matching this project's
+    established never-destroy-processing-history principle — but that
+    means a naive "all speakers for this conversation" query returns
+    stale speakers from every earlier diarization run too, once a
+    conversation has been reprocessed more than once. Found via manual
+    testing: reprocessing a real 3-speaker recording with a corrected
+    speaker-count hint left 5 speaker rows visible (2 stale + 3 current)
+    instead of the real 3, and the rename-chip UI showed duplicate
+    SPEAKER_00/SPEAKER_01 entries from the old run alongside the new
+    one. `TranscriptSegment.diarization_run_id` is exactly the field
+    Phase 3's alignment provenance work added for this kind of lookup.
+    """
+    from app.transcription.models import Transcript, TranscriptSegment
+
+    run_ids_result = await session.execute(
+        select(TranscriptSegment.diarization_run_id)
+        .join(Transcript, Transcript.id == TranscriptSegment.transcript_id)
+        .where(
+            Transcript.conversation_id == conversation_id,
+            Transcript.is_active.is_(True),
+            TranscriptSegment.diarization_run_id.is_not(None),
+        )
+        .distinct()
+    )
+    active_run_ids = {row[0] for row in run_ids_result.all()}
+    if not active_run_ids:
+        # No diarization has ever completed for the active transcript
+        # (e.g. diarize=False, or diarization hasn't finished yet) —
+        # nothing to show, not "every speaker ever detected".
+        return []
+
     result = await session.execute(
         select(DetectedSpeaker)
-        .where(DetectedSpeaker.conversation_id == conversation_id)
+        .where(
+            DetectedSpeaker.conversation_id == conversation_id,
+            DetectedSpeaker.diarization_run_id.in_(active_run_ids),
+        )
         .order_by(DetectedSpeaker.internal_label)
     )
     return list(result.scalars().all())

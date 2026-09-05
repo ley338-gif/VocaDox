@@ -114,7 +114,13 @@ export interface DetectedSpeaker {
 
 export function processTranscript(
   conversationId: string,
-  body: { diarize?: boolean; language_hint?: string; reprocess?: boolean },
+  body: {
+    diarize?: boolean;
+    language_hint?: string;
+    reprocess?: boolean;
+    min_speakers?: number;
+    max_speakers?: number;
+  },
   csrfToken: string
 ): Promise<Transcript> {
   return request<Transcript>(
