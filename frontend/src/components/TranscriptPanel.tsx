@@ -9,11 +9,10 @@
  * ProcessingJob rows to one of five honest stages.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, RefreshCw, Users } from "lucide-react";
+import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
-  assignSpeaker,
   correctSegment,
   getProcessingStatus,
   getTranscript,
@@ -28,9 +27,7 @@ import {
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { TextInput } from "../design-system/FormControls";
-import { Modal } from "../design-system/Modal";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
-import { speakerColor } from "../lib/speakerColor";
 import { SpeakerBadge } from "./SpeakerBadge";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import { TranscriptTurn } from "./TranscriptTurn";
@@ -94,7 +91,6 @@ export function TranscriptPanel({
   const [editValue, setEditValue] = useState("");
   const [search, setSearch] = useState("");
   const [speakerFilter, setSpeakerFilter] = useState<string | null>(null);
-  const [showSpeakerManager, setShowSpeakerManager] = useState(false);
   // Optional hint for the diarization model — real testing showed
   // pyannote's own automatic speaker-count guess can genuinely
   // undercount on real (non-synthetic) multi-speaker recordings; telling
@@ -161,12 +157,6 @@ export function TranscriptPanel({
       setEditingSegmentId(null);
       void queryClient.invalidateQueries({ queryKey: ["transcript-segments", conversationId] });
     },
-  });
-
-  const assignSpeakerMutation = useMutation({
-    mutationFn: (vars: { speakerId: string; label: string }) =>
-      assignSpeaker(conversationId, vars.speakerId, { display_label: vars.label || null }, csrfToken ?? ""),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] }),
   });
 
   const stage = stageFromJobs(processingQuery.data?.jobs ?? [], transcriptQuery.data?.status);
@@ -275,37 +265,6 @@ export function TranscriptPanel({
               onClick={() => setSpeakerFilter((current) => (current === speaker.id ? null : speaker.id))}
             />
           ))}
-          {hasPermission("speaker:assign") && (
-            <Button variant="tertiary" type="button" onClick={() => setShowSpeakerManager(true)}>
-              <Users size={14} aria-hidden="true" /> Sprecher verwalten
-            </Button>
-          )}
-        </div>
-      )}
-
-      {hasPermission("transcript:process") && (
-        <div className={styles.speakerHintRow}>
-          <span className={styles.muted}>
-            Falsche Sprecheranzahl ({speakers.length} erkannt)?
-          </span>
-          <TextInput
-            aria-label="Erwartete Sprecheranzahl für die erneute Verarbeitung"
-            type="number"
-            min={1}
-            max={20}
-            style={{ width: "5rem" }}
-            value={expectedSpeakers}
-            onChange={(event) => setExpectedSpeakers(event.target.value)}
-            placeholder="auto"
-          />
-          <Button
-            variant="tertiary"
-            type="button"
-            disabled={processMutation.isPending}
-            onClick={() => processMutation.mutate({ reprocess: true })}
-          >
-            <RefreshCw size={14} aria-hidden="true" /> Neu verarbeiten
-          </Button>
         </div>
       )}
 
@@ -334,46 +293,6 @@ export function TranscriptPanel({
           <EmptyState title="Keine Segmente für diesen Sprecher" />
         )}
       </ul>
-
-      <Modal open={showSpeakerManager} onClose={() => setShowSpeakerManager(false)} title="Sprecher verwalten">
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-          {speakers.map((speaker) => (
-            <SpeakerChip
-              key={speaker.id}
-              speaker={speaker}
-              onRename={(label) => assignSpeakerMutation.mutate({ speakerId: speaker.id, label })}
-            />
-          ))}
-        </div>
-      </Modal>
-    </div>
-  );
-}
-
-function SpeakerChip({
-  speaker,
-  onRename,
-}: {
-  speaker: DetectedSpeaker;
-  onRename: (label: string) => void;
-}) {
-  const [value, setValue] = useState(speaker.display_label ?? "");
-  return (
-    <div className={styles.speakerChip}>
-      <span
-        className={styles.speakerDot}
-        style={{ background: speakerColor(speaker.internal_label) }}
-        aria-hidden="true"
-      />
-      <TextInput
-        aria-label={`${speaker.internal_label} umbenennen`}
-        placeholder={speaker.internal_label}
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onBlur={() => {
-          if (value !== (speaker.display_label ?? "")) onRename(value);
-        }}
-      />
     </div>
   );
 }
