@@ -10,7 +10,9 @@ import { listMyOrganizations } from "../api/organizations";
 import { listProcessingProfiles } from "../api/profiles";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
+import { FormField } from "../design-system/FormField";
 import { Checkbox, Select, TextInput } from "../design-system/FormControls";
+import { ErrorState } from "../design-system/States";
 import styles from "./NewConversationPage.module.css";
 
 type Mode = "record" | "upload";
@@ -77,7 +79,7 @@ export function NewConversationPage() {
         state: { startRecording: mode === "record" },
       });
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : "Something went wrong.");
+      setError(submitError instanceof ApiError ? submitError.message : "Etwas ist schiefgelaufen.");
     } finally {
       setSubmitting(false);
     }
@@ -85,9 +87,7 @@ export function NewConversationPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: "var(--font-h1-size)", marginBottom: "var(--space-6)" }}>
-        New conversation
-      </h1>
+      <h1 style={{ fontSize: "var(--font-h1-size)", marginBottom: "var(--space-6)" }}>Neues Gespräch</h1>
 
       <div className={styles.choiceRow}>
         <button
@@ -96,10 +96,8 @@ export function NewConversationPage() {
           onClick={() => setMode("record")}
         >
           <Mic size={24} aria-hidden="true" />
-          <h3>Start recording</h3>
-          <p style={{ color: "var(--text-muted)" }}>
-            Record directly in the browser using your microphone.
-          </p>
+          <h3>Aufnahme starten</h3>
+          <p style={{ color: "var(--text-muted)" }}>Direkt im Browser über das Mikrofon aufnehmen.</p>
         </button>
         <button
           type="button"
@@ -107,66 +105,45 @@ export function NewConversationPage() {
           onClick={() => setMode("upload")}
         >
           <Upload size={24} aria-hidden="true" />
-          <h3>Upload audio</h3>
-          <p style={{ color: "var(--text-muted)" }}>
-            Upload an existing audio file (WebM, WAV, MP3, or M4A).
-          </p>
+          <h3>Audio hochladen</h3>
+          <p style={{ color: "var(--text-muted)" }}>Eine vorhandene Audiodatei hochladen (WebM, WAV, MP3, M4A).</p>
         </button>
       </div>
 
       {mode && (
         <div className={styles.form}>
-          <div className={styles.field}>
-            <label htmlFor="title">Title</label>
-            <TextInput
-              id="title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              required
-            />
-          </div>
+          <FormField label="Titel" required>
+            <TextInput value={title} onChange={(event) => setTitle(event.target.value)} required />
+          </FormField>
 
-          <div className={styles.field}>
-            <label htmlFor="org">Organization</label>
-            <Select
-              id="org"
-              value={organizationId}
-              onChange={(event) => setOrganizationId(event.target.value)}
-              required
-            >
-              <option value="">Select an organization…</option>
+          <FormField label="Organisation" required>
+            <Select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} required>
+              <option value="">Organisation wählen…</option>
               {organizations?.map((org) => (
                 <option key={org.id} value={org.id}>
                   {org.name}
                 </option>
               ))}
             </Select>
-          </div>
+          </FormField>
 
-          <div className={styles.field}>
-            <label htmlFor="type">Conversation type</label>
+          <FormField label="Gesprächstyp">
             <Select
-              id="type"
               value={conversationType}
               onChange={(event) => setConversationType(event.target.value as ConversationType)}
             >
-              <option value="general">General</option>
-              <option value="medical">Medical</option>
-              <option value="therapy">Therapy</option>
+              <option value="general">Allgemein</option>
+              <option value="medical">Medizinisch</option>
+              <option value="therapy">Therapie</option>
               <option value="meeting">Meeting</option>
               <option value="interview">Interview</option>
-              <option value="other">Other</option>
+              <option value="other">Sonstiges</option>
             </Select>
-          </div>
+          </FormField>
 
-          <div className={styles.field}>
-            <label htmlFor="profile">Processing profile</label>
-            <Select
-              id="profile"
-              value={processingProfileId}
-              onChange={(event) => setProcessingProfileId(event.target.value)}
-            >
-              <option value="">General (default)</option>
+          <FormField label="Verarbeitungsprofil">
+            <Select value={processingProfileId} onChange={(event) => setProcessingProfileId(event.target.value)}>
+              <option value="">Allgemein (Standard)</option>
               {selectableProfiles
                 .filter((p) => !p.is_system_default)
                 .map((p) => (
@@ -175,40 +152,33 @@ export function NewConversationPage() {
                   </option>
                 ))}
             </Select>
-          </div>
+          </FormField>
+
+          <FormField label="Externe Referenz (optional)">
+            <TextInput value={externalReference} onChange={(event) => setExternalReference(event.target.value)} />
+          </FormField>
 
           <div className={styles.field}>
-            <label htmlFor="externalRef">External reference (optional)</label>
-            <TextInput
-              id="externalRef"
-              value={externalReference}
-              onChange={(event) => setExternalReference(event.target.value)}
-            />
-          </div>
-
-          <div className={styles.field}>
-            <label>
+            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
               <Checkbox
                 checked={privacyMode === "restricted"}
                 onChange={(event) => setPrivacyMode(event.target.checked ? "restricted" : "standard")}
-              />{" "}
-              Mark as restricted privacy
+              />
+              Als eingeschränkt (restricted) markieren
             </label>
           </div>
 
           {mode === "upload" && (
-            <div className={styles.field}>
-              <label htmlFor="file">Audio file</label>
+            <FormField label="Audiodatei">
               <input
-                id="file"
                 type="file"
                 accept="audio/webm,audio/wav,audio/x-wav,audio/mpeg,audio/mp4,audio/x-m4a,.webm,.wav,.mp3,.m4a"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
-            </div>
+            </FormField>
           )}
 
-          {error && <p role="alert">{error}</p>}
+          {error && <ErrorState message={error} />}
 
           <Button
             variant="primary"
@@ -216,7 +186,7 @@ export function NewConversationPage() {
             disabled={submitting || !title.trim() || !organizationId || (mode === "upload" && !file)}
             onClick={() => void handleCreate()}
           >
-            {mode === "record" ? "Continue to recording" : "Create and upload"}
+            {mode === "record" ? "Weiter zur Aufnahme" : "Erstellen und hochladen"}
           </Button>
         </div>
       )}

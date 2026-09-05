@@ -31,8 +31,28 @@ import { TasksPanel } from "../components/TasksPanel";
 import { TranscriptPanel } from "../components/TranscriptPanel";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
+import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
+import { StatusBadge } from "../design-system/StatusBadge";
+import { Tabs, type TabItem } from "../design-system/Tabs";
 import styles from "./ConversationDetailPage.module.css";
+
+const TAB_LABELS: Record<Tab, string> = {
+  overview: "Übersicht",
+  document: "Dokumentation",
+  review: "Review",
+  audio: "Audio",
+  transcript: "Transkript",
+  facts: "Fakten",
+  timeline: "Verlauf",
+  related: "Verwandt",
+  tasks: "Aufgaben",
+  details: "Details",
+  participants: "Teilnehmer",
+  notes: "Notizen",
+  activity: "Aktivität",
+};
 
 type Tab =
   | "overview"
@@ -149,12 +169,16 @@ export function ConversationDetailPage() {
     onSuccess: () => navigate("/app/conversations"),
   });
 
-  if (conversationQuery.isLoading) return <p>Loading conversation…</p>;
+  if (conversationQuery.isLoading) {
+    return <Skeleton height="8rem" />;
+  }
   if (conversationQuery.isError || !conversationQuery.data) {
-    return <p role="alert">Conversation not found, or you don&apos;t have access to it.</p>;
+    return <ErrorState title="Gespräch nicht gefunden" message="Kein Zugriff oder das Gespräch existiert nicht." />;
   }
   const conversation = conversationQuery.data;
   const sourceMedia = mediaQuery.data?.find((m) => m.kind === "source_audio");
+
+  const tabItems: TabItem[] = (Object.keys(TAB_LABELS) as Tab[]).map((t) => ({ id: t, label: TAB_LABELS[t] }));
 
   return (
     <div>
@@ -162,10 +186,10 @@ export function ConversationDetailPage() {
         <div>
           <h1 style={{ fontSize: "var(--font-h1-size)" }}>{conversation.title}</h1>
           <div className={styles.meta}>
-            <Badge tone="info">{conversation.status}</Badge>
+            <StatusBadge status={conversation.status} />
             <span>{conversation.conversation_type}</span>
             <span>{new Date(conversation.created_at).toLocaleString()}</span>
-            {conversation.privacy_mode === "restricted" && <Badge tone="warning">Restricted</Badge>}
+            {conversation.privacy_mode === "restricted" && <Badge tone="warning">Eingeschränkt</Badge>}
           </div>
         </div>
         {hasPermission("conversation:delete") && (
@@ -173,46 +197,17 @@ export function ConversationDetailPage() {
             variant="destructive"
             type="button"
             onClick={() => {
-              if (confirm("Delete this conversation and its media? This cannot be undone.")) {
+              if (confirm("Dieses Gespräch inkl. Medien löschen? Dies kann nicht rückgängig gemacht werden.")) {
                 deleteConversationMutation.mutate();
               }
             }}
           >
-            <Trash2 size={16} aria-hidden="true" /> Delete
+            <Trash2 size={16} aria-hidden="true" /> Löschen
           </Button>
         )}
       </div>
 
-      <div className={styles.tabs} role="tablist">
-        {(
-          [
-            "overview",
-            "document",
-            "review",
-            "audio",
-            "transcript",
-            "facts",
-            "timeline",
-            "related",
-            "tasks",
-            "details",
-            "participants",
-            "notes",
-            "activity",
-          ] as Tab[]
-        ).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            aria-selected={tab === t}
-            className={`${styles.tab} ${tab === t ? styles.tabActive : ""}`}
-            onClick={() => setTab(t)}
-            type="button"
-          >
-            {t[0].toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
+      <Tabs idPrefix="conv" items={tabItems} activeId={tab} onChange={(id) => setTab(id as Tab)} />
 
       <div className={styles.layout}>
         <div>
@@ -545,9 +540,10 @@ export function ConversationDetailPage() {
         </div>
 
         <aside className={styles.sidebar}>
-          <div className={styles.sideCard}>
-            <h4>Markers</h4>
-            {markersQuery.data && markersQuery.data.length === 0 && <p>No markers yet.</p>}
+          <Card title="Marker">
+            {markersQuery.data && markersQuery.data.length === 0 && (
+              <EmptyState title="Noch keine Marker" />
+            )}
             <ul className={styles.list}>
               {markersQuery.data?.map((marker) => (
                 <li key={marker.id} className={styles.listItem}>
@@ -557,7 +553,7 @@ export function ConversationDetailPage() {
                   {hasPermission("conversation:manage-markers") && (
                     <button
                       type="button"
-                      aria-label="Remove marker"
+                      aria-label="Marker entfernen"
                       onClick={() => removeMarkerMutation.mutate(marker.id)}
                     >
                       <Trash2 size={14} aria-hidden="true" />
@@ -569,17 +565,17 @@ export function ConversationDetailPage() {
             {hasPermission("conversation:manage-markers") && (
               <div className={styles.addRow}>
                 <TextInput
-                  placeholder="Marker label"
-                  aria-label="Marker label"
+                  placeholder="Marker-Beschriftung"
+                  aria-label="Marker-Beschriftung"
                   value={markerLabel}
                   onChange={(event) => setMarkerLabel(event.target.value)}
                 />
                 <Button variant="secondary" type="button" onClick={() => addMarkerMutation.mutate()}>
-                  Add
+                  Hinzufügen
                 </Button>
               </div>
             )}
-          </div>
+          </Card>
         </aside>
       </div>
     </div>
