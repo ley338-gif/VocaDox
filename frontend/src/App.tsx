@@ -33,6 +33,7 @@ import { ConversationsListPage } from "./pages/ConversationsListPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewConversationPage } from "./pages/NewConversationPage";
+import { TasksListPage } from "./pages/TasksListPage";
 
 /**
  * Phase 7 Admin Portal routes (spec §48): each page is wrapped in its own
@@ -71,6 +72,14 @@ export function App() {
               <RequireAuth>
                 <NewConversationPage />
               </RequireAuth>
+            }
+          />
+          <Route
+            path="/app/tasks"
+            element={
+              <RequirePermission code="task:read">
+                <TasksListPage />
+              </RequirePermission>
             }
           />
           <Route
