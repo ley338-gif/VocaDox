@@ -210,6 +210,35 @@ async def test_media_download_and_sha256_roundtrip(client: AsyncClient, seeded: 
     assert hashlib.sha256(content_response.content).hexdigest() == media["sha256"]
 
 
+async def test_media_content_is_served_inline_not_as_a_download(
+    client: AsyncClient, seeded: dict
+) -> None:
+    """Regression test: this endpoint is what the in-app <audio> player's
+    src actually points at (frontend/src/api/conversations.ts's
+    mediaContentUrl). `Content-Disposition: attachment` (Starlette's
+    `FileResponse(..., filename=...)` default) told browsers this was a
+    download rather than playable media, which made HTML5 audio
+    duration/seeking unreliable — found by manually testing the player
+    and seeing a real recording's duration render as 0:00/0:00 despite
+    playback otherwise working. Must stay `inline` (with a filename
+    still offered, for a user's own "Save audio as...")."""
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+    files = {"file": ("session.wav", make_wav_bytes(duration_s=0.3), "audio/wav")}
+    upload_response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/media", files=files, headers=headers
+    )
+    media = upload_response.json()
+
+    content_response = await client.get(
+        f"/api/v1/conversations/{conv['id']}/media/{media['id']}/content", headers=headers
+    )
+    assert content_response.status_code == 200
+    disposition = content_response.headers.get("content-disposition", "")
+    assert disposition.startswith("inline"), disposition
+    assert "session.wav" in disposition
+
+
 async def test_media_access_denied_across_organizations(client: AsyncClient, seeded: dict) -> None:
     alice_headers = await login(client, "alice", "a very strong password 123")
     conv = await _create_conversation(client, alice_headers, seeded["org_a"])
