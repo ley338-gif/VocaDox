@@ -41,6 +41,11 @@ const STATUS_MAP: Record<string, { label: string; tone: Tone }> = {
   medium: { label: "Mittel", tone: "warning" },
   high: { label: "Hoch", tone: "danger" },
   critical: { label: "Kritisch", tone: "danger" },
+  // ModelProfile lifecycle (AVAILABLE -> TESTING -> PILOT -> PRODUCTION -> RETIRED)
+  available: { label: "Verfügbar", tone: "neutral" },
+  testing: { label: "Testphase", tone: "info" },
+  pilot: { label: "Pilot", tone: "warning" },
+  production: { label: "Produktion", tone: "success" },
 };
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {

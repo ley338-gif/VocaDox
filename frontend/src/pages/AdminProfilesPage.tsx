@@ -12,13 +12,18 @@ import {
   listProcessingProfileVersions,
   listProcessingProfiles,
   publishProcessingProfileVersion,
+  type ProcessingProfileVersion,
 } from "../api/profiles";
 import { listTemplateVersions, listTemplates } from "../api/templates";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
-import { Select, TextInput } from "../design-system/FormControls";
+import { Card } from "../design-system/Card";
+import { Select, TextInput, Textarea } from "../design-system/FormControls";
+import { ErrorState } from "../design-system/States";
+import { StatusBadge } from "../design-system/StatusBadge";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
 /**
  * Phase 7 Admin Portal Processing Profiles page (AI > Processing
@@ -68,182 +73,157 @@ export function AdminProfilesPage() {
     });
   }
 
+  const versionColumns = (profileId: string): DataTableColumn<ProcessingProfileVersion>[] => [
+    { key: "version", header: "Version", render: (v) => `v${v.version_number}` },
+    { key: "status", header: "Status", render: (v) => <StatusBadge status={v.status} /> },
+    {
+      key: "speech",
+      header: "Sprach-Konfiguration",
+      render: (v) => (
+        <span style={{ fontSize: "var(--font-caption-size)" }}>
+          {v.speech_provider_config ? JSON.stringify(v.speech_provider_config) : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "diarization",
+      header: "Diarisierungs-Konfiguration",
+      render: (v) => (
+        <span style={{ fontSize: "var(--font-caption-size)" }}>
+          {v.diarization_provider_config ? JSON.stringify(v.diarization_provider_config) : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (v) =>
+        canWrite && v.status === "draft" ? (
+          <Button variant="primary" onClick={() => void handlePublish(profileId, v.id)}>
+            Veröffentlichen
+          </Button>
+        ) : null,
+    },
+  ];
+
   return (
     <AdminLayout>
       <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
-        Processing Profiles
+        Verarbeitungsprofile
       </h1>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        Processing Profiles bundle a template, extraction model, language,
-        retention policy, and speech/diarization provider hints into the
-        friendly, named preset a user picks when starting a conversation.
+      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)", marginBottom: "var(--space-6)" }}>
+        Verarbeitungsprofile bündeln eine Vorlage, ein Extraktionsmodell, Sprache, Aufbewahrungsrichtlinie
+        und Sprach-/Diarisierungs-Hinweise zu dem benannten Preset, das beim Starten eines Gesprächs
+        ausgewählt wird.
       </p>
 
-      {processingProfilesQuery.data?.map((profile) => (
-        <div
-          key={profile.id}
-          style={{
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <strong>{profile.name}</strong>{" "}
-              <code style={{ color: "var(--text-muted)" }}>({profile.key})</code>{" "}
-              {profile.is_system_default && <Badge tone="info">system default</Badge>}{" "}
-              {profile.current_published_version_id ? (
-                <Badge tone="success">published</Badge>
-              ) : (
-                <Badge tone="neutral">draft only</Badge>
-              )}
-            </div>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                setExpandedProfileId(expandedProfileId === profile.id ? null : profile.id)
-              }
-            >
-              {expandedProfileId === profile.id ? "Hide versions" : "Show versions"}
-            </Button>
-          </div>
-          <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)" }}>
-            {profile.description}
-          </p>
-
-          {expandedProfileId === profile.id && (
-            <>
-              {versionsQuery.data && (
-                <table style={{ width: "100%", marginTop: "var(--space-4)" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left" }}>Version</th>
-                      <th style={{ textAlign: "left" }}>Status</th>
-                      <th style={{ textAlign: "left" }}>Speech config</th>
-                      <th style={{ textAlign: "left" }}>Diarization config</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {versionsQuery.data.map((version) => (
-                      <tr key={version.id}>
-                        <td>v{version.version_number}</td>
-                        <td>
-                          <Badge tone={version.status === "published" ? "success" : "neutral"}>
-                            {version.status}
-                          </Badge>
-                        </td>
-                        <td style={{ fontSize: "var(--font-caption-size)" }}>
-                          {version.speech_provider_config
-                            ? JSON.stringify(version.speech_provider_config)
-                            : "—"}
-                        </td>
-                        <td style={{ fontSize: "var(--font-caption-size)" }}>
-                          {version.diarization_provider_config
-                            ? JSON.stringify(version.diarization_provider_config)
-                            : "—"}
-                        </td>
-                        <td>
-                          {canWrite && version.status === "draft" && (
-                            <Button
-                              variant="primary"
-                              onClick={() => void handlePublish(profile.id, version.id)}
-                            >
-                              Publish
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-
-              {canWrite && (
-                <div style={{ marginTop: "var(--space-4)" }}>
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      setShowNewVersion(showNewVersion === profile.id ? null : profile.id)
-                    }
-                  >
-                    {showNewVersion === profile.id ? "Cancel" : "New draft version"}
-                  </Button>
-                  {showNewVersion === profile.id && (
-                    <NewVersionForm
-                      processingProfileId={profile.id}
-                      templates={templatesQuery.data ?? []}
-                      modelProfiles={modelProfilesQuery.data ?? []}
-                      onCreated={() => {
-                        setShowNewVersion(null);
-                        void queryClient.invalidateQueries({
-                          queryKey: ["admin", "processing-profile-versions", profile.id],
-                        });
-                      }}
-                    />
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      ))}
-
-      <section style={{ marginTop: "var(--space-8)" }}>
-        <h2 style={{ fontSize: "var(--font-h2-size)" }}>Model Profiles</h2>
-        <p style={{ color: "var(--text-secondary)" }}>
-          Lifecycle: AVAILABLE → TESTING → PILOT → PRODUCTION → RETIRED, with rollback to any
-          earlier status. Every transition is an explicit admin action — nothing here ever
-          changes automatically.
-        </p>
-        {modelProfilesQuery.data?.map((mp) => (
-          <div
-            key={mp.id}
-            style={{
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4)",
-              marginTop: "var(--space-3)",
-            }}
-          >
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        {processingProfilesQuery.data?.map((profile) => (
+          <Card key={profile.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <strong>{mp.name}</strong> — {mp.provider}/{mp.model_identifier} (v{mp.version}){" "}
-                {mp.enabled ? (
-                  <Badge tone="success">enabled</Badge>
+                <strong>{profile.name}</strong>{" "}
+                <code style={{ color: "var(--text-muted)" }}>({profile.key})</code>{" "}
+                {profile.is_system_default && <Badge tone="info">Systemstandard</Badge>}{" "}
+                {profile.current_published_version_id ? (
+                  <Badge tone="success">veröffentlicht</Badge>
                 ) : (
-                  <Badge tone="neutral">disabled</Badge>
-                )}{" "}
-                <Badge tone={LIFECYCLE_TONE[mp.lifecycle_status] ?? "neutral"}>
-                  {mp.lifecycle_status}
-                </Badge>
+                  <Badge tone="neutral">nur Entwurf</Badge>
+                )}
               </div>
               <Button
                 variant="secondary"
                 onClick={() =>
-                  setExpandedLifecycleId(expandedLifecycleId === mp.id ? null : mp.id)
+                  setExpandedProfileId(expandedProfileId === profile.id ? null : profile.id)
                 }
               >
-                {expandedLifecycleId === mp.id ? "Hide lifecycle" : "Lifecycle"}
+                {expandedProfileId === profile.id ? "Versionen ausblenden" : "Versionen anzeigen"}
               </Button>
             </div>
-            {expandedLifecycleId === mp.id && <ModelLifecyclePanel modelProfileId={mp.id} />}
-          </div>
+            <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)" }}>
+              {profile.description}
+            </p>
+
+            {expandedProfileId === profile.id && (
+              <>
+                {versionsQuery.data && (
+                  <div style={{ marginTop: "var(--space-4)" }}>
+                    <DataTable
+                      columns={versionColumns(profile.id)}
+                      rows={versionsQuery.data}
+                      keyExtractor={(v) => v.id}
+                    />
+                  </div>
+                )}
+
+                {canWrite && (
+                  <div style={{ marginTop: "var(--space-4)" }}>
+                    <Button
+                      variant="secondary"
+                      onClick={() =>
+                        setShowNewVersion(showNewVersion === profile.id ? null : profile.id)
+                      }
+                    >
+                      {showNewVersion === profile.id ? "Abbrechen" : "Neue Entwurfsversion"}
+                    </Button>
+                    {showNewVersion === profile.id && (
+                      <NewVersionForm
+                        processingProfileId={profile.id}
+                        templates={templatesQuery.data ?? []}
+                        modelProfiles={modelProfilesQuery.data ?? []}
+                        onCreated={() => {
+                          setShowNewVersion(null);
+                          void queryClient.invalidateQueries({
+                            queryKey: ["admin", "processing-profile-versions", profile.id],
+                          });
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </Card>
         ))}
+      </div>
+
+      <section style={{ marginTop: "var(--space-8)" }}>
+        <h2 style={{ fontSize: "var(--font-h2-size)" }}>Modellprofile</h2>
+        <p style={{ color: "var(--text-secondary)" }}>
+          Lebenszyklus: VERFÜGBAR → TESTPHASE → PILOT → PRODUKTION → ZURÜCKGEZOGEN, mit Rollback zu
+          jedem früheren Status. Jeder Übergang ist eine explizite Admin-Aktion — nichts ändert
+          sich hier automatisch.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {modelProfilesQuery.data?.map((mp) => (
+            <Card key={mp.id}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <strong>{mp.name}</strong> — {mp.provider}/{mp.model_identifier} (v{mp.version}){" "}
+                  {mp.enabled ? (
+                    <Badge tone="success">aktiviert</Badge>
+                  ) : (
+                    <Badge tone="neutral">deaktiviert</Badge>
+                  )}{" "}
+                  <StatusBadge status={mp.lifecycle_status} />
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setExpandedLifecycleId(expandedLifecycleId === mp.id ? null : mp.id)
+                  }
+                >
+                  {expandedLifecycleId === mp.id ? "Lebenszyklus ausblenden" : "Lebenszyklus"}
+                </Button>
+              </div>
+              {expandedLifecycleId === mp.id && <ModelLifecyclePanel modelProfileId={mp.id} />}
+            </Card>
+          ))}
+        </div>
       </section>
     </AdminLayout>
   );
 }
-
-const LIFECYCLE_TONE: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
-  available: "neutral",
-  testing: "info",
-  pilot: "warning",
-  production: "success",
-  retired: "danger",
-};
 
 const LIFECYCLE_ORDER = ["available", "testing", "pilot", "production", "retired"];
 
@@ -283,7 +263,7 @@ function ModelLifecyclePanel({ modelProfileId }: { modelProfileId: string }) {
       setNote("");
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "transition failed");
+      setError(err instanceof Error ? err.message : "Übergang fehlgeschlagen.");
     }
   }
 
@@ -299,7 +279,7 @@ function ModelLifecyclePanel({ modelProfileId }: { modelProfileId: string }) {
       setNote("");
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "rollback failed");
+      setError(err instanceof Error ? err.message : "Rollback fehlgeschlagen.");
     }
   }
 
@@ -309,7 +289,7 @@ function ModelLifecyclePanel({ modelProfileId }: { modelProfileId: string }) {
         <div style={{ display: "grid", gap: "var(--space-2)", maxWidth: "480px" }}>
           {nextStatus && (
             <>
-              <div style={{ fontWeight: 600 }}>Promote to {nextStatus}</div>
+              <div style={{ fontWeight: 600 }}>Befördern zu {nextStatus}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
                 {LIFECYCLE_CHECKLIST_KEYS.map((key) => (
                   <label key={key} style={{ display: "flex", gap: "var(--space-1)" }}>
@@ -323,12 +303,12 @@ function ModelLifecyclePanel({ modelProfileId }: { modelProfileId: string }) {
                 ))}
               </div>
               <TextInput
-                placeholder="Note (optional)"
+                placeholder="Notiz (optional)"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
               <Button variant="primary" onClick={() => void handlePromote()}>
-                Promote to {nextStatus}
+                Befördern zu {nextStatus}
               </Button>
             </>
           )}
@@ -350,24 +330,24 @@ function ModelLifecyclePanel({ modelProfileId }: { modelProfileId: string }) {
           )}
           {currentStatus === "retired" && (
             <div>
-              <div style={{ fontWeight: 600, marginTop: "var(--space-3)" }}>Reactivate</div>
+              <div style={{ fontWeight: 600, marginTop: "var(--space-3)" }}>Reaktivieren</div>
               <Button variant="secondary" onClick={() => void handleRollback("available")}>
                 → available
               </Button>
             </div>
           )}
-          {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
+          {error && <ErrorState message={error} />}
         </div>
       )}
 
-      <h4 style={{ marginTop: "var(--space-4)" }}>History</h4>
+      <h4 style={{ marginTop: "var(--space-4)" }}>Verlauf</h4>
       <ul>
         {lifecycleQuery.data?.events.map((event) => (
           <li key={event.id}>
             {new Date(event.created_at).toLocaleString()} —{" "}
             {event.from_status ? `${event.from_status} → ` : ""}
             {event.to_status}
-            {event.is_rollback ? " (rollback)" : ""}
+            {event.is_rollback ? " (Rollback)" : ""}
             {event.note ? `: ${event.note}` : ""}
           </li>
         ))}
@@ -404,7 +384,7 @@ function NewVersionForm({
 
   async function handleSubmit() {
     if (!csrfToken || !templateId || !publishedVersion) {
-      setError("Choose a template with a published version.");
+      setError("Eine Vorlage mit veröffentlichter Version auswählen.");
       return;
     }
     let speechConfig: Record<string, unknown> | null = null;
@@ -413,7 +393,7 @@ function NewVersionForm({
       speechConfig = speechConfigText.trim() ? JSON.parse(speechConfigText) : null;
       diarizationConfig = diarizationConfigText.trim() ? JSON.parse(diarizationConfigText) : null;
     } catch {
-      setError("Speech/diarization config must be valid JSON.");
+      setError("Sprach-/Diarisierungs-Konfiguration muss gültiges JSON sein.");
       return;
     }
     setError(null);
@@ -432,77 +412,69 @@ function NewVersionForm({
       );
       onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to create draft version");
+      setError(err instanceof Error ? err.message : "Entwurfsversion konnte nicht erstellt werden.");
     }
   }
 
   return (
-    <div
-      style={{
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-md)",
-        padding: "var(--space-4)",
-        marginTop: "var(--space-3)",
-        display: "grid",
-        gap: "var(--space-3)",
-        maxWidth: "480px",
-      }}
-    >
-      <label>
-        Template
-        <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-          <option value="">Choose a template…</option>
-          {templates
-            .filter((t) => t.current_published_version_id)
-            .map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.key}
-              </option>
-            ))}
-        </Select>
-      </label>
-      <label>
-        Extraction model
-        <Select
-          value={extractionModelProfileId}
-          onChange={(e) => setExtractionModelProfileId(e.target.value)}
-        >
-          <option value="">(inherit)</option>
-          {modelProfiles
-            .filter((m) => m.purpose === "extraction")
-            .map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-        </Select>
-      </label>
-      <label>
-        Language
-        <TextInput value={language} onChange={(e) => setLanguage(e.target.value)} />
-      </label>
-      <label>
-        Speech provider config (JSON)
-        <textarea
-          value={speechConfigText}
-          onChange={(e) => setSpeechConfigText(e.target.value)}
-          rows={3}
-          style={{ width: "100%", fontFamily: "monospace" }}
-        />
-      </label>
-      <label>
-        Diarization provider config (JSON)
-        <textarea
-          value={diarizationConfigText}
-          onChange={(e) => setDiarizationConfigText(e.target.value)}
-          rows={3}
-          style={{ width: "100%", fontFamily: "monospace" }}
-        />
-      </label>
-      {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
-      <Button variant="primary" onClick={() => void handleSubmit()}>
-        Create draft version
-      </Button>
-    </div>
+    <Card>
+      <div style={{ display: "grid", gap: "var(--space-3)", maxWidth: "480px" }}>
+        <label>
+          Vorlage
+          <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            <option value="">Vorlage wählen…</option>
+            {templates
+              .filter((t) => t.current_published_version_id)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.key}
+                </option>
+              ))}
+          </Select>
+        </label>
+        <label>
+          Extraktionsmodell
+          <Select
+            value={extractionModelProfileId}
+            onChange={(e) => setExtractionModelProfileId(e.target.value)}
+          >
+            <option value="">(geerbt)</option>
+            {modelProfiles
+              .filter((m) => m.purpose === "extraction")
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+          </Select>
+        </label>
+        <label>
+          Sprache
+          <TextInput value={language} onChange={(e) => setLanguage(e.target.value)} />
+        </label>
+        <label>
+          Sprach-Anbieter-Konfiguration (JSON)
+          <Textarea
+            value={speechConfigText}
+            onChange={(e) => setSpeechConfigText(e.target.value)}
+            rows={3}
+            style={{ width: "100%", fontFamily: "monospace" }}
+          />
+        </label>
+        <label>
+          Diarisierungs-Anbieter-Konfiguration (JSON)
+          <Textarea
+            value={diarizationConfigText}
+            onChange={(e) => setDiarizationConfigText(e.target.value)}
+            rows={3}
+            style={{ width: "100%", fontFamily: "monospace" }}
+          />
+        </label>
+        {error && <ErrorState message={error} />}
+        <Button variant="primary" onClick={() => void handleSubmit()}>
+          Entwurfsversion erstellen
+        </Button>
+      </div>
+    </Card>
   );
 }

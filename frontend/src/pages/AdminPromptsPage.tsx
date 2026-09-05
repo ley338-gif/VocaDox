@@ -1,11 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { listPromptVersions, listPrompts, publishPromptVersion } from "../api/templates";
+import { listPromptVersions, listPrompts, publishPromptVersion, type PromptVersion } from "../api/templates";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { Card } from "../design-system/Card";
+import { StatusBadge } from "../design-system/StatusBadge";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
 /**
  * Phase 7 Admin Portal Prompts page: the Prompt/PromptVersion lifecycle
@@ -36,80 +39,65 @@ export function AdminPromptsPage() {
     await queryClient.invalidateQueries({ queryKey: ["admin", "prompt-versions", promptId] });
   }
 
+  const versionColumns = (promptId: string): DataTableColumn<PromptVersion>[] => [
+    { key: "version", header: "Version", render: (v) => `v${v.version_number}` },
+    { key: "status", header: "Status", render: (v) => <StatusBadge status={v.status} /> },
+    {
+      key: "actions",
+      header: "",
+      render: (v) =>
+        canWrite && v.status !== "published" && v.status !== "retired" ? (
+          <Button variant="primary" onClick={() => void handlePublish(promptId, v.id)}>
+            Veröffentlichen
+          </Button>
+        ) : null,
+    },
+  ];
+
   return (
     <AdminLayout>
       <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Prompts</h1>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        Prompts carry the system prompt / category instructions a Processing
-        Profile can reference for LLM extraction. Publishing a new version
-        retires (never overwrites) the previously published one.
+      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)", marginBottom: "var(--space-6)" }}>
+        Prompts enthalten den System-Prompt / die Kategorie-Anweisungen, die ein Verarbeitungsprofil
+        für die LLM-Extraktion referenzieren kann. Das Veröffentlichen einer neuen Version zieht die
+        zuvor veröffentlichte zurück (überschreibt sie nie).
       </p>
 
-      {promptsQuery.data?.map((prompt) => (
-        <div
-          key={prompt.id}
-          style={{
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <strong>{prompt.name}</strong>{" "}
-              <code style={{ color: "var(--text-muted)" }}>({prompt.key})</code>{" "}
-              {prompt.current_published_version_id ? (
-                <Badge tone="success">published</Badge>
-              ) : (
-                <Badge tone="neutral">draft only</Badge>
-              )}
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        {promptsQuery.data?.map((prompt) => (
+          <Card key={prompt.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <strong>{prompt.name}</strong>{" "}
+                <code style={{ color: "var(--text-muted)" }}>({prompt.key})</code>{" "}
+                {prompt.current_published_version_id ? (
+                  <Badge tone="success">veröffentlicht</Badge>
+                ) : (
+                  <Badge tone="neutral">nur Entwurf</Badge>
+                )}
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  setExpandedPromptId(expandedPromptId === prompt.id ? null : prompt.id)
+                }
+              >
+                {expandedPromptId === prompt.id ? "Versionen ausblenden" : "Versionen anzeigen"}
+              </Button>
             </div>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                setExpandedPromptId(expandedPromptId === prompt.id ? null : prompt.id)
-              }
-            >
-              {expandedPromptId === prompt.id ? "Hide versions" : "Show versions"}
-            </Button>
-          </div>
 
-          {expandedPromptId === prompt.id && versionsQuery.data && (
-            <table style={{ width: "100%", marginTop: "var(--space-4)" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left" }}>Version</th>
-                  <th style={{ textAlign: "left" }}>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {versionsQuery.data.map((version) => (
-                  <tr key={version.id}>
-                    <td>v{version.version_number}</td>
-                    <td>
-                      <Badge tone={version.status === "published" ? "success" : "neutral"}>
-                        {version.status}
-                      </Badge>
-                    </td>
-                    <td>
-                      {canWrite && version.status !== "published" && version.status !== "retired" && (
-                        <Button
-                          variant="primary"
-                          onClick={() => void handlePublish(prompt.id, version.id)}
-                        >
-                          Publish
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      ))}
+            {expandedPromptId === prompt.id && versionsQuery.data && (
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <DataTable
+                  columns={versionColumns(prompt.id)}
+                  rows={versionsQuery.data}
+                  keyExtractor={(v) => v.id}
+                />
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
     </AdminLayout>
   );
 }

@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -11,7 +12,11 @@ import {
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Button } from "../design-system/Button";
+import { Card } from "../design-system/Card";
+import { FormField } from "../design-system/FormField";
 import { Select, TextInput } from "../design-system/FormControls";
+import { Modal } from "../design-system/Modal";
+import { ErrorState } from "../design-system/States";
 
 /**
  * Phase 7 Admin Portal Organizations page: list/create organizations and
@@ -41,66 +46,22 @@ export function AdminOrganizationsPage() {
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey: ["admin", "organizations"] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to create organization");
+      setError(err instanceof Error ? err.message : "Organisation konnte nicht erstellt werden.");
     }
   }
 
   return (
     <AdminLayout>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
-          Organizations
-        </h1>
-        <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
-          {showCreate ? "Cancel" : "New organization"}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Organisationen</h1>
+        <Button variant="primary" onClick={() => setShowCreate(true)}>
+          <Plus size={16} aria-hidden="true" /> Neue Organisation
         </Button>
       </div>
 
-      {showCreate && (
-        <div
-          style={{
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-            display: "grid",
-            gap: "var(--space-3)",
-            maxWidth: "420px",
-          }}
-        >
-          <TextInput
-            placeholder="Name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <TextInput
-            placeholder="Slug (e.g. general-medicine)"
-            value={form.slug}
-            onChange={(e) => setForm({ ...form, slug: e.target.value })}
-          />
-          <TextInput
-            placeholder="Description (optional)"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-          {error && <p style={{ color: "var(--color-danger)" }}>{error}</p>}
-          <Button variant="primary" onClick={() => void handleCreate()}>
-            Create
-          </Button>
-        </div>
-      )}
-
-      <div style={{ marginTop: "var(--space-6)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         {orgsQuery.data?.map((org) => (
-          <div
-            key={org.id}
-            style={{
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4)",
-              marginTop: "var(--space-3)",
-            }}
-          >
+          <Card key={org.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <strong>{org.name}</strong>{" "}
@@ -110,7 +71,7 @@ export function AdminOrganizationsPage() {
                 variant="secondary"
                 onClick={() => setExpandedOrgId(expandedOrgId === org.id ? null : org.id)}
               >
-                {expandedOrgId === org.id ? "Hide members" : "Show members"}
+                {expandedOrgId === org.id ? "Mitglieder ausblenden" : "Mitglieder anzeigen"}
               </Button>
             </div>
             {org.description && (
@@ -121,9 +82,27 @@ export function AdminOrganizationsPage() {
             {expandedOrgId === org.id && (
               <OrgMembers orgId={org.id} users={usersQuery.data ?? []} />
             )}
-          </div>
+          </Card>
         ))}
       </div>
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Neue Organisation">
+        <div style={{ display: "grid", gap: "var(--space-3)" }}>
+          <FormField label="Name" required>
+            <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </FormField>
+          <FormField label="Slug" hint="z. B. general-medicine" required>
+            <TextInput value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+          </FormField>
+          <FormField label="Beschreibung (optional)">
+            <TextInput value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </FormField>
+          {error && <ErrorState message={error} />}
+          <Button variant="primary" onClick={() => void handleCreate()}>
+            Erstellen
+          </Button>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 }
@@ -161,7 +140,7 @@ function OrgMembers({
       </ul>
       <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
         <Select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
-          <option value="">Add a user…</option>
+          <option value="">Benutzer hinzufügen…</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
               {u.username}
@@ -169,7 +148,7 @@ function OrgMembers({
           ))}
         </Select>
         <Button variant="secondary" onClick={() => void handleAdd()}>
-          Add
+          Hinzufügen
         </Button>
       </div>
     </div>
