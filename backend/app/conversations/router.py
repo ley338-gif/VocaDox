@@ -564,8 +564,23 @@ async def get_media_content_endpoint(
     )
     await db.commit()
 
+    # `inline`, not `attachment` (Starlette's `FileResponse(..., filename=...)`
+    # shortcut always sends `attachment`, which told browsers this was a
+    # download rather than playable media — found manually testing the
+    # in-app <audio> player: with `attachment`, HTML5 audio duration/
+    # seeking became unreliable across browsers even though playback
+    # itself often still worked). This is the one endpoint the in-app
+    # player's <audio src> actually points at (see
+    # frontend/src/api/conversations.ts's mediaContentUrl) — `inline`
+    # still lets a browser's own "Save audio as..." save it under a
+    # sensible filename if a user chooses to, it just no longer forces
+    # that behavior as the response's stated intent.
     filename = content_disposition_filename(media.original_filename)
-    return FileResponse(path=path, media_type=media.content_type, filename=filename)
+    return FileResponse(
+        path=path,
+        media_type=media.content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.delete(

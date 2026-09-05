@@ -112,9 +112,33 @@ services:
       # the session cookie at all. A real deployment sits behind TLS and
       # must leave this at its secure-by-default `true`.
       VOCADOX_SESSION_COOKIE_SECURE: ${VOCADOX_SESSION_COOKIE_SECURE:-false}
-      # api never loads a real speech/diarization provider itself (it only
-      # enqueues jobs) — kept at the safe "fake" default here regardless;
-      # only the worker services below set these to the real providers.
+      # api never actually RUNS a real speech/diarization/LLM provider
+      # (it only enqueues jobs — worker-speech/worker-diarization/
+      # worker-extraction below are the only processes that ever call
+      # .transcribe()/.diarize()/.complete()) and its image deliberately
+      # never installs the heavy [ai] extra (faster-whisper/pyannote.audio/
+      # torch) — see docs/architecture/adr/0016 and 0017. But these same
+      # env vars ARE now also read here so the admin Models/Speech/
+      # Diarization/LLM status pages report the real configured provider
+      # instead of a misleading "fake" that has nothing to do with what
+      # the workers actually run. This is safe without the [ai] extra
+      # installed: every provider's .status() (unlike .transcribe/
+      # .diarize/.complete) only checks file existence / device
+      # capabilities / a lightweight HTTP call — never imports
+      # faster_whisper/pyannote.audio/torch, and gracefully degrades to
+      # "not installed"/"cuda unavailable" rather than raising if a
+      # heavy package genuinely isn't importable. Found stale during a
+      # manual post-GA walkthrough: the Models page showed "fake" for
+      # everything even after real models were installed and the workers
+      # were correctly configured with real providers.
+      VOCADOX_SPEECH_PROVIDER: ${VOCADOX_SPEECH_PROVIDER:-fake}
+      VOCADOX_SPEECH_DEVICE: ${VOCADOX_SPEECH_DEVICE:-auto}
+      VOCADOX_DIARIZATION_PROVIDER: ${VOCADOX_DIARIZATION_PROVIDER:-fake}
+      VOCADOX_DIARIZATION_DEVICE: ${VOCADOX_DIARIZATION_DEVICE:-auto}
+      VOCADOX_LLM_PROVIDER: ${VOCADOX_LLM_PROVIDER:-fake}
+      VOCADOX_LLM_BASE_URL: ${VOCADOX_LLM_BASE_URL:-}
+      VOCADOX_LLM_MODEL: ${VOCADOX_LLM_MODEL:-qwen2.5:14b}
+      VOCADOX_MODEL_VOLUME_ROOT: /app/data/models
       # Phase 11: separate volume from media/model storage (ADR-0018's
       # "don't mix storage purposes" principle applied a third time) —
       # backups must never live on the same volume as the data they back
@@ -134,6 +158,10 @@ services:
       # restart-persistence validation).
       - vocadox_backend_data:/app/data
       - vocadox_backups_data:/app/backups
+      # Read-only: the api process only ever checks whether model files
+      # exist for status-display purposes (see the env block above) —
+      # it must never write into the shared model volume itself.
+      - vocadox_models_data:/app/data/models:ro
     depends_on:
       migrate:
         condition: service_completed_successfully
