@@ -2,6 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getAbout } from "../api/admin";
 import { AdminLayout } from "../components/AdminLayout";
+import { Skeleton } from "../design-system/States";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
+
+interface LicenseRow {
+  category: string;
+  counts: Record<string, number>;
+}
+
+const COLUMNS: DataTableColumn<LicenseRow>[] = [
+  { key: "category", header: "Kategorie", render: (r) => r.category.replace(/_/g, " ") },
+  { key: "approved", header: "Genehmigt", render: (r) => r.counts.approved ?? 0 },
+  { key: "review", header: "Prüfung nötig", render: (r) => r.counts.review_required ?? 0 },
+  { key: "blocked", header: "Blockiert", render: (r) => r.counts.blocked ?? 0 },
+  { key: "unknown", header: "Unbekannt", render: (r) => r.counts.unknown ?? 0 },
+];
 
 /**
  * Phase 7 Admin Portal About & Licenses page: application version plus
@@ -19,8 +34,9 @@ export function AdminAboutPage() {
   return (
     <AdminLayout>
       <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
-        About &amp; Licenses
+        Über &amp; Lizenzen
       </h1>
+      {aboutQuery.isLoading && <Skeleton height="6rem" />}
       {about && (
         <>
           <p style={{ marginTop: "var(--space-4)" }}>
@@ -28,46 +44,28 @@ export function AdminAboutPage() {
           </p>
 
           <section style={{ marginTop: "var(--space-6)" }}>
-            <h2 style={{ fontSize: "var(--font-h2-size)" }}>License compliance</h2>
+            <h2 style={{ fontSize: "var(--font-h2-size)", marginBottom: "var(--space-3)" }}>Lizenz-Compliance</h2>
             {Object.keys(about.license_summary).length === 0 ? (
               <p style={{ color: "var(--text-muted)" }}>
-                Compliance inventory files are not shipped in this deployment.
+                Compliance-Inventardateien sind in diesem Deployment nicht enthalten.
               </p>
             ) : (
-              <table style={{ width: "100%", marginTop: "var(--space-3)" }}>
-                <thead>
-                  <tr style={{ textAlign: "left" }}>
-                    <th>Category</th>
-                    <th>Approved</th>
-                    <th>Review required</th>
-                    <th>Blocked</th>
-                    <th>Unknown</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(about.license_summary).map(([category, counts]) => (
-                    <tr key={category}>
-                      <td>{category.replace(/_/g, " ")}</td>
-                      <td>{counts.approved}</td>
-                      <td>{counts.review_required}</td>
-                      <td>{counts.blocked}</td>
-                      <td>{counts.unknown}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={COLUMNS}
+                rows={Object.entries(about.license_summary).map(([category, counts]) => ({ category, counts }))}
+                keyExtractor={(r) => r.category}
+              />
             )}
           </section>
 
           <section style={{ marginTop: "var(--space-6)" }}>
-            <h2 style={{ fontSize: "var(--font-h2-size)" }}>Third-party notices</h2>
+            <h2 style={{ fontSize: "var(--font-h2-size)", marginBottom: "var(--space-3)" }}>Hinweise zu Drittanbietern</h2>
             <pre
               style={{
                 whiteSpace: "pre-wrap",
-                background: "var(--color-gray-100)",
+                background: "var(--surface-sunken)",
                 padding: "var(--space-4)",
                 borderRadius: "var(--radius-md)",
-                marginTop: "var(--space-3)",
                 maxHeight: "400px",
                 overflow: "auto",
               }}
