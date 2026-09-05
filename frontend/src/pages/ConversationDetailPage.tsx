@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { CheckSquare, Clock, FileText, Sparkles, Trash2, Users } from "lucide-react";
 import { useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
@@ -19,7 +19,9 @@ import {
   mediaContentUrl,
   uploadMedia,
 } from "../api/conversations";
-import { getProcessingStatus } from "../api/transcription";
+import { getDocument } from "../api/documents";
+import { listConversationTasks } from "../api/longitudinal";
+import { getProcessingStatus, listSpeakers } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
 import { DocumentPanel } from "../components/DocumentPanel";
@@ -27,15 +29,19 @@ import { FactsPanel } from "../components/FactsPanel";
 import { LongitudinalPanel } from "../components/LongitudinalPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
 import { ReviewWizard } from "../components/ReviewWizard";
+import { SpeakerBadge } from "../components/SpeakerBadge";
 import { TasksPanel } from "../components/TasksPanel";
 import { TranscriptPanel } from "../components/TranscriptPanel";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
+import { PageHeader } from "../design-system/PageHeader";
+import { SidePanelCard } from "../design-system/SidePanelCard";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { Tabs, type TabItem } from "../design-system/Tabs";
+import { CONVERSATION_TYPE_LABELS } from "../lib/conversationLabels";
 import styles from "./ConversationDetailPage.module.css";
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -113,6 +119,27 @@ export function ConversationDetailPage() {
     enabled: Boolean(conversationId) && (tab === "timeline" || tab === "details"),
   });
 
+  // Sidebar summaries — deliberately read the SAME query keys the owning
+  // tabs/panels already use (document/speakers/tasks), so React Query
+  // dedupes the request instead of firing a second network call, and the
+  // sidebar and its tab always agree with each other.
+  const documentQuery = useQuery({
+    queryKey: ["document", conversationId],
+    queryFn: () => getDocument(conversationId),
+    retry: false,
+    enabled: Boolean(conversationId),
+  });
+  const speakersQuery = useQuery({
+    queryKey: ["speakers", conversationId],
+    queryFn: () => listSpeakers(conversationId),
+    enabled: Boolean(conversationId),
+  });
+  const tasksQuery = useQuery({
+    queryKey: ["conversation-tasks", conversationId],
+    queryFn: () => listConversationTasks(conversationId),
+    enabled: Boolean(conversationId) && hasPermission("task:read"),
+  });
+
   const [participantName, setParticipantName] = useState("");
   const [participantType, setParticipantType] = useState("unknown");
   const [noteContent, setNoteContent] = useState("");
@@ -180,32 +207,58 @@ export function ConversationDetailPage() {
 
   const tabItems: TabItem[] = (Object.keys(TAB_LABELS) as Tab[]).map((t) => ({ id: t, label: TAB_LABELS[t] }));
 
+  const openTasks = (tasksQuery.data ?? []).filter((t) => t.status === "open");
+  const documentPreview = documentQuery.data?.current_revision?.rendered_text ?? null;
+
   return (
     <div>
-      <div className={styles.header}>
-        <div>
-          <h1 style={{ fontSize: "var(--font-h1-size)" }}>{conversation.title}</h1>
-          <div className={styles.meta}>
+      <PageHeader
+        breadcrumb={[{ label: "Gespräche", to: "/app/conversations" }, { label: conversation.title }]}
+        title={conversation.title}
+        meta={
+          <>
             <StatusBadge status={conversation.status} />
-            <span>{conversation.conversation_type}</span>
-            <span>{new Date(conversation.created_at).toLocaleString()}</span>
+            <span className={styles.metaItem}>{CONVERSATION_TYPE_LABELS[conversation.conversation_type]}</span>
+            <span className={styles.metaItem}>
+              <Clock size={13} aria-hidden="true" /> {new Date(conversation.created_at).toLocaleString()}
+            </span>
+            {conversation.duration_ms !== null && (
+              <span className={styles.metaItem}>{Math.round(conversation.duration_ms / 1000)}s</span>
+            )}
+            {participantsQuery.data && (
+              <span className={styles.metaItem}>
+                <Users size={13} aria-hidden="true" /> {participantsQuery.data.length} Teilnehmer
+              </span>
+            )}
             {conversation.privacy_mode === "restricted" && <Badge tone="warning">Eingeschränkt</Badge>}
-          </div>
-        </div>
-        {hasPermission("conversation:delete") && (
-          <Button
-            variant="destructive"
-            type="button"
-            onClick={() => {
-              if (confirm("Dieses Gespräch inkl. Medien löschen? Dies kann nicht rückgängig gemacht werden.")) {
-                deleteConversationMutation.mutate();
-              }
-            }}
-          >
-            <Trash2 size={16} aria-hidden="true" /> Löschen
-          </Button>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          hasPermission("document:approve") && (
+            <Button variant="primary" type="button" onClick={() => setTab("document")}>
+              Freigeben
+            </Button>
+          )
+        }
+        overflowActions={
+          hasPermission("conversation:delete")
+            ? [
+                {
+                  label: "Gespräch löschen",
+                  danger: true,
+                  icon: <Trash2 size={14} aria-hidden="true" />,
+                  onClick: () => {
+                    if (
+                      confirm("Dieses Gespräch inkl. Medien löschen? Dies kann nicht rückgängig gemacht werden.")
+                    ) {
+                      deleteConversationMutation.mutate();
+                    }
+                  },
+                },
+              ]
+            : undefined
+        }
+      />
 
       <Tabs idPrefix="conv" items={tabItems} activeId={tab} onChange={(id) => setTab(id as Tab)} />
 
@@ -540,6 +593,32 @@ export function ConversationDetailPage() {
         </div>
 
         <aside className={styles.sidebar}>
+          <SidePanelCard
+            icon={<Sparkles size={14} aria-hidden="true" />}
+            title="Kurzfassung"
+            action={
+              documentPreview && (
+                <Button variant="tertiary" type="button" onClick={() => setTab("document")}>
+                  Vollständig
+                </Button>
+              )
+            }
+          >
+            {documentQuery.isLoading && <Skeleton height="3rem" />}
+            {!documentQuery.isLoading && !documentPreview && (
+              <EmptyState
+                icon={<FileText size={18} aria-hidden="true" />}
+                title="Noch keine Dokumentation"
+                description="Automatisch erstellt, sobald ein Dokument zusammengestellt wurde."
+              />
+            )}
+            {documentPreview && (
+              <p className={styles.summaryPreview}>
+                {documentPreview.length > 320 ? `${documentPreview.slice(0, 320)}…` : documentPreview}
+              </p>
+            )}
+          </SidePanelCard>
+
           <Card title="Marker">
             {markersQuery.data && markersQuery.data.length === 0 && (
               <EmptyState title="Noch keine Marker" />
@@ -576,6 +655,71 @@ export function ConversationDetailPage() {
               </div>
             )}
           </Card>
+
+          <SidePanelCard
+            icon={<Users size={14} aria-hidden="true" />}
+            title="Teilnehmer"
+            action={
+              <Button variant="tertiary" type="button" onClick={() => setTab("participants")}>
+                Alle
+              </Button>
+            }
+          >
+            {participantsQuery.data && participantsQuery.data.length === 0 && (
+              <EmptyState title="Noch keine Teilnehmer" />
+            )}
+            <ul className={styles.list}>
+              {participantsQuery.data?.slice(0, 5).map((participant) => (
+                <li key={participant.id} className={styles.listItem}>
+                  <span>{participant.display_name}</span>
+                </li>
+              ))}
+            </ul>
+            {(speakersQuery.data ?? []).length > 0 && (
+              <>
+                <p className={styles.sidebarSubheading}>Sprecherzuordnung</p>
+                <div className={styles.speakerBadgeRow}>
+                  {speakersQuery.data?.map((speaker) => (
+                    <SpeakerBadge
+                      key={speaker.id}
+                      colorKey={speaker.internal_label}
+                      label={speaker.display_label ?? speaker.internal_label}
+                    />
+                  ))}
+                </div>
+                {hasPermission("speaker:assign") && (
+                  <Button variant="tertiary" type="button" onClick={() => setTab("transcript")}>
+                    Sprecherzuordnung bearbeiten
+                  </Button>
+                )}
+              </>
+            )}
+          </SidePanelCard>
+
+          {hasPermission("task:read") && (
+            <SidePanelCard
+              icon={<CheckSquare size={14} aria-hidden="true" />}
+              title="Nächste Schritte"
+              action={
+                <Button variant="tertiary" type="button" onClick={() => setTab("tasks")}>
+                  Alle
+                </Button>
+              }
+            >
+              {tasksQuery.isLoading && <Skeleton height="2rem" />}
+              {!tasksQuery.isLoading && openTasks.length === 0 && (
+                <EmptyState title="Keine offenen Aufgaben" />
+              )}
+              <ul className={styles.taskPreviewList}>
+                {openTasks.slice(0, 5).map((task) => (
+                  <li key={task.id} className={styles.taskPreviewItem}>
+                    <input type="checkbox" disabled aria-hidden="true" tabIndex={-1} />
+                    <span>{task.description}</span>
+                  </li>
+                ))}
+              </ul>
+            </SidePanelCard>
+          )}
         </aside>
       </div>
     </div>
