@@ -86,7 +86,14 @@ RUN useradd --create-home --uid 10001 vocadox
 # --no-cache && up -d`), not assumed. The actual persistent data lives in
 # a named volume mounted at /app/data (see deploy/docker-compose.yml), so
 # this only needs to own the mount point, not pre-populate real content.
-RUN mkdir -p /app/data/media /app/data/tmp-uploads && chown -R vocadox:vocadox /app/data
+#
+# Phase 11: same reasoning applies to /app/backups (settings.backup_root's
+# default `VOCADOX_BACKUP_ROOT=/app/backups`, its own named volume in
+# deploy/docker-compose.yml) — found the exact same way, via a real
+# `docker compose run --rm backup create` against fresh infrastructure,
+# which failed with a real PermissionError before this line was added.
+RUN mkdir -p /app/data/media /app/data/tmp-uploads /app/backups \
+    && chown -R vocadox:vocadox /app/data /app/backups
 
 USER vocadox
 

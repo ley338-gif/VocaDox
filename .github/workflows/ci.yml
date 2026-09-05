@@ -46,8 +46,12 @@ jobs:
     # that proof, separate from `backend` so a Postgres-specific failure
     # here is never confused with an application-logic test failure.
     services:
+      # Phase 11: kept in sync with deploy/docker-compose.yml's postgres
+      # version (17.6) — see that file's comment for why (a real
+      # backup/restore test surfaced a pg_dump/pg_restore client/server
+      # major-version mismatch against 16.x).
       postgres:
-        image: postgres:16.6-alpine3.20@sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc
+        image: postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
         env:
           POSTGRES_USER: vocadox
           POSTGRES_PASSWORD: changeme

@@ -41,14 +41,23 @@
 
 containers:
   - image: postgres
-    tag: "16.6-alpine3.20"
-    digest: "sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc"
+    tag: "17.6-alpine3.22"
+    digest: "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
     purpose: "Primary datastore (system of record)"
     source: "docker.io/library/postgres (Docker Official Image)"
     license: "PostgreSQL License (PostgreSQL Global Development Group)"
     pinned: true
     approval_status: approved
-    notes: "PostgreSQL License is in the approved list (equivalent to MIT/BSD-style permissive)."
+    notes: >
+      PostgreSQL License is in the approved list (equivalent to MIT/BSD-style
+      permissive). Bumped 16.6 -> 17.6 in Phase 11: a real backup/restore
+      test against fresh infrastructure found that the backend image's
+      `postgresql-client` package (Debian trixie ships 17.x) produces
+      pg_dump output a 16.x server's pg_restore rejects (`SET
+      transaction_timeout = 0;`, a GUC introduced in Postgres 17). Matching
+      the server to the client trixie ships avoids adding a third-party
+      apt repository (apt.postgresql.org) or copying cross-distro binaries
+      just to pin an older client. See PHASE_11_VALIDATION_REPORT.md.
 
   - image: valkey/valkey
     tag: "8.0.2-alpine"

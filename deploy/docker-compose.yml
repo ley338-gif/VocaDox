@@ -24,8 +24,20 @@
 # real-time-factor numbers).
 
 services:
+  # Phase 11: bumped 16.6 -> 17.6 to match the `postgresql-client` package
+  # Debian trixie's apt repo actually ships (17.x) — found via a REAL
+  # restore-into-fresh-infrastructure test: pg_dump 17.x (from the
+  # backend image's postgresql-client) emits `SET transaction_timeout =
+  # 0;` in its custom-format dump header (a GUC introduced in Postgres
+  # 17), which a 16.x server's pg_restore rejects with "unrecognized
+  # configuration parameter" — a real client/server major-version
+  # mismatch, not a hypothetical one. Matching the server to the client
+  # trixie ships is simpler and lower-risk than pinning postgresql-client
+  # to 16.x via the third-party apt.postgresql.org repository (extra
+  # supply-chain trust) or copying cross-distro binaries (fragile shared
+  # library ABI assumptions) — see PHASE_11_VALIDATION_REPORT.md, Restore.
   postgres:
-    image: postgres:16.6-alpine3.20@sha256:1e59919c179e296eaf3cc701f4d50bab5c393d7ed9746c188c9d519489c998dc
+    image: postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-vocadox}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
