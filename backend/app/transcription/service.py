@@ -78,11 +78,33 @@ async def create_transcript(
 
 
 async def mark_transcript_processing(
-    session: AsyncSession, transcript: Transcript, *, processing_run_id: uuid.UUID, language: str
+    session: AsyncSession,
+    transcript: Transcript,
+    *,
+    processing_run_id: uuid.UUID,
+    language: str,
+    provider: str | None = None,
+    model: str | None = None,
+    model_revision: str | None = None,
 ) -> None:
+    """Also syncs `provider`/`model`/`model_revision` from the real
+    `ProcessingRun` that actually did the work (when given), correcting
+    the values `create_transcript` initially wrote from the API process's
+    own (deliberately fake — see docker-compose.yml's `backend` service
+    comment) provider before the job was even dispatched. The worker that
+    actually transcribes is the only process that knows what it really
+    used; leaving the Transcript's own fields stale after real processing
+    would make its provenance metadata factually wrong, contradicting the
+    evidence-traceability principle this field exists to serve."""
     transcript.status = TranscriptStatus.PROCESSING.value
     transcript.processing_run_id = processing_run_id
     transcript.language = language
+    if provider is not None:
+        transcript.provider = provider
+    if model is not None:
+        transcript.model = model
+    if model_revision is not None:
+        transcript.model_revision = model_revision
     await session.flush()
 
 
