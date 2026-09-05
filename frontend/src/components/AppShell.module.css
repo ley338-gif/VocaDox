@@ -176,8 +176,20 @@
 
 .searchForm {
   flex: 1;
+  min-width: 0;
   max-width: 28rem;
   position: relative;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
+  }
+
+  .pageTitle {
+    display: none;
+  }
 }
 
 .searchInput {

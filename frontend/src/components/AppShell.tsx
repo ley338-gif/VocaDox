@@ -9,10 +9,19 @@ import styles from "./AppShell.module.css";
 import { ADMIN_SECTIONS, APP_SECTIONS, type NavSection } from "./navigation";
 
 const SIDEBAR_COLLAPSED_KEY = "vocadox.sidebarCollapsed";
+const NARROW_VIEWPORT_QUERY = "(max-width: 900px)";
 
 function readCollapsedPreference(): boolean {
   try {
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function matchesNarrowViewport(): boolean {
+  try {
+    return window.matchMedia(NARROW_VIEWPORT_QUERY).matches;
   } catch {
     return false;
   }
@@ -31,9 +40,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(matchesNarrowViewport);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Responsive (brief §24): below ~900px the sidebar auto-collapses to an
+  // icon rail regardless of the user's manual preference, which still
+  // takes over again once the viewport widens back out. Guarded because
+  // matchMedia doesn't exist in the jsdom test environment.
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia(NARROW_VIEWPORT_QUERY);
+    const onChange = (event: MediaQueryListEvent) => setIsNarrowViewport(event.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  const effectiveCollapsed = collapsed || isNarrowViewport;
 
   const isWorkspaceRoute = Boolean(user) && (location.pathname.startsWith("/app") || location.pathname.startsWith("/admin"));
   const isAdminSection = location.pathname.startsWith("/admin");
@@ -96,9 +120,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={styles.shell}>
-      <aside className={`${styles.sidebar} ${collapsed ? styles.sidebarCollapsed : ""}`}>
+      <aside className={`${styles.sidebar} ${effectiveCollapsed ? styles.sidebarCollapsed : ""}`}>
         <div className={styles.sidebarHeader}>
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <Link to="/app" className={styles.brand}>
               VocaDox
             </Link>
@@ -107,9 +131,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             type="button"
             className={styles.collapseButton}
             onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Sidebar erweitern" : "Sidebar einklappen"}
+            disabled={isNarrowViewport}
+            aria-label={effectiveCollapsed ? "Sidebar erweitern" : "Sidebar einklappen"}
           >
-            {collapsed ? <ChevronRight size={16} aria-hidden="true" /> : <ChevronLeft size={16} aria-hidden="true" />}
+            {effectiveCollapsed ? <ChevronRight size={16} aria-hidden="true" /> : <ChevronLeft size={16} aria-hidden="true" />}
           </button>
         </div>
         <nav className={styles.nav} aria-label={isAdminSection ? "Administration" : "Hauptnavigation"}>
@@ -118,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             if (visibleItems.length === 0) return null;
             return (
               <div className={styles.navSection} key={section.title ?? `section-${sectionIndex}`}>
-                {section.title && !collapsed && <div className={styles.navSectionTitle}>{section.title}</div>}
+                {section.title && !effectiveCollapsed && <div className={styles.navSectionTitle}>{section.title}</div>}
                 <ul className={styles.navList}>
                   {visibleItems.map((item) => {
                     const active = location.pathname === item.to;
@@ -128,10 +153,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                         <Link
                           to={item.to}
                           className={`${styles.navLink} ${active ? styles.navLinkActive : ""}`}
-                          title={collapsed ? item.label : undefined}
+                          title={effectiveCollapsed ? item.label : undefined}
                         >
                           <Icon size={18} aria-hidden="true" />
-                          {!collapsed && <span>{item.label}</span>}
+                          {!effectiveCollapsed && <span>{item.label}</span>}
                         </Link>
                       </li>
                     );
@@ -142,7 +167,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className={styles.sidebarFooter}>
-          {!collapsed ? (
+          {!effectiveCollapsed ? (
             <>
               <span>Lokal / On-Prem</span>
               <span>Keine Cloud</span>
