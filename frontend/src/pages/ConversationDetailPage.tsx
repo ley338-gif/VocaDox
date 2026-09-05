@@ -38,6 +38,7 @@ import { listFacts } from "../api/intelligence";
 import { assignSpeaker, getProcessingStatus, listSpeakers, processTranscript } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
+import { DocumentContent } from "../components/DocumentContent";
 import { DocumentPanel } from "../components/DocumentPanel";
 import { FactsPanel } from "../components/FactsPanel";
 import { LongitudinalPanel } from "../components/LongitudinalPanel";
@@ -265,7 +266,7 @@ export function ConversationDetailPage() {
   const tabItems: TabItem[] = PRIMARY_TAB_IDS.map((t) => ({ id: t, label: TAB_LABELS[t] }));
 
   const openTasks = (tasksQuery.data ?? []).filter((t) => t.status === "open");
-  const documentPreview = documentQuery.data?.current_revision?.rendered_text ?? null;
+  const documentSections = documentQuery.data?.current_revision?.structured_content ?? null;
 
   return (
     <div>
@@ -328,21 +329,21 @@ export function ConversationDetailPage() {
                   <h2 className={styles.overviewSummaryTitle}>
                     <Sparkles size={16} aria-hidden="true" /> Kurzfassung
                   </h2>
-                  {documentPreview && (
+                  {documentSections && (
                     <Button variant="tertiary" type="button" onClick={() => setTab("document")}>
                       Vollständig
                     </Button>
                   )}
                 </div>
                 {documentQuery.isLoading && <Skeleton height="3rem" />}
-                {!documentQuery.isLoading && !documentPreview && (
+                {!documentQuery.isLoading && !documentSections && (
                   <EmptyState
                     icon={<FileText size={18} aria-hidden="true" />}
                     title="Noch keine Dokumentation"
                     description="Automatisch erstellt, sobald ein Dokument zusammengestellt wurde."
                   />
                 )}
-                {documentPreview && <p className={styles.summaryPreview}>{documentPreview}</p>}
+                {documentSections && <DocumentContent sections={documentSections} />}
               </div>
 
               {conversation.description && (

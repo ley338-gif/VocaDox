@@ -36,7 +36,7 @@ import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
-import styles from "./DocumentPanel.module.css";
+import { DocumentContent } from "./DocumentContent";
 import panelStyles from "./FactsPanel.module.css";
 
 export function DocumentPanel({ conversationId }: { conversationId: string }) {
@@ -149,7 +149,7 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
             </p>
           )}
 
-          <div className={styles.documentText}>{revision.rendered_text}</div>
+          <DocumentContent sections={revision.structured_content} />
 
           {hasPermission("document:approve") && revision.status !== "approved" && (
             <div style={{ marginTop: "var(--space-4)" }}>

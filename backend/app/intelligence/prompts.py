@@ -19,7 +19,10 @@ SYSTEM_PROMPT = (
     "guessing. Every extracted item must include the transcript segment number(s) (the "
     "integer after 'SEG' in the transcript) that support it in 'evidence_segment_sequences'. "
     "If you cannot point to a specific segment, return an empty list for "
-    "'evidence_segment_sequences' rather than guessing a segment number."
+    "'evidence_segment_sequences' rather than guessing a segment number. All extracted text "
+    "values (e.g. subject, attribute, value, decision text, task description) MUST be written "
+    "in the same language the transcript itself is spoken in — never translate them to "
+    "English or any other language, regardless of the language of this instruction."
 )
 
 _CATEGORY_INSTRUCTIONS: dict[str, str] = {
