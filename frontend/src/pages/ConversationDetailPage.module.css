@@ -58,6 +58,28 @@
   margin-top: var(--space-3);
 }
 
+.addRowStacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.addRowStacked .addRow {
+  margin-top: 0;
+}
+
+.addRowStacked input,
+.addRowStacked select {
+  min-width: 0;
+  width: 100%;
+}
+
+.addRowStacked .addRow > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .summaryPreview {
   color: var(--text-secondary);
   font-size: var(--font-body-sm-size);
@@ -88,6 +110,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
 }
 
 .taskPreviewItem {
