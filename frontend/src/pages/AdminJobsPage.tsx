@@ -1,20 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { listJobs, retryJob } from "../api/admin";
+import { listJobs, retryJob, type ProcessingJobSummary } from "../api/admin";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
-import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Select } from "../design-system/FormControls";
-
-const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
-  queued: "info",
-  running: "warning",
-  succeeded: "success",
-  failed: "danger",
-  cancelled: "neutral",
-};
+import { StatusBadge } from "../design-system/StatusBadge";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
 /**
  * Phase 7 Admin Portal Jobs page: real `ProcessingJob` rows (Phase 3,
@@ -39,57 +32,44 @@ export function AdminJobsPage() {
     await queryClient.invalidateQueries({ queryKey: ["admin", "jobs"] });
   }
 
+  const columns: DataTableColumn<ProcessingJobSummary>[] = [
+    { key: "job_type", header: "Typ", render: (job) => job.job_type },
+    { key: "status", header: "Status", render: (job) => <StatusBadge status={job.status} /> },
+    { key: "attempt", header: "Versuch", render: (job) => `${job.attempt}/${job.max_attempts}` },
+    { key: "queued_at", header: "Eingereiht am", render: (job) => new Date(job.queued_at).toLocaleString() },
+    { key: "error", header: "Fehler", render: (job) => <span style={{ color: "var(--color-danger)" }}>{job.error_code ?? "—"}</span> },
+  ];
+
   return (
     <AdminLayout>
       <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Jobs</h1>
-      <div style={{ marginTop: "var(--space-4)" }}>
+      <div style={{ margin: "var(--space-4) 0" }}>
         <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="queued">Queued</option>
-          <option value="running">Running</option>
-          <option value="succeeded">Succeeded</option>
-          <option value="failed">Failed</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="">Alle Status</option>
+          <option value="queued">Wartend</option>
+          <option value="running">Läuft</option>
+          <option value="succeeded">Erfolgreich</option>
+          <option value="failed">Fehlgeschlagen</option>
+          <option value="cancelled">Abgebrochen</option>
         </Select>
       </div>
 
-      <table style={{ width: "100%", marginTop: "var(--space-4)", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Attempt</th>
-            <th>Queued at</th>
-            <th>Error</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {jobsQuery.data?.items.map((job) => (
-            <tr key={job.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <td>{job.job_type}</td>
-              <td>
-                <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>{job.status}</Badge>
-              </td>
-              <td>
-                {job.attempt}/{job.max_attempts}
-              </td>
-              <td>{new Date(job.queued_at).toLocaleString()}</td>
-              <td style={{ color: "var(--color-danger)" }}>{job.error_code ?? "—"}</td>
-              <td>
-                {job.status === "failed" && (
-                  <Button variant="secondary" onClick={() => void handleRetry(job.id)}>
-                    Retry
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+        columns={columns}
+        rows={jobsQuery.data?.items ?? []}
+        keyExtractor={(job) => job.id}
+        loading={jobsQuery.isLoading}
+        rowActions={(job) =>
+          job.status === "failed" ? (
+            <Button variant="secondary" onClick={() => void handleRetry(job.id)}>
+              Wiederholen
+            </Button>
+          ) : null
+        }
+      />
       {jobsQuery.data && (
         <p style={{ marginTop: "var(--space-3)", color: "var(--text-muted)" }}>
-          {jobsQuery.data.total} total job(s)
+          {jobsQuery.data.total} Job(s) insgesamt
         </p>
       )}
     </AdminLayout>

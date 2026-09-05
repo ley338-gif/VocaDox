@@ -7,12 +7,18 @@ import {
   listRetentionPolicies,
   runRetentionCleanup,
   updateRetentionPolicy,
+  type RetentionCleanupRun,
+  type RetentionPolicy,
 } from "../api/admin";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { FormField } from "../design-system/FormField";
 import { Checkbox, TextInput } from "../design-system/FormControls";
+import { Modal } from "../design-system/Modal";
+import { ErrorState } from "../design-system/States";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
 /**
  * Phase 7 Admin Portal Retention page: the `retention_policies` data
@@ -24,7 +30,9 @@ import { Checkbox, TextInput } from "../design-system/FormControls";
  * delete" — see backend/app/operations/retention_service.py for the full
  * set of safety rules this enforces server-side (this checkbox is a UX
  * safeguard on top of, never instead of, the server defaulting to
- * dry_run=true).
+ * dry_run=true). Redesign note: this destructive-action UX (checkbox +
+ * destructive-variant button + explicit "irreversible" label) is kept
+ * byte-for-byte identical in behavior — only surrounding chrome changed.
  */
 export function AdminRetentionPage() {
   const { csrfToken, hasPermission } = useAuth();
@@ -88,7 +96,7 @@ export function AdminRetentionPage() {
       setExecuteCleanup(false);
       await queryClient.invalidateQueries({ queryKey: ["admin", "retention-cleanup", "runs"] });
     } catch (err) {
-      setCleanupError(err instanceof Error ? err.message : "Retention cleanup run failed.");
+      setCleanupError(err instanceof Error ? err.message : "Retention-Cleanup-Lauf fehlgeschlagen.");
     } finally {
       setCleanupBusy(false);
     }
@@ -100,200 +108,142 @@ export function AdminRetentionPage() {
     await queryClient.invalidateQueries({ queryKey: ["admin", "retention-policies"] });
   }
 
+  const policyColumns: DataTableColumn<RetentionPolicy>[] = [
+    { key: "name", header: "Name", render: (p) => p.name },
+    { key: "retention", header: "Aufbewahrung", render: (p) => (p.retention_days !== null ? `${p.retention_days} Tage` : "unbegrenzt") },
+    { key: "source", header: "Quelle löschen", render: (p) => (p.delete_source_media ? "ja" : "nein") },
+    { key: "derived", header: "Abgeleitet löschen", render: (p) => (p.delete_derived_media ? "ja" : "nein") },
+    { key: "transcript", header: "Transkript löschen", render: (p) => (p.delete_transcript ? "ja" : "nein") },
+    {
+      key: "status",
+      header: "Status",
+      render: (p) => <Badge tone={p.active ? "success" : "neutral"}>{p.active ? "aktiv" : "inaktiv"}</Badge>,
+    },
+  ];
+
+  const runColumns: DataTableColumn<RetentionCleanupRun>[] = [
+    { key: "started", header: "Gestartet", render: (r) => new Date(r.started_at).toLocaleString() },
+    { key: "mode", header: "Modus", render: (r) => <Badge tone={r.dry_run ? "info" : "warning"}>{r.dry_run ? "Testlauf" : "ausgeführt"}</Badge> },
+    {
+      key: "status",
+      header: "Status",
+      render: (r) => (
+        <Badge tone={r.status === "succeeded" ? "success" : r.status === "failed" ? "danger" : "neutral"}>
+          {r.status}
+        </Badge>
+      ),
+    },
+    { key: "evaluated", header: "Geprüft", render: (r) => r.conversations_evaluated },
+    { key: "deleted", header: "Gelöscht", render: (r) => r.items_deleted },
+    { key: "freed", header: "Freigegeben", render: (r) => `${r.bytes_freed.toLocaleString()} B` },
+  ];
+
   return (
     <AdminLayout>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
-          Retention
-        </h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+        <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Aufbewahrung</h1>
         {canWrite && (
-          <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
-            {showCreate ? "Cancel" : "New policy"}
+          <Button variant="primary" onClick={() => setShowCreate(true)}>
+            Neue Richtlinie
           </Button>
         )}
       </div>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        Retention policies can be assigned to conversations (via a Processing
-        Profile or directly). No automated cleanup runs against them yet —
-        enforcement is a later phase; this page manages the policy
-        definitions only.
+      <p style={{ color: "var(--text-secondary)", marginBottom: "var(--space-4)" }}>
+        Aufbewahrungsrichtlinien können Gesprächen zugewiesen werden (über ein Verarbeitungsprofil
+        oder direkt). Es läuft noch keine automatisierte Bereinigung gegen sie — die Durchsetzung
+        erfolgt unten; diese Seite verwaltet nur die Richtliniendefinitionen.
       </p>
 
-      {showCreate && (
-        <div
-          style={{
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-            display: "grid",
-            gap: "var(--space-3)",
-            maxWidth: "420px",
-          }}
-        >
-          <TextInput
-            placeholder="Policy name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <TextInput
-            placeholder="Retention days (blank = indefinite)"
-            value={form.retention_days}
-            onChange={(e) => setForm({ ...form, retention_days: e.target.value })}
-          />
+      <DataTable
+        columns={policyColumns}
+        rows={policiesQuery.data ?? []}
+        keyExtractor={(p) => p.id}
+        loading={policiesQuery.isLoading}
+        rowActions={(p) =>
+          canWrite ? (
+            <Button variant="secondary" onClick={() => void handleToggleActive(p.id, p.active)}>
+              {p.active ? "Deaktivieren" : "Aktivieren"}
+            </Button>
+          ) : null
+        }
+      />
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Neue Aufbewahrungsrichtlinie">
+        <div style={{ display: "grid", gap: "var(--space-3)" }}>
+          <FormField label="Richtlinienname" required>
+            <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </FormField>
+          <FormField label="Aufbewahrungstage" hint="Leer lassen = unbegrenzt">
+            <TextInput value={form.retention_days} onChange={(e) => setForm({ ...form, retention_days: e.target.value })} />
+          </FormField>
           <label>
             <Checkbox
               checked={form.delete_source_media}
               onChange={(e) => setForm({ ...form, delete_source_media: e.target.checked })}
             />{" "}
-            Delete source media on expiry
+            Quellmedien bei Ablauf löschen
           </label>
           <label>
             <Checkbox
               checked={form.delete_derived_media}
               onChange={(e) => setForm({ ...form, delete_derived_media: e.target.checked })}
             />{" "}
-            Delete derived media on expiry
+            Abgeleitete Medien bei Ablauf löschen
           </label>
           <label>
             <Checkbox
               checked={form.delete_transcript}
               onChange={(e) => setForm({ ...form, delete_transcript: e.target.checked })}
             />{" "}
-            Delete transcript on expiry
+            Transkript bei Ablauf löschen
           </label>
           <Button variant="primary" onClick={() => void handleCreate()}>
-            Create
+            Erstellen
           </Button>
         </div>
-      )}
-
-      <table style={{ width: "100%", marginTop: "var(--space-6)", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-            <th>Name</th>
-            <th>Retention</th>
-            <th>Delete source</th>
-            <th>Delete derived</th>
-            <th>Delete transcript</th>
-            <th>Status</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {policiesQuery.data?.map((policy) => (
-            <tr key={policy.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <td>{policy.name}</td>
-              <td>{policy.retention_days !== null ? `${policy.retention_days} days` : "indefinite"}</td>
-              <td>{policy.delete_source_media ? "yes" : "no"}</td>
-              <td>{policy.delete_derived_media ? "yes" : "no"}</td>
-              <td>{policy.delete_transcript ? "yes" : "no"}</td>
-              <td>
-                <Badge tone={policy.active ? "success" : "neutral"}>
-                  {policy.active ? "active" : "inactive"}
-                </Badge>
-              </td>
-              <td>
-                {canWrite && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => void handleToggleActive(policy.id, policy.active)}
-                  >
-                    {policy.active ? "Deactivate" : "Activate"}
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      </Modal>
 
       {canRead && (
         <>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: "var(--space-8)",
-            }}
-          >
-            <h2>Retention cleanup</h2>
-          </div>
+          <h2 style={{ marginTop: "var(--space-8)", marginBottom: "var(--space-2)" }}>Retention-Cleanup</h2>
           <p style={{ color: "var(--text-secondary)" }}>
-            Evaluates every active policy above against its assigned
-            conversations and, once a conversation's age passes the
-            policy's threshold, performs real physical deletion (never a
-            soft-delete flag alone). Defaults to a safe dry run that
-            records exactly what would be deleted without touching
-            anything.
+            Prüft jede aktive Richtlinie oben gegen ihre zugewiesenen Gespräche und führt, sobald das
+            Alter eines Gesprächs den Schwellenwert der Richtlinie überschreitet, eine echte
+            physische Löschung durch (nie nur ein Soft-Delete-Flag). Standardmäßig ein sicherer
+            Testlauf, der genau protokolliert, was gelöscht würde, ohne etwas zu verändern.
           </p>
           {canTrigger && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-3)",
-                marginTop: "var(--space-3)",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
               <label>
                 <Checkbox
                   checked={executeCleanup}
                   onChange={(e) => setExecuteCleanup(e.target.checked)}
                 />{" "}
-                Actually delete (uncheck for a safe dry run)
+                Tatsächlich löschen (deaktivieren für einen sicheren Testlauf)
               </label>
               <Button
                 variant={executeCleanup ? "destructive" : "primary"}
                 onClick={() => void handleRunCleanup()}
                 disabled={cleanupBusy}
               >
-                {cleanupBusy ? "Running…" : executeCleanup ? "Run cleanup (irreversible)" : "Run dry run"}
+                {cleanupBusy ? "Läuft…" : executeCleanup ? "Cleanup ausführen (unumkehrbar)" : "Testlauf starten"}
               </Button>
             </div>
           )}
-          {cleanupError && <p style={{ color: "var(--status-error-text, crimson)" }}>{cleanupError}</p>}
+          {cleanupError && (
+            <div style={{ marginTop: "var(--space-3)" }}>
+              <ErrorState message={cleanupError} />
+            </div>
+          )}
 
-          <table style={{ width: "100%", marginTop: "var(--space-4)", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-                <th>Started</th>
-                <th>Mode</th>
-                <th>Status</th>
-                <th>Evaluated</th>
-                <th>Deleted</th>
-                <th>Bytes freed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cleanupRunsQuery.data?.map((run) => (
-                <tr key={run.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
-                  <td>{new Date(run.started_at).toLocaleString()}</td>
-                  <td>
-                    <Badge tone={run.dry_run ? "info" : "warning"}>
-                      {run.dry_run ? "dry run" : "executed"}
-                    </Badge>
-                  </td>
-                  <td>
-                    <Badge tone={run.status === "succeeded" ? "success" : run.status === "failed" ? "danger" : "neutral"}>
-                      {run.status}
-                    </Badge>
-                  </td>
-                  <td>{run.conversations_evaluated}</td>
-                  <td>{run.items_deleted}</td>
-                  <td>{run.bytes_freed.toLocaleString()} B</td>
-                </tr>
-              ))}
-              {cleanupRunsQuery.data?.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ color: "var(--text-muted)" }}>
-                    No retention cleanup runs yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <div style={{ marginTop: "var(--space-4)" }}>
+            <DataTable
+              columns={runColumns}
+              rows={cleanupRunsQuery.data ?? []}
+              keyExtractor={(r) => r.id}
+              empty={<p style={{ color: "var(--text-muted)" }}>Noch keine Retention-Cleanup-Läufe.</p>}
+            />
+          </div>
         </>
       )}
     </AdminLayout>

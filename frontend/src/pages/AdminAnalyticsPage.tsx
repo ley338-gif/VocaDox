@@ -3,12 +3,31 @@ import { useState } from "react";
 
 import { getCorrectionMetrics, getQualityMetrics, getTechnicalAnalytics } from "../api/analytics";
 import { AdminLayout } from "../components/AdminLayout";
+import { StatCard } from "../design-system/Card";
+import { TabPanel, Tabs } from "../design-system/Tabs";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
 type Tab = "technical" | "quality" | "corrections";
 
 function formatRate(rate: number | null): string {
-  return rate === null ? "n/a" : `${(rate * 100).toFixed(1)}%`;
+  return rate === null ? "k. A." : `${(rate * 100).toFixed(1)}%`;
 }
+
+interface JobTypeRow {
+  jobType: string;
+  queued: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  success_rate: number | null;
+  avg_latency_seconds: number | null;
+}
+
+const TAB_ITEMS = [
+  { id: "technical", label: "Technisch" },
+  { id: "quality", label: "Qualität" },
+  { id: "corrections", label: "Korrekturen" },
+];
 
 /**
  * Phase 8 Admin Portal Analytics page (spec roadmap §73): technical
@@ -40,144 +59,106 @@ export function AdminAnalyticsPage() {
     enabled: tab === "corrections",
   });
 
+  const jobTypeColumns: DataTableColumn<JobTypeRow>[] = [
+    { key: "jobType", header: "Job-Typ", render: (r) => r.jobType },
+    { key: "queued", header: "Wartend", render: (r) => r.queued },
+    { key: "running", header: "Läuft", render: (r) => r.running },
+    { key: "succeeded", header: "Erfolgreich", render: (r) => r.succeeded },
+    { key: "failed", header: "Fehlgeschlagen", render: (r) => r.failed },
+    { key: "rate", header: "Erfolgsrate", render: (r) => formatRate(r.success_rate) },
+    { key: "latency", header: "Ø Latenz", render: (r) => (r.avg_latency_seconds === null ? "k. A." : `${r.avg_latency_seconds.toFixed(1)}s`) },
+  ];
+
   return (
     <AdminLayout>
-      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
+      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)", marginBottom: "var(--space-4)" }}>
         Analytics
       </h1>
-      <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-4)" }}>
-        {(["technical", "quality", "corrections"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              padding: "var(--space-2) var(--space-3)",
-              border: "none",
-              borderBottom: tab === t ? "2px solid var(--accent)" : "2px solid transparent",
-              background: "transparent",
-              fontWeight: tab === t ? 600 : 400,
-              cursor: "pointer",
-              textTransform: "capitalize",
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <Tabs items={TAB_ITEMS} activeId={tab} onChange={(id) => setTab(id as Tab)} idPrefix="analytics" />
 
-      {tab === "technical" && technicalQuery.data && (
-        <section style={{ marginTop: "var(--space-6)" }}>
-          <p style={{ color: "var(--text-muted)" }}>
-            Last {technicalQuery.data.window_days} days — {technicalQuery.data.total_jobs} total
-            job(s).
-          </p>
-          <table style={{ width: "100%", marginTop: "var(--space-4)", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-                <th>Job type</th>
-                <th>Queued</th>
-                <th>Running</th>
-                <th>Succeeded</th>
-                <th>Failed</th>
-                <th>Success rate</th>
-                <th>Avg latency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(technicalQuery.data.by_job_type).map(([jobType, counts]) => (
-                <tr key={jobType} style={{ borderBottom: "1px solid var(--border-default)" }}>
-                  <td>{jobType}</td>
-                  <td>{counts.queued}</td>
-                  <td>{counts.running}</td>
-                  <td>{counts.succeeded}</td>
-                  <td>{counts.failed}</td>
-                  <td>{formatRate(counts.success_rate)}</td>
-                  <td>
-                    {counts.avg_latency_seconds === null
-                      ? "n/a"
-                      : `${counts.avg_latency_seconds.toFixed(1)}s`}
-                  </td>
-                </tr>
+      <TabPanel id="technical" activeId={tab} idPrefix="analytics">
+        {technicalQuery.data && (
+          <>
+            <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
+              Letzte {technicalQuery.data.window_days} Tage — {technicalQuery.data.total_jobs} Job(s) insgesamt.
+            </p>
+            <DataTable
+              columns={jobTypeColumns}
+              rows={Object.entries(technicalQuery.data.by_job_type).map(([jobType, counts]) => ({ jobType, ...counts }))}
+              keyExtractor={(r) => r.jobType}
+            />
+          </>
+        )}
+      </TabPanel>
+
+      <TabPanel id="quality" activeId={tab} idPrefix="analytics">
+        {qualityQuery.data && (
+          <>
+            <div style={{ display: "flex", gap: "var(--space-4)", flexWrap: "wrap" }}>
+              <StatCard
+                label="Transkript-Korrekturrate"
+                value={formatRate(qualityQuery.data.transcript_correction_rate)}
+                hint={`${qualityQuery.data.transcript_segments_corrected} von ${qualityQuery.data.transcript_segments_total} Segmenten korrigiert`}
+              />
+              <StatCard
+                label="Fakten korrigiert/entfernt"
+                value={formatRate(qualityQuery.data.fact_corrected_or_removed_rate)}
+                hint={`${qualityQuery.data.facts_total} Fakten insgesamt`}
+              />
+            </div>
+            <div style={{ marginTop: "var(--space-6)", display: "flex", gap: "var(--space-8)", flexWrap: "wrap" }}>
+              <div>
+                <h3 style={{ fontSize: "var(--font-h3-size)" }}>Fakten-Review-Status</h3>
+                <ul>
+                  {Object.entries(qualityQuery.data.fact_review_status_counts).map(([k, v]) => (
+                    <li key={k}>
+                      {k}: {v}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 style={{ fontSize: "var(--font-h3-size)" }}>Auflösung von Review-Hinweisen</h3>
+                <ul>
+                  {Object.entries(qualityQuery.data.review_issue_resolution_counts).map(([k, v]) => (
+                    <li key={k}>
+                      {k}: {v}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
+      </TabPanel>
+
+      <TabPanel id="corrections" activeId={tab} idPrefix="analytics">
+        {correctionsQuery.data && (
+          <>
+            <h3 style={{ fontSize: "var(--font-h3-size)" }}>Korrekturen nach Fakt-Kategorie</h3>
+            <ul>
+              {Object.entries(correctionsQuery.data.fact_corrections_by_category).map(([k, v]) => (
+                <li key={k}>
+                  {k}: {v}
+                </li>
               ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-
-      {tab === "quality" && qualityQuery.data && (
-        <section style={{ marginTop: "var(--space-6)" }}>
-          <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap" }}>
-            <div>
-              <div style={{ color: "var(--text-muted)" }}>Transcript correction rate</div>
-              <div style={{ fontSize: "var(--font-h2-size)" }}>
-                {formatRate(qualityQuery.data.transcript_correction_rate)}
-              </div>
-              <div style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)" }}>
-                {qualityQuery.data.transcript_segments_corrected} of{" "}
-                {qualityQuery.data.transcript_segments_total} segments corrected
-              </div>
-            </div>
-            <div>
-              <div style={{ color: "var(--text-muted)" }}>Fact corrected-or-removed rate</div>
-              <div style={{ fontSize: "var(--font-h2-size)" }}>
-                {formatRate(qualityQuery.data.fact_corrected_or_removed_rate)}
-              </div>
-              <div style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)" }}>
-                {qualityQuery.data.facts_total} facts total
-              </div>
-            </div>
-          </div>
-          <div style={{ marginTop: "var(--space-6)", display: "flex", gap: "var(--space-8)" }}>
-            <div>
-              <h3 style={{ fontSize: "var(--font-h3-size)" }}>Fact review status</h3>
-              <ul>
-                {Object.entries(qualityQuery.data.fact_review_status_counts).map(([k, v]) => (
-                  <li key={k}>
-                    {k}: {v}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 style={{ fontSize: "var(--font-h3-size)" }}>Review issue resolution</h3>
-              <ul>
-                {Object.entries(qualityQuery.data.review_issue_resolution_counts).map(([k, v]) => (
-                  <li key={k}>
-                    {k}: {v}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {tab === "corrections" && correctionsQuery.data && (
-        <section style={{ marginTop: "var(--space-6)" }}>
-          <h3 style={{ fontSize: "var(--font-h3-size)" }}>Corrections by fact category</h3>
-          <ul>
-            {Object.entries(correctionsQuery.data.fact_corrections_by_category).map(([k, v]) => (
-              <li key={k}>
-                {k}: {v}
-              </li>
-            ))}
-          </ul>
-          <h3 style={{ fontSize: "var(--font-h3-size)", marginTop: "var(--space-6)" }}>
-            Most-corrected subjects
-          </h3>
-          <ul>
-            {correctionsQuery.data.most_corrected_subjects.map((s) => (
-              <li key={s.subject}>
-                {s.subject}: {s.count}
-              </li>
-            ))}
-          </ul>
-          <p style={{ marginTop: "var(--space-6)", color: "var(--text-muted)" }}>
-            {correctionsQuery.data.transcript_segment_corrections_total} total transcript segment
-            correction(s).
-          </p>
-        </section>
-      )}
+            </ul>
+            <h3 style={{ fontSize: "var(--font-h3-size)", marginTop: "var(--space-6)" }}>
+              Am häufigsten korrigierte Subjekte
+            </h3>
+            <ul>
+              {correctionsQuery.data.most_corrected_subjects.map((s) => (
+                <li key={s.subject}>
+                  {s.subject}: {s.count}
+                </li>
+              ))}
+            </ul>
+            <p style={{ marginTop: "var(--space-6)", color: "var(--text-muted)" }}>
+              {correctionsQuery.data.transcript_segment_corrections_total} Transkriptsegment-Korrektur(en) insgesamt.
+            </p>
+          </>
+        )}
+      </TabPanel>
     </AdminLayout>
   );
 }

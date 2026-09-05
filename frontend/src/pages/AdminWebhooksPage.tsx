@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import {
   type WebhookCreated,
+  type WebhookDelivery,
   createWebhook,
   deleteWebhook,
   listOrganizations,
@@ -16,7 +17,12 @@ import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { Card } from "../design-system/Card";
+import { FormField } from "../design-system/FormField";
 import { Checkbox, TextInput, Select } from "../design-system/FormControls";
+import { Modal } from "../design-system/Modal";
+import { ErrorState } from "../design-system/States";
+import { DataTable, type DataTableColumn } from "../design-system/Table";
 
 /**
  * Phase 10 Admin Portal: Webhooks (spec §55). Follows AdminAuditPage's
@@ -78,7 +84,7 @@ export function AdminWebhooksPage() {
       setShowCreate(false);
       await queryClient.invalidateQueries({ queryKey: ["admin", "webhooks"] });
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "failed to create webhook");
+      setCreateError(err instanceof Error ? err.message : "Webhook konnte nicht erstellt werden.");
     }
   }
 
@@ -90,54 +96,70 @@ export function AdminWebhooksPage() {
 
   async function handleRotateSecret(webhookId: string) {
     if (!csrfToken) return;
-    if (!confirm("Rotate this webhook's signing secret? Update your receiver before rotating.")) return;
+    if (!confirm("Signaturschlüssel dieses Webhooks rotieren? Empfänger vorher aktualisieren.")) return;
     const rotated = await rotateWebhookSecret(webhookId, csrfToken);
     setRevealedSecret(rotated);
   }
 
   async function handleDelete(webhookId: string) {
     if (!csrfToken) return;
-    if (!confirm("Delete this webhook permanently?")) return;
+    if (!confirm("Diesen Webhook dauerhaft löschen?")) return;
     await deleteWebhook(webhookId, csrfToken);
     await queryClient.invalidateQueries({ queryKey: ["admin", "webhooks"] });
   }
 
   const orgName = (id: string) => orgsQuery.data?.find((o) => o.id === id)?.name ?? id;
 
+  const deliveryColumns: DataTableColumn<WebhookDelivery>[] = [
+    { key: "when", header: "Zeitpunkt", render: (d) => new Date(d.created_at).toLocaleString() },
+    { key: "event", header: "Ereignis", render: (d) => d.event_type },
+    { key: "attempt", header: "Versuch", render: (d) => d.attempt_number },
+    {
+      key: "status",
+      header: "Status",
+      render: (d) => (
+        <Badge tone={d.status === "success" ? "success" : d.status === "exhausted" ? "danger" : "warning"}>
+          {d.status}
+        </Badge>
+      ),
+    },
+    { key: "response", header: "Antwort", render: (d) => d.response_status_code ?? "—" },
+    { key: "error", header: "Fehler", render: (d) => <span style={{ fontSize: "var(--font-caption-size)" }}>{d.error_message ?? "—"}</span> },
+  ];
+
   return (
     <AdminLayout>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Webhooks</h1>
         {canWrite && (
-          <Button variant="primary" onClick={() => setShowCreate((v) => !v)}>
-            {showCreate ? "Cancel" : "New webhook"}
+          <Button variant="primary" onClick={() => setShowCreate(true)}>
+            Neuer Webhook
           </Button>
         )}
       </div>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        Deliveries are HMAC-SHA256 signed (X-VocaDox-Signature) and never
-        include conversation/transcript/fact/document content by default —
-        only event ids and metadata. Targets must be https and may not
-        resolve to a loopback/private/link-local address.
+      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        Zustellungen sind HMAC-SHA256-signiert (X-VocaDox-Signature) und enthalten standardmäßig nie
+        Gesprächs-/Transkript-/Fakten-/Dokumentinhalte — nur Ereignis-IDs und Metadaten. Ziele müssen
+        https sein und dürfen nicht auf eine Loopback-/private/link-lokale Adresse auflösen.
       </p>
 
       {revealedSecret && (
         <div
           style={{
-            border: "1px solid var(--color-warning-border, orange)",
+            border: "1px solid var(--color-warning)",
             borderRadius: "var(--radius-md)",
             padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-            background: "var(--surface-warning, rgba(255,180,0,0.08))",
+            marginBottom: "var(--space-4)",
+            background: "color-mix(in srgb, var(--color-warning) 10%, var(--surface-raised))",
           }}
         >
-          <strong>Signing secret for "{revealedSecret.name}" — copy it now, it will not be shown again:</strong>
+          <strong>Signaturschlüssel für "{revealedSecret.name}" — jetzt kopieren, er wird nicht erneut angezeigt:</strong>
           <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
             <code
               style={{
                 flex: 1,
                 padding: "var(--space-2)",
-                background: "var(--surface-secondary)",
+                background: "var(--surface-sunken)",
                 borderRadius: "var(--radius-sm)",
                 overflowWrap: "anywhere",
               }}
@@ -145,49 +167,93 @@ export function AdminWebhooksPage() {
               {revealedSecret.secret}
             </code>
             <Button variant="secondary" onClick={() => navigator.clipboard.writeText(revealedSecret.secret)}>
-              Copy
+              Kopieren
             </Button>
             <Button variant="secondary" onClick={() => setRevealedSecret(null)}>
-              Dismiss
+              Schließen
             </Button>
           </div>
         </div>
       )}
 
-      {showCreate && (
-        <div
-          style={{
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginTop: "var(--space-4)",
-            display: "grid",
-            gap: "var(--space-3)",
-            maxWidth: "480px",
-          }}
-        >
-          <TextInput
-            placeholder="Name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <Select
-            value={form.organization_id}
-            onChange={(e) => setForm({ ...form, organization_id: e.target.value })}
-          >
-            <option value="">Select organization…</option>
-            {orgsQuery.data?.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </Select>
-          <TextInput
-            placeholder="https://your-receiver.example.com/webhook"
-            value={form.target_url}
-            onChange={(e) => setForm({ ...form, target_url: e.target.value })}
-          />
-          <div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        {webhooksQuery.data?.map((webhook) => (
+          <Card key={webhook.id}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "var(--space-3)" }}>
+              <div>
+                <strong>{webhook.name}</strong>{" "}
+                <Badge tone={webhook.is_active ? "success" : "neutral"}>
+                  {webhook.is_active ? "aktiv" : "deaktiviert"}
+                </Badge>
+                <p style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)", overflowWrap: "anywhere", marginTop: "var(--space-1)" }}>
+                  {orgName(webhook.organization_id)} · {webhook.target_url}
+                </p>
+                <p style={{ color: "var(--text-secondary)", fontSize: "var(--font-caption-size)" }}>
+                  {webhook.event_types.join(", ")}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setExpandedWebhookId(expandedWebhookId === webhook.id ? null : webhook.id)}
+                >
+                  {expandedWebhookId === webhook.id ? "Log ausblenden" : "Zustellungsprotokoll"}
+                </Button>
+                {canWrite && (
+                  <>
+                    <Button variant="secondary" onClick={() => void handleToggleActive(webhook.id, webhook.is_active)}>
+                      {webhook.is_active ? "Deaktivieren" : "Aktivieren"}
+                    </Button>
+                    <Button variant="secondary" onClick={() => void handleRotateSecret(webhook.id)}>
+                      Schlüssel rotieren
+                    </Button>
+                    <Button variant="destructive" onClick={() => void handleDelete(webhook.id)}>
+                      Löschen
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {expandedWebhookId === webhook.id && (
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <strong>Zustellungsprotokoll ({deliveriesQuery.data?.total ?? 0} insgesamt)</strong>
+                <div style={{ marginTop: "var(--space-2)" }}>
+                  <DataTable
+                    columns={deliveryColumns}
+                    rows={deliveriesQuery.data?.items ?? []}
+                    keyExtractor={(d) => d.id}
+                  />
+                </div>
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Neuer Webhook">
+        <div style={{ display: "grid", gap: "var(--space-3)" }}>
+          <FormField label="Name" required>
+            <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </FormField>
+          <FormField label="Organisation" required>
+            <Select value={form.organization_id} onChange={(e) => setForm({ ...form, organization_id: e.target.value })}>
+              <option value="">Organisation wählen…</option>
+              {orgsQuery.data?.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Ziel-URL" required>
+            <TextInput
+              placeholder="https://ihr-empfaenger.example.com/webhook"
+              value={form.target_url}
+              onChange={(e) => setForm({ ...form, target_url: e.target.value })}
+            />
+          </FormField>
+          <Card title="Ereignistypen" padded>
             {eventTypesQuery.data?.event_types.map((eventType) => (
               <label key={eventType} style={{ display: "block" }}>
                 <Checkbox
@@ -197,107 +263,13 @@ export function AdminWebhooksPage() {
                 {eventType}
               </label>
             ))}
-          </div>
-          {createError && <p style={{ color: "var(--color-danger, red)" }}>{createError}</p>}
+          </Card>
+          {createError && <ErrorState message={createError} />}
           <Button variant="primary" onClick={() => void handleCreate()}>
-            Create
+            Erstellen
           </Button>
         </div>
-      )}
-
-      <table style={{ width: "100%", marginTop: "var(--space-6)", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-            <th>Name</th>
-            <th>Organization</th>
-            <th>Target</th>
-            <th>Events</th>
-            <th>Status</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {webhooksQuery.data?.map((webhook) => (
-            <>
-              <tr key={webhook.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
-                <td>{webhook.name}</td>
-                <td>{orgName(webhook.organization_id)}</td>
-                <td style={{ maxWidth: 240, overflowWrap: "anywhere" }}>{webhook.target_url}</td>
-                <td style={{ fontSize: "var(--font-caption-size)" }}>{webhook.event_types.join(", ")}</td>
-                <td>
-                  <Badge tone={webhook.is_active ? "success" : "neutral"}>
-                    {webhook.is_active ? "active" : "disabled"}
-                  </Badge>
-                </td>
-                <td style={{ display: "flex", gap: "var(--space-2)" }}>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setExpandedWebhookId(expandedWebhookId === webhook.id ? null : webhook.id)}
-                  >
-                    {expandedWebhookId === webhook.id ? "Hide log" : "Delivery log"}
-                  </Button>
-                  {canWrite && (
-                    <>
-                      <Button variant="secondary" onClick={() => void handleToggleActive(webhook.id, webhook.is_active)}>
-                        {webhook.is_active ? "Disable" : "Enable"}
-                      </Button>
-                      <Button variant="secondary" onClick={() => void handleRotateSecret(webhook.id)}>
-                        Rotate secret
-                      </Button>
-                      <Button variant="destructive" onClick={() => void handleDelete(webhook.id)}>
-                        Delete
-                      </Button>
-                    </>
-                  )}
-                </td>
-              </tr>
-              {expandedWebhookId === webhook.id && (
-                <tr key={`${webhook.id}-deliveries`}>
-                  <td colSpan={6} style={{ padding: "var(--space-3)", background: "var(--surface-secondary)" }}>
-                    <strong>Delivery log ({deliveriesQuery.data?.total ?? 0} total)</strong>
-                    <table style={{ width: "100%", marginTop: "var(--space-2)", borderCollapse: "collapse" }}>
-                      <thead>
-                        <tr style={{ textAlign: "left" }}>
-                          <th>When</th>
-                          <th>Event</th>
-                          <th>Attempt</th>
-                          <th>Status</th>
-                          <th>Response</th>
-                          <th>Error</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {deliveriesQuery.data?.items.map((delivery) => (
-                          <tr key={delivery.id}>
-                            <td>{new Date(delivery.created_at).toLocaleString()}</td>
-                            <td>{delivery.event_type}</td>
-                            <td>{delivery.attempt_number}</td>
-                            <td>
-                              <Badge
-                                tone={
-                                  delivery.status === "success"
-                                    ? "success"
-                                    : delivery.status === "exhausted"
-                                      ? "danger"
-                                      : "warning"
-                                }
-                              >
-                                {delivery.status}
-                              </Badge>
-                            </td>
-                            <td>{delivery.response_status_code ?? "—"}</td>
-                            <td style={{ fontSize: "var(--font-caption-size)" }}>{delivery.error_message ?? "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
-              )}
-            </>
-          ))}
-        </tbody>
-      </table>
+      </Modal>
     </AdminLayout>
   );
 }

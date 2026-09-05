@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getWorkersOverview } from "../api/admin";
 import { AdminLayout } from "../components/AdminLayout";
 import { Badge } from "../design-system/Badge";
+import { Card } from "../design-system/Card";
+import { Skeleton } from "../design-system/States";
 
 /**
  * Phase 7 Admin Portal Workers page: derived purely from `ProcessingJob`
@@ -15,43 +17,37 @@ export function AdminWorkersPage() {
 
   return (
     <AdminLayout>
-      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Workers</h1>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-4)" }}>
-        Derived from processing job activity — a worker is considered
-        "active" only while it currently holds a RUNNING job's lease.
+      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Worker</h1>
+      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)", marginBottom: "var(--space-6)" }}>
+        Abgeleitet aus der Verarbeitungsjob-Aktivität — ein Worker gilt nur als "aktiv", solange er
+        gerade den Lease eines laufenden Jobs hält.
       </p>
-      <div style={{ display: "grid", gap: "var(--space-4)", marginTop: "var(--space-6)" }}>
+      {workersQuery.isLoading && <Skeleton height="6rem" />}
+      <div style={{ display: "grid", gap: "var(--space-4)" }}>
         {workersQuery.data?.workers.map((w) => (
-          <div
-            key={w.role}
-            style={{
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4)",
-            }}
-          >
+          <Card key={w.role}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong>{w.role}</strong>
               <Badge tone={w.active_worker_ids.length > 0 ? "success" : "neutral"}>
-                {w.active_worker_ids.length > 0 ? "active" : "idle"}
+                {w.active_worker_ids.length > 0 ? "aktiv" : "inaktiv"}
               </Badge>
             </div>
             <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)" }}>
-              Job types: {w.job_types.join(", ")}
+              Job-Typen: {w.job_types.join(", ")}
             </p>
             <p style={{ color: "var(--text-secondary)" }}>
-              Running: {w.running_jobs} · Queued: {w.queued_jobs}
+              Läuft: {w.running_jobs} · Wartend: {w.queued_jobs}
             </p>
             {w.active_worker_ids.length > 0 && (
               <p style={{ color: "var(--text-secondary)" }}>
-                Active worker id(s): {w.active_worker_ids.join(", ")}
+                Aktive Worker-ID(s): {w.active_worker_ids.join(", ")}
               </p>
             )}
             <p style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)" }}>
-              Last activity:{" "}
-              {w.last_activity_at ? new Date(w.last_activity_at).toLocaleString() : "none observed"}
+              Letzte Aktivität:{" "}
+              {w.last_activity_at ? new Date(w.last_activity_at).toLocaleString() : "keine beobachtet"}
             </p>
-          </div>
+          </Card>
         ))}
       </div>
     </AdminLayout>
