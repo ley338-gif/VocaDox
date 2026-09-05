@@ -61,6 +61,103 @@ async def test_end_to_end_transcript_and_diarization(client, seeded, processing_
     assert resp.json()["status"] == "ready"
 
 
+async def test_transcript_provider_reflects_the_worker_that_actually_ran_it(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """Regression test for a real bug found manually testing a local
+    deployment with a real speech provider configured on worker-speech
+    but not on the backend/api container (the architecturally-intended
+    split — see docker-compose.yml's `backend` service comment: the api
+    "never loads a real speech/diarization provider itself... kept at
+    the safe 'fake' default here regardless").
+
+    `create_transcript` initially writes provider/model from the API
+    process's own (here: default fake) provider before the job is even
+    dispatched. If nothing corrects those fields once the job actually
+    runs, the Transcript's provenance metadata is just wrong whenever
+    the process that answers `POST .../process/transcript` differs from
+    the process that actually transcribes — exactly the case with the
+    real two-container topology. This test simulates that divergence
+    with two *different* fake providers standing in for "api's own
+    (irrelevant) provider" vs. "what worker-speech is really running",
+    and asserts the persisted Transcript ends up with the worker's real
+    values, not the api's initial placeholder.
+    """
+    from app.processing.queues import DIARIZATION_WORKER_JOB_TYPES, SPEECH_WORKER_JOB_TYPES
+    from app.providers.speech_to_text import FakeSpeechProvider, SpeechProviderStatus
+    from app.workers.processing_worker import ProcessingWorker
+
+    class _RealWorkerSpeechProvider(FakeSpeechProvider):
+        """Stands in for a real provider configured only on the speech
+        worker — distinguishable provider/model identity from whatever
+        the api/backend process's own `get_speech_provider()` reports."""
+
+        def status(self) -> SpeechProviderStatus:
+            return SpeechProviderStatus(
+                provider="faster-whisper",
+                model="Systran/faster-whisper-small",
+                model_revision="536b0662742c02347bc0e980a01041f333bce12",
+                installed=True,
+                device="cpu",
+                cuda_available=False,
+                detail="stand-in for a real worker-side provider in this test",
+            )
+
+    _, sessionmaker, queue, storage = processing_env
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id, _media_id = await create_conversation_with_source_audio(
+        client, headers, organization_id=seeded["org_a"]
+    )
+
+    resp = await _process_and_wait(client, headers, conversation_id, diarize=False)
+    assert resp.status_code == 202, resp.text
+    # The api process's own (default fake) provider wrote this initial,
+    # soon-to-be-stale placeholder value.
+    assert resp.json()["provider"] == "fake"
+
+    speech_worker = ProcessingWorker(
+        worker_id="test-speech-real",
+        job_types=SPEECH_WORKER_JOB_TYPES,
+        sessionmaker=sessionmaker,
+        queue=queue,
+        storage=storage,
+        speech_provider=_RealWorkerSpeechProvider(),
+    )
+    # diarize=False still needs an ALIGN pass to finalize the transcript
+    # as "ready" (with honestly UNASSIGNED segments — see
+    # test_process_without_diarize_still_produces_transcript below); the
+    # provider it uses is irrelevant to what this test is checking, so a
+    # plain default worker is enough.
+    diarization_worker = ProcessingWorker(
+        worker_id="test-diarization-default",
+        job_types=DIARIZATION_WORKER_JOB_TYPES,
+        sessionmaker=sessionmaker,
+        queue=queue,
+        storage=storage,
+    )
+    # Job creation writes a Transactional Outbox row rather than enqueuing
+    # directly (Phase 3.1) — each worker's own maintenance sweep relays
+    # it, which only happens as a side effect of `run_forever` below. So
+    # run at least once unconditionally before checking whether more work
+    # is left, mirroring `run_all_jobs`'s loop in this same conftest.
+    for _ in range(6):
+        await speech_worker.run_forever(max_iterations=1)
+        await diarization_worker.run_forever(max_iterations=1)
+        pending = sum(len(v) for v in queue._queues.values())  # noqa: SLF001
+        if pending == 0:
+            break
+
+    resp = await client.get(f"/api/v1/conversations/{conversation_id}/transcript", headers=headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "ready"
+    # Corrected to what the worker that actually ran it used — not the
+    # api process's stale initial placeholder.
+    assert body["provider"] == "faster-whisper"
+    assert body["model"] == "Systran/faster-whisper-small"
+    assert body["model_revision"] == "536b0662742c02347bc0e980a01041f333bce12"
+
+
 async def test_process_without_diarize_still_produces_transcript(
     client, seeded, processing_env  # noqa: ANN001
 ) -> None:

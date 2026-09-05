@@ -393,7 +393,13 @@ async def execute_transcribe(
     transcript = await get_active_transcript(session, source_media_id=job.source_media_id)
     if transcript is not None:
         await mark_transcript_processing(
-            session, transcript, processing_run_id=run.id, language=result.language
+            session,
+            transcript,
+            processing_run_id=run.id,
+            language=result.language,
+            provider=status.provider,
+            model=status.model,
+            model_revision=status.model_revision,
         )
 
     await record_event(
