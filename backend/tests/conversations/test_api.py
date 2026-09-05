@@ -239,6 +239,33 @@ async def test_media_content_is_served_inline_not_as_a_download(
     assert "session.wav" in disposition
 
 
+async def test_conversation_duration_is_synced_from_uploaded_source_audio(
+    client: AsyncClient, seeded: dict
+) -> None:
+    """Regression test: `Conversation.duration_ms` was declared since
+    Phase 2 but nothing ever set it — a real, fully "ready" conversation
+    with a known-duration source recording still showed "—" everywhere
+    (Conversations list, Overview tab), found during manual testing.
+    Upload now syncs it from the ingested source audio's own real
+    (wave-header-derived) duration."""
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+    assert conv["duration_ms"] is None
+
+    data = make_wav_bytes(duration_s=0.3, sample_rate=8000)
+    files = {"file": ("session.wav", data, "audio/wav")}
+    upload_response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/media", files=files, headers=headers
+    )
+    assert upload_response.status_code == 201, upload_response.text
+    media = upload_response.json()
+    assert media["duration_ms"] == 300
+
+    get_response = await client.get(f"/api/v1/conversations/{conv['id']}", headers=headers)
+    assert get_response.status_code == 200, get_response.text
+    assert get_response.json()["duration_ms"] == 300
+
+
 async def test_media_access_denied_across_organizations(client: AsyncClient, seeded: dict) -> None:
     alice_headers = await login(client, "alice", "a very strong password 123")
     conv = await _create_conversation(client, alice_headers, seeded["org_a"])
