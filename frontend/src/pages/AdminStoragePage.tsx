@@ -1,7 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { HardDrive } from "lucide-react";
 
 import { getStorageUsage } from "../api/admin";
 import { AdminLayout } from "../components/AdminLayout";
+import { Card, StatCard } from "../design-system/Card";
+import { Skeleton } from "../design-system/States";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -21,43 +24,32 @@ export function AdminStoragePage() {
 
   return (
     <AdminLayout>
-      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>Storage</h1>
+      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)", marginBottom: "var(--space-6)" }}>
+        Speicher
+      </h1>
+      {storageQuery.isLoading && <Skeleton height="6rem" />}
       {storage && (
-        <div style={{ display: "grid", gap: "var(--space-6)", marginTop: "var(--space-6)" }}>
-          <div
-            style={{
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4)",
-            }}
-          >
-            <strong>Conversation media</strong>
-            <p style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)" }}>
+        <div style={{ display: "grid", gap: "var(--space-4)", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+          <Card title="Gesprächsmedien">
+            <p style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)", marginBottom: "var(--space-3)" }}>
               {storage.media_storage_root}
             </p>
-            <p>Used: {formatBytes(storage.media_used_bytes)}</p>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Disk: {formatBytes(storage.media_disk_free_bytes)} free of{" "}
+            <StatCard label="Belegt" value={formatBytes(storage.media_used_bytes)} icon={<HardDrive size={18} aria-hidden="true" />} />
+            <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-3)" }}>
+              Datenträger: {formatBytes(storage.media_disk_free_bytes)} frei von{" "}
               {formatBytes(storage.media_disk_total_bytes)}
             </p>
-          </div>
-          <div
-            style={{
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-md)",
-              padding: "var(--space-4)",
-            }}
-          >
-            <strong>Model volume</strong>
-            <p style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)" }}>
+          </Card>
+          <Card title="Modell-Volume">
+            <p style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)", marginBottom: "var(--space-3)" }}>
               {storage.model_volume_root}
             </p>
-            <p>Used: {formatBytes(storage.model_volume_used_bytes)}</p>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Disk: {formatBytes(storage.model_volume_disk_free_bytes)} free of{" "}
+            <StatCard label="Belegt" value={formatBytes(storage.model_volume_used_bytes)} icon={<HardDrive size={18} aria-hidden="true" />} />
+            <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-3)" }}>
+              Datenträger: {formatBytes(storage.model_volume_disk_free_bytes)} frei von{" "}
               {formatBytes(storage.model_volume_disk_total_bytes)}
             </p>
-          </div>
+          </Card>
         </div>
       )}
     </AdminLayout>
