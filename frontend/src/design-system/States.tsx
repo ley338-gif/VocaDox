@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { Button } from "./Button";
@@ -59,4 +59,28 @@ interface SkeletonProps {
 export function Skeleton({ width = "100%", height = "1rem", className, style }: SkeletonProps) {
   const classes = [styles.skeleton, className].filter(Boolean).join(" ");
   return <div className={classes} style={{ width, height, ...style }} aria-hidden="true" />;
+}
+
+export function Spinner({ size = 16 }: { size?: number }) {
+  return <Loader2 size={size} className={styles.spinner} aria-hidden="true" />;
+}
+
+interface ProcessingBannerProps {
+  title: string;
+  description?: string;
+}
+
+/** Prominent "something is running in the background" banner — pairs a
+ * spinner with a short label so a page never just looks inert while a
+ * job (transcription, extraction, ...) is in flight. */
+export function ProcessingBanner({ title, description }: ProcessingBannerProps) {
+  return (
+    <div className={styles.processing} role="status">
+      <Spinner size={20} />
+      <div className={styles.processingText}>
+        <span className={styles.processingTitle}>{title}</span>
+        {description && <span>{description}</span>}
+      </div>
+    </div>
+  );
 }
