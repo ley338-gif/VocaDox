@@ -152,10 +152,16 @@
   gap: var(--space-2);
 }
 
-.dashboardGrid {
+.overviewTilesGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.overviewTileTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .speakerHintRow {
