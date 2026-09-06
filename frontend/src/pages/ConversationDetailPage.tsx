@@ -11,6 +11,7 @@ import {
   Sparkles,
   StickyNote,
   Trash2,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -30,11 +31,14 @@ import {
   listNotes,
   listParticipants,
   mediaContentUrl,
+  type Participant,
+  updateParticipant,
   uploadMedia,
 } from "../api/conversations";
 import { getDocument } from "../api/documents";
 import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
 import { listFacts } from "../api/intelligence";
+import { createKnownSpeaker, listKnownSpeakers } from "../api/people";
 import { assignSpeaker, getProcessingStatus, listSpeakers, processTranscript } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
@@ -174,19 +178,51 @@ export function ConversationDetailPage() {
 
   const [participantName, setParticipantName] = useState("");
   const [participantType, setParticipantType] = useState("unknown");
+  const [selectedKnownSpeakerId, setSelectedKnownSpeakerId] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [markerLabel, setMarkerLabel] = useState("");
+
+  const knownSpeakersQuery = useQuery({
+    queryKey: ["known-speakers", organizationId],
+    queryFn: () => listKnownSpeakers(organizationId ?? ""),
+    enabled: Boolean(organizationId) && hasPermission("known-speaker:read"),
+  });
 
   const addParticipantMutation = useMutation({
     mutationFn: () =>
       addParticipant(
         conversationId,
-        { display_name: participantName, participant_type: participantType as never },
+        {
+          display_name: participantName,
+          participant_type: participantType as never,
+          known_speaker_id: selectedKnownSpeakerId || null,
+        },
         csrfToken ?? ""
       ),
     onSuccess: () => {
       setParticipantName("");
+      setSelectedKnownSpeakerId("");
       void queryClient.invalidateQueries({ queryKey: ["conversation-participants", conversationId] });
+    },
+  });
+
+  const rememberParticipantMutation = useMutation({
+    mutationFn: async (participant: Participant) => {
+      const knownSpeaker = await createKnownSpeaker(
+        organizationId ?? "",
+        { display_name: participant.display_name },
+        csrfToken ?? ""
+      );
+      return updateParticipant(
+        conversationId,
+        participant.id,
+        { known_speaker_id: knownSpeaker.id },
+        csrfToken ?? ""
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["conversation-participants", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["known-speakers", organizationId] });
     },
   });
 
@@ -703,26 +739,69 @@ export function ConversationDetailPage() {
                 <li key={participant.id} className={styles.listItem}>
                   <span>
                     {participant.display_name} ({participant.participant_type})
+                    {participant.known_speaker_id && (
+                      <span className={styles.knownSpeakerBadge} title="Bekannte Person">
+                        {" "}
+                        ★
+                      </span>
+                    )}
                   </span>
-                  {hasPermission("conversation:manage-participants") && (
-                    <button
-                      type="button"
-                      aria-label={`${participant.display_name} entfernen`}
-                      onClick={() => removeParticipantMutation.mutate(participant.id)}
-                    >
-                      <Trash2 size={14} aria-hidden="true" />
-                    </button>
-                  )}
+                  <span className={styles.listItemActions}>
+                    {!participant.known_speaker_id &&
+                      hasPermission("known-speaker:manage") &&
+                      hasPermission("conversation:manage-participants") && (
+                        <button
+                          type="button"
+                          aria-label={`${participant.display_name} als bekannte Person merken`}
+                          title="Als bekannte Person merken"
+                          disabled={rememberParticipantMutation.isPending}
+                          onClick={() => rememberParticipantMutation.mutate(participant)}
+                        >
+                          <UserCheck size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                    {hasPermission("conversation:manage-participants") && (
+                      <button
+                        type="button"
+                        aria-label={`${participant.display_name} entfernen`}
+                        onClick={() => removeParticipantMutation.mutate(participant.id)}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
             {hasPermission("conversation:manage-participants") && (
               <div className={styles.addRowStacked}>
+                {(knownSpeakersQuery.data ?? []).length > 0 && (
+                  <Select
+                    aria-label="Bekannte Person auswählen"
+                    value={selectedKnownSpeakerId}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setSelectedKnownSpeakerId(value);
+                      const known = knownSpeakersQuery.data?.find((k) => k.id === value);
+                      if (known) setParticipantName(known.display_name);
+                    }}
+                  >
+                    <option value="">— Neue Person —</option>
+                    {knownSpeakersQuery.data?.map((known) => (
+                      <option key={known.id} value={known.id}>
+                        {known.display_name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
                 <TextInput
                   placeholder="Person A"
                   aria-label="Teilnehmername"
                   value={participantName}
-                  onChange={(event) => setParticipantName(event.target.value)}
+                  onChange={(event) => {
+                    setParticipantName(event.target.value);
+                    setSelectedKnownSpeakerId("");
+                  }}
                 />
                 <div className={styles.addRow}>
                   <Select

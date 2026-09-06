@@ -45,6 +45,12 @@ from app.media import models as _media_models  # noqa: F401,E402
 from app.operations import models as _operations_models  # noqa: F401,E402
 from app.organizations import models as _organizations_models  # noqa: F401
 
+# Post-GA: known_speakers FK-references organizations.id/users.id;
+# conversation_participants.known_speaker_id FK-references known_speakers.id
+# (declared on the conversations model, so people is imported after
+# conversations for readability only — SQLAlchemy resolves either order).
+from app.people import models as _people_models  # noqa: F401,E402
+
 # Phase 3: processing_runs must be imported before transcription/diarization
 # (both FK-reference processing_runs.id).
 from app.processing import models as _processing_models  # noqa: F401,E402

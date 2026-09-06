@@ -79,6 +79,17 @@
   font-size: var(--font-body-sm-size);
 }
 
+.listItemActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.knownSpeakerBadge {
+  color: var(--accent);
+}
+
 .emptyState {
   padding: var(--space-6);
   text-align: center;
