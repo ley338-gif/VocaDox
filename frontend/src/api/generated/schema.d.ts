@@ -2202,6 +2202,79 @@ export interface paths {
         patch: operations["update_known_speaker_endpoint_api_v1_known_speakers__known_speaker_id__patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/recap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Recap Endpoint */
+        get: operations["get_recap_endpoint_api_v1_conversations__conversation_id__recap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/recap/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Recap Endpoint */
+        post: operations["generate_recap_endpoint_api_v1_conversations__conversation_id__recap_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/recap/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Recap Endpoint */
+        post: operations["approve_recap_endpoint_api_v1_conversations__conversation_id__recap_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/recap/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Recap Endpoint
+         * @description Plain text export — the recap is meant to be copied into an email
+         *     or printed, matching the Document export's minimalism (PDF/DOCX
+         *     deliberately deferred, same rationale as app.documents.router).
+         */
+        get: operations["export_recap_endpoint_api_v1_conversations__conversation_id__recap_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3938,6 +4011,75 @@ export interface components {
             database: boolean;
             /** Valkey */
             valkey: boolean;
+        };
+        /** RecapResponse */
+        RecapResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Status */
+            status: string;
+            /** Current Revision Id */
+            current_revision_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            current_revision?: components["schemas"]["RecapRevisionResponse"] | null;
+        };
+        /** RecapRevisionResponse */
+        RecapRevisionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Recap Id
+             * Format: uuid
+             */
+            recap_id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Content */
+            content: string;
+            /** Language */
+            language: string | null;
+            /** Provider */
+            provider: string;
+            /** Model Identifier */
+            model_identifier: string;
+            /** Status */
+            status: string;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Approved By User Id */
+            approved_by_user_id: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ResolveReviewIssueRequest */
         ResolveReviewIssueRequest: {
@@ -9396,6 +9538,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnownSpeakerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recap_endpoint_api_v1_conversations__conversation_id__recap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_recap_endpoint_api_v1_conversations__conversation_id__recap_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_recap_endpoint_api_v1_conversations__conversation_id__recap_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_recap_endpoint_api_v1_conversations__conversation_id__recap_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

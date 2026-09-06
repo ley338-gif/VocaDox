@@ -8,6 +8,7 @@ import {
   Info,
   Link2,
   RefreshCw,
+  Send,
   Sparkles,
   StickyNote,
   Trash2,
@@ -46,6 +47,7 @@ import { DocumentContent } from "../components/DocumentContent";
 import { DocumentPanel } from "../components/DocumentPanel";
 import { FactsPanel } from "../components/FactsPanel";
 import { LongitudinalPanel } from "../components/LongitudinalPanel";
+import { RecapPanel } from "../components/RecapPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
 import { ReviewWizard } from "../components/ReviewWizard";
 import { SpeakerAssignRow } from "../components/SpeakerAssignRow";
@@ -79,6 +81,7 @@ const TAB_LABELS: Record<Tab, string> = {
   details: "Details",
   notes: "Notizen",
   activity: "Aktivität",
+  recap: "Recap",
 };
 
 const PRIMARY_TAB_IDS: Tab[] = ["overview", "transcript", "document", "review", "audio"];
@@ -95,7 +98,8 @@ type Tab =
   | "tasks"
   | "details"
   | "notes"
-  | "activity";
+  | "activity"
+  | "recap";
 
 export function ConversationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -426,6 +430,12 @@ export function ConversationDetailPage() {
                   description="Zeitpunkte & Status"
                   onClick={() => setTab("activity")}
                 />
+                <NavCard
+                  icon={<Send size={18} aria-hidden="true" />}
+                  title="Recap"
+                  description="KI-Entwurf zum Teilen mit Teilnehmer:innen"
+                  onClick={() => setTab("recap")}
+                />
               </div>
             </div>
           )}
@@ -688,6 +698,12 @@ export function ConversationDetailPage() {
                 Full event-level audit history is available to Auditor/System Admin roles via the
                 admin area in a later phase.
               </p>
+            </div>
+          )}
+
+          {tab === "recap" && (
+            <div className={styles.sideCard}>
+              <RecapPanel conversationId={conversationId} />
             </div>
           )}
         </div>
