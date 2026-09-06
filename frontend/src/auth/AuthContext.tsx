@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: response.display_name,
           email: response.email,
           permissions: response.permissions,
+          groups: response.groups,
         });
         try {
           const csrfResponse = await apiCsrf();
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       displayName: response.display_name,
       email: null,
       permissions: [],
+      groups: [],
     });
     const me = await apiMe();
     setUser({
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       displayName: me.display_name,
       email: me.email,
       permissions: me.permissions,
+      groups: me.groups,
     });
   }, []);
 

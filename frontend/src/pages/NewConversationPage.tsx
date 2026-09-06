@@ -19,7 +19,7 @@ type Mode = "record" | "upload";
 
 export function NewConversationPage() {
   const navigate = useNavigate();
-  const { csrfToken } = useAuth();
+  const { csrfToken, user } = useAuth();
   const [mode, setMode] = useState<Mode | null>(null);
   const [title, setTitle] = useState("");
   const [conversationType, setConversationType] = useState<ConversationType>("general");
@@ -27,6 +27,11 @@ export function NewConversationPage() {
   const [processingProfileId, setProcessingProfileId] = useState("");
   const [externalReference, setExternalReference] = useState("");
   const [privacyMode, setPrivacyMode] = useState<PrivacyMode>("standard");
+  // Post-GA team-scoped visibility: pre-select if the user has exactly one
+  // team, otherwise leave unselected (-> org-wide/no-team, today's
+  // behavior) rather than forcing a choice on someone with no team yet.
+  const myGroups = user?.groups ?? [];
+  const [groupId, setGroupId] = useState(() => (myGroups.length === 1 ? myGroups[0].id : ""));
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +64,7 @@ export function NewConversationPage() {
           external_reference: externalReference || undefined,
           privacy_mode: privacyMode,
           processing_profile_id: processingProfileId || undefined,
+          group_id: groupId || undefined,
         },
         csrfToken
       );
@@ -126,6 +132,19 @@ export function NewConversationPage() {
               ))}
             </Select>
           </FormField>
+
+          {myGroups.length > 0 && (
+            <FormField label="Team (optional)">
+              <Select value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+                <option value="">Kein Team — für die ganze Organisation sichtbar</option>
+                {myGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          )}
 
           <FormField label="Gesprächstyp">
             <Select

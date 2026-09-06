@@ -179,6 +179,19 @@ async def list_groups(session: AsyncSession) -> list[Group]:
     return list(result.scalars().all())
 
 
+async def list_user_groups(session: AsyncSession, user_id: uuid.UUID) -> list[Group]:
+    """A user's OWN team memberships — served on `GET /auth/me` so the
+    frontend can offer a team picker (e.g. NewConversationPage) without
+    needing the admin-only `GET /admin/groups` listing (group:manage)."""
+    result = await session.execute(
+        select(Group)
+        .join(UserGroupMembership, UserGroupMembership.group_id == Group.id)
+        .where(UserGroupMembership.user_id == user_id)
+        .order_by(Group.name)
+    )
+    return list(result.scalars().all())
+
+
 async def get_group(session: AsyncSession, group_id: uuid.UUID) -> Group | None:
     return await session.get(Group, group_id)
 

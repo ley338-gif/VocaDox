@@ -23,6 +23,8 @@ from app.audit.service import record_event
 from app.conversations.authz import (
     assert_organization_member_or_admin,
     authorize_conversation_access,
+    can_bypass_team_scope,
+    user_group_ids,
 )
 from app.conversations.models import Conversation
 from app.identity.deps import get_current_user, require_csrf, require_permission
@@ -169,7 +171,7 @@ async def list_tasks_endpoint(
     db: AsyncSession = Depends(get_session),
 ) -> list[FollowUpTaskResponse]:
     """Cross-conversation task list for the org-wide "Aufgaben" nav entry —
-    same permission + org-scoping pattern as
+    same permission + org/team-scoping pattern as
     `app.conversations.router.conversation_stats_endpoint`."""
     from app.identity.rbac import get_user_permissions
     from app.organizations.models import OrganizationMembership
@@ -188,9 +190,10 @@ async def list_tasks_endpoint(
             )
         )
         org_ids = {row[0] for row in result.all()}
+    group_ids = None if can_bypass_team_scope(permissions) else await user_group_ids(db, user.id)
 
     tasks = await list_tasks_for_organizations(
-        db, organization_ids=org_ids, status_filter=status_filter
+        db, organization_ids=org_ids, group_ids=group_ids, status_filter=status_filter
     )
     return [FollowUpTaskResponse.model_validate(t) for t in tasks]
 

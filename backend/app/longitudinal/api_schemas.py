@@ -52,6 +52,7 @@ class FollowUpTaskResponse(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     conversation_id: uuid.UUID
+    group_id: uuid.UUID | None
     source: str
     source_fact_id: uuid.UUID | None
     description: str

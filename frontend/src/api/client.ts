@@ -53,12 +53,18 @@ export interface LoginResponse {
   csrf_token: string;
 }
 
+export interface GroupSummary {
+  id: string;
+  name: string;
+}
+
 export interface CurrentUserResponse {
   user_id: string;
   username: string;
   display_name: string;
   email: string | null;
   permissions: string[];
+  groups: GroupSummary[];
 }
 
 export function login(username: string, password: string): Promise<LoginResponse> {

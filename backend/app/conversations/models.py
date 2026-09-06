@@ -102,6 +102,17 @@ class Conversation(Base):
     created_by_user_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # Post-GA team-scoped visibility: NULL means "no team assigned, visible
+    # to every member of the organization" (today's exact pre-existing
+    # behavior — every conversation created before this field existed, and
+    # any created without picking a team, stays this way). A non-NULL value
+    # scopes read access to that Group's members plus system:admin/
+    # conversation:read-cross-team — see app.conversations.authz. Reuses
+    # the existing Group model rather than a new "Team" entity — see
+    # app.identity.models.Group's own docstring.
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

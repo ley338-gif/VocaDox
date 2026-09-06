@@ -101,7 +101,7 @@ export function ConversationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation() as { state?: { startRecording?: boolean } };
   const navigate = useNavigate();
-  const { csrfToken, hasPermission } = useAuth();
+  const { csrfToken, hasPermission, user } = useAuth();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>(location.state?.startRecording ? "audio" : "overview");
   const [showRecorder, setShowRecorder] = useState(Boolean(location.state?.startRecording));
@@ -311,6 +311,12 @@ export function ConversationDetailPage() {
   }
   const conversation = conversationQuery.data;
   const sourceMedia = mediaQuery.data?.find((m) => m.kind === "source_audio");
+  // Post-GA team-scoped visibility: only resolvable to a name when the
+  // viewer is themselves a member of that team (user.groups is the
+  // viewer's OWN memberships, not a full org-wide team directory) — a
+  // cross-team Manager/Admin viewing another team's conversation simply
+  // sees no team badge rather than a name we can't actually confirm.
+  const myTeamName = user?.groups.find((g) => g.id === conversation.group_id)?.name;
 
   const tabItems: TabItem[] = PRIMARY_TAB_IDS.map((t) => ({ id: t, label: TAB_LABELS[t] }));
 
@@ -358,6 +364,7 @@ export function ConversationDetailPage() {
               </span>
             )}
             {conversation.privacy_mode === "restricted" && <Badge tone="warning">Eingeschränkt</Badge>}
+            {conversation.group_id && myTeamName && <Badge tone="neutral">Team: {myTeamName}</Badge>}
           </>
         }
         actions={
