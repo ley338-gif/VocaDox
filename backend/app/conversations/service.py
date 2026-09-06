@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import (
@@ -24,6 +24,7 @@ from app.conversations.models import (
     PrivacyMode,
 )
 from app.conversations.state_machine import transition
+from app.longitudinal.models import FollowUpTask
 from app.media.models import MediaAsset
 from app.providers.storage import StorageProvider
 
@@ -160,6 +161,15 @@ async def soft_delete_conversation(
     for media in result.scalars().all():
         await storage.delete(media.storage_key)
         media.deleted_at = datetime.now(UTC)
+
+    # FollowUpTask has no soft-delete concept of its own (see its model
+    # docstring -- it's a derived/denormalized view of the conversation, not
+    # an independent record), so a deleted conversation's tasks are hard-
+    # deleted here rather than left behind to keep showing up in the
+    # org-wide Aufgaben list forever.
+    await session.execute(
+        delete(FollowUpTask).where(FollowUpTask.conversation_id == conversation.id)
+    )
 
 
 # -- Participants -------------------------------------------------------
