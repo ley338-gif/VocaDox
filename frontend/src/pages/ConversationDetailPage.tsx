@@ -38,7 +38,6 @@ import {
 } from "../api/conversations";
 import { getDocument } from "../api/documents";
 import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
-import { listFacts } from "../api/intelligence";
 import { createKnownSpeaker, listKnownSpeakers } from "../api/people";
 import { assignSpeaker, getProcessingStatus, listSpeakers, processTranscript } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
@@ -84,7 +83,7 @@ const TAB_LABELS: Record<Tab, string> = {
   recap: "Recap",
 };
 
-const PRIMARY_TAB_IDS: Tab[] = ["overview", "transcript", "document", "review", "audio"];
+const PRIMARY_TAB_IDS: Tab[] = ["overview", "transcript", "facts", "document", "review", "audio"];
 
 type Tab =
   | "overview"
@@ -166,11 +165,6 @@ export function ConversationDetailPage() {
     queryKey: ["conversation-tasks", conversationId],
     queryFn: () => listConversationTasks(conversationId),
     enabled: Boolean(conversationId) && hasPermission("task:read"),
-  });
-  const factsQuery = useQuery({
-    queryKey: ["facts", conversationId],
-    queryFn: () => listFacts(conversationId),
-    enabled: Boolean(conversationId),
   });
   const externalReference = conversationQuery.data?.external_reference;
   const organizationId = conversationQuery.data?.organization_id;
@@ -392,12 +386,6 @@ export function ConversationDetailPage() {
                 </p>
               )}
               <div className={styles.dashboardGrid}>
-                <NavCard
-                  icon={<Sparkles size={18} aria-hidden="true" />}
-                  title="Fakten"
-                  description={`${factsQuery.data?.length ?? 0} extrahierte Fakten`}
-                  onClick={() => setTab("facts")}
-                />
                 <NavCard
                   icon={<History size={18} aria-hidden="true" />}
                   title="Verlauf"
