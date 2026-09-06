@@ -257,7 +257,11 @@ export function ConversationDetailPage() {
 
   const addMarkerMutation = useMutation({
     mutationFn: () =>
-      addMarker(conversationId, { timestamp_ms: 0, label: markerLabel || undefined }, csrfToken ?? ""),
+      addMarker(
+        conversationId,
+        { timestamp_ms: Math.round(activeMs), label: markerLabel || undefined },
+        csrfToken ?? ""
+      ),
     onSuccess: () => {
       setMarkerLabel("");
       void queryClient.invalidateQueries({ queryKey: ["conversation-markers", conversationId] });
@@ -608,6 +612,7 @@ export function ConversationDetailPage() {
                       setShowRecorder(false);
                       void queryClient.invalidateQueries({ queryKey: ["conversation-media", conversationId] });
                       void queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] });
+                      void queryClient.invalidateQueries({ queryKey: ["conversation-markers", conversationId] });
                     }}
                   />
                 )

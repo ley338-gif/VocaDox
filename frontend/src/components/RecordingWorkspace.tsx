@@ -2,7 +2,7 @@ import { AlertTriangle, Bookmark, Circle, Pause, Play, Square, Trash2, Upload } 
 import { useState } from "react";
 
 import { ApiError } from "../api/client";
-import { finalizeRecording } from "../api/conversations";
+import { addMarker, finalizeRecording } from "../api/conversations";
 import { Button } from "../design-system/Button";
 import { isRecordingSupported, useRecorder } from "../recording/useRecorder";
 import styles from "./RecordingWorkspace.module.css";
@@ -80,6 +80,18 @@ export function RecordingWorkspace({
     recorder.beginUpload();
     try {
       await finalizeRecording(conversationId, recorder.blob, idempotencyKey, csrfToken);
+      // Best-effort: the recording itself is the critical part and is
+      // already saved at this point, so a single marker failing to save
+      // must not surface as an "upload failed" error for the whole take.
+      await Promise.allSettled(
+        recorder.markers.map((marker) =>
+          addMarker(
+            conversationId,
+            { timestamp_ms: Math.round(marker.timestampMs), label: marker.label },
+            csrfToken
+          )
+        )
+      );
       recorder.uploadSucceeded();
       onFinalized();
     } catch (error) {
