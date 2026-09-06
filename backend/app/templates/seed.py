@@ -101,7 +101,13 @@ _MEETING_CATEGORIES = [
         "instruction": (
             "Extract concrete action items with a clear owner that someone committed to doing "
             "after this meeting. For each, note the owner, due date, and priority if stated, "
-            "using 'NOT_MENTIONED' for any field that wasn't."
+            "using 'NOT_MENTIONED' for any field that wasn't. Capture the due date exactly as "
+            "spoken, including relative or informal time references (e.g. 'tomorrow morning', "
+            "'by end of week', 'next Monday', 'morgen Vormittag') — a relative phrase still "
+            "counts as stated; only use 'NOT_MENTIONED' if no time reference was said at all. "
+            "If a speaker commits to doing something themselves (e.g. 'I can take care of "
+            "that', 'I'll do it', 'ich kann das übernehmen'), record them as the owner even "
+            "though they are only referred to in the first person, not by name."
         ),
         "fields": [
             {"name": "description", "max_length": 1024},
