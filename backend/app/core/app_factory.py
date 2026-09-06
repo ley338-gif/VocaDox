@@ -33,6 +33,7 @@ from app.platform.middleware import RequestIdMiddleware
 from app.platform.version import APPLICATION_VERSION
 from app.profiles.router import processing_router as processing_profiles_router
 from app.profiles.router import router as model_profiles_router
+from app.recap.router import router as recap_router
 from app.templates.router import prompts_router
 from app.templates.router import router as templates_router
 from app.transcription.router import router as transcription_router
@@ -81,5 +82,6 @@ def create_app() -> FastAPI:
     app.include_router(integrations_api_router, prefix=settings.api_prefix)
     app.include_router(operations_router, prefix=settings.api_prefix)
     app.include_router(known_speakers_router, prefix=settings.api_prefix)
+    app.include_router(recap_router, prefix=settings.api_prefix)
 
     return app
