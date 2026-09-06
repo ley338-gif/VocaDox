@@ -48,6 +48,7 @@ describe("RequireAuth", () => {
       display_name: "Alice",
       email: null,
       permissions: [],
+      groups: [],
     });
 
     render(
@@ -84,6 +85,7 @@ describe("RequirePermission", () => {
       display_name: "Alice",
       email: null,
       permissions: ["conversation:read"],
+      groups: [],
     });
 
     render(
@@ -115,6 +117,7 @@ describe("RequirePermission", () => {
       display_name: "Administrator",
       email: null,
       permissions: ["system:admin"],
+      groups: [],
     });
 
     render(

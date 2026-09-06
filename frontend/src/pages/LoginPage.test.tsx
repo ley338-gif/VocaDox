@@ -63,6 +63,7 @@ describe("LoginPage", () => {
         display_name: "Alice",
         email: null,
         permissions: [],
+        groups: [],
       });
 
     renderLoginPage();
