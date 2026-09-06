@@ -175,6 +175,12 @@ services:
       context: ../backend
       dockerfile: worker.Dockerfile
     command: ["--role", "speech"]
+    # Restart on crash (e.g. a host sleep/resume or Docker daemon restart
+    # killing the process) — without this, a crashed worker never comes
+    # back on its own and jobs sit stuck in "queued" indefinitely, since
+    # `docker compose up -d <other-service>` does not touch it. Not "always"
+    # — an explicit `docker compose stop worker-speech` should stay stopped.
+    restart: unless-stopped
     environment:
       VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
       VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
@@ -213,6 +219,8 @@ services:
       context: ../backend
       dockerfile: worker.Dockerfile
     command: ["--role", "diarization"]
+    # See worker-speech's restart comment above — same reasoning.
+    restart: unless-stopped
     environment:
       VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
       VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
@@ -266,6 +274,8 @@ services:
       context: ../backend
       dockerfile: worker.Dockerfile
     command: ["--role", "extraction"]
+    # See worker-speech's restart comment above — same reasoning.
+    restart: unless-stopped
     environment:
       VOCADOX_ENVIRONMENT: ${VOCADOX_ENVIRONMENT:-development}
       VOCADOX_LOG_LEVEL: ${VOCADOX_LOG_LEVEL:-INFO}
