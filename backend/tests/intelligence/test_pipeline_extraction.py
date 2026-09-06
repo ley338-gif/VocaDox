@@ -11,12 +11,13 @@ import json
 import uuid
 from typing import Any
 
+from app.diarization.models import DetectedSpeaker
 from app.intelligence.models import ExtractedFact, FactStatus
 from app.intelligence.service import run_extraction
 from app.profiles.models import ModelProfilePurpose
 from app.profiles.service import get_active_profile
 from app.providers.llm import LLMProvider, LLMResponse
-from app.review.models import ReviewIssue, ReviewIssueType, UncertaintyCategory
+from app.review.models import ReviewIssue, ReviewIssueStatus, ReviewIssueType, UncertaintyCategory
 from app.transcription.models import Transcript, TranscriptSegment
 from sqlalchemy import select
 
@@ -313,3 +314,215 @@ def uuid_from(value: str):
     import uuid
 
     return uuid.UUID(value)
+
+
+async def test_speaker_labels_are_passed_to_extraction_prompt(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """A segment linked to a DetectedSpeaker gets a '[label] ' prefix in
+    the transcript text sent to the LLM -- the only mechanism by which
+    decided_by/assignee can ever resolve to a real speaker instead of
+    NOT_MENTIONED or a fabricated placeholder like 'speaker_from_SEG_8'
+    (see app.intelligence.prompts.SYSTEM_PROMPT)."""
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id = await _make_ready_conversation_with_transcript(
+        client, headers, seeded["org_a"], processing_env
+    )
+    _, sessionmaker, _queue, _storage = processing_env
+    conversation_uuid = uuid.UUID(conversation_id)
+
+    captured_prompts: list[str] = []
+
+    class _CapturingStubProvider(_StubLLMProvider):
+        async def complete_structured(self, prompt: str, **kwargs: Any) -> LLMResponse:
+            captured_prompts.append(prompt)
+            return await super().complete_structured(prompt, **kwargs)
+
+    async with sessionmaker() as session:
+        result = await session.execute(
+            select(Transcript).where(Transcript.conversation_id == conversation_uuid)
+        )
+        transcript = result.scalars().first()
+        assert transcript is not None
+        segments = (
+            (
+                await session.execute(
+                    select(TranscriptSegment)
+                    .where(TranscriptSegment.transcript_id == transcript.id)
+                    .order_by(TranscriptSegment.sequence)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(segments) >= 1
+
+        speaker = DetectedSpeaker(
+            conversation_id=conversation_uuid,
+            internal_label="SPEAKER_00",
+            display_label="Dr. Müller",
+        )
+        session.add(speaker)
+        await session.flush()
+        segments[0].speaker_id = speaker.id
+        await session.flush()
+
+        profile = await get_active_profile(session, purpose=ModelProfilePurpose.EXTRACTION)
+        assert profile is not None
+
+        provider = _CapturingStubProvider({"facts": [], "decisions": [], "tasks": []})
+        await run_extraction(
+            session,
+            conversation_id=conversation_uuid,
+            transcript=transcript,
+            processing_run_id=None,
+            provider=provider,
+            profile=profile,
+        )
+        await session.commit()
+
+    assert captured_prompts, "expected at least one extraction prompt to be captured"
+    assert any("[Dr. Müller]" in p for p in captured_prompts)
+
+
+async def _run_extraction_once(
+    sessionmaker, conversation_uuid: uuid.UUID, provider: LLMProvider
+) -> None:
+    async with sessionmaker() as session:
+        result = await session.execute(
+            select(Transcript).where(Transcript.conversation_id == conversation_uuid)
+        )
+        transcript = result.scalars().first()
+        assert transcript is not None
+        profile = await get_active_profile(session, purpose=ModelProfilePurpose.EXTRACTION)
+        assert profile is not None
+        await run_extraction(
+            session,
+            conversation_id=conversation_uuid,
+            transcript=transcript,
+            processing_run_id=None,
+            provider=provider,
+            profile=profile,
+        )
+        await session.commit()
+
+
+async def test_reextraction_marks_previous_facts_superseded(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """A second extraction run must not leave the first run's facts as
+    duplicates alongside the new ones -- this is the direct cause of tasks
+    showing up multiple times in the Aufgaben list/Document/Recap."""
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id = await _make_ready_conversation_with_transcript(
+        client, headers, seeded["org_a"], processing_env
+    )
+    _, sessionmaker, _queue, _storage = processing_env
+    conversation_uuid = uuid.UUID(conversation_id)
+
+    provider = _StubLLMProvider(
+        {
+            "facts": [
+                {
+                    "subject": "Ramipril",
+                    "attribute": "dose",
+                    "value": "5mg",
+                    "certainty": "stated",
+                    "evidence_segment_sequences": [],
+                }
+            ],
+            "decisions": [],
+            "tasks": [],
+        }
+    )
+
+    await _run_extraction_once(sessionmaker, conversation_uuid, provider)
+
+    async with sessionmaker() as session:
+        result = await session.execute(
+            select(ExtractedFact).where(ExtractedFact.conversation_id == conversation_uuid)
+        )
+        first_run_facts = list(result.scalars().all())
+        assert len(first_run_facts) == 1
+        first_fact_id = first_run_facts[0].id
+        assert first_run_facts[0].status != FactStatus.SUPERSEDED.value
+
+    await _run_extraction_once(sessionmaker, conversation_uuid, provider)
+
+    async with sessionmaker() as session:
+        result = await session.execute(
+            select(ExtractedFact).where(ExtractedFact.conversation_id == conversation_uuid)
+        )
+        all_facts = {f.id: f for f in result.scalars().all()}
+        assert len(all_facts) == 2  # both runs' facts still exist -- never deleted
+        assert all_facts[first_fact_id].status == FactStatus.SUPERSEDED.value
+        second_fact = next(f for fid, f in all_facts.items() if fid != first_fact_id)
+        assert second_fact.status != FactStatus.SUPERSEDED.value
+
+    # The Fakten tab (and Document composition/Aufgaben sync) only ever
+    # show the current, non-superseded fact.
+    resp = await client.get(f"/api/v1/conversations/{conversation_id}/facts", headers=headers)
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
+
+
+async def test_reextraction_acknowledges_stale_open_review_issues(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """An OPEN review issue whose only related fact gets superseded by a
+    re-extraction must not stay OPEN forever -- otherwise it would
+    permanently block Document approval over a fact nobody can see
+    anymore."""
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id = await _make_ready_conversation_with_transcript(
+        client, headers, seeded["org_a"], processing_env
+    )
+    _, sessionmaker, _queue, _storage = processing_env
+    conversation_uuid = uuid.UUID(conversation_id)
+
+    # No resolvable evidence -> UNVERIFIED -> a MISSING_EVIDENCE review
+    # issue gets created, OPEN, every time this runs.
+    provider = _StubLLMProvider(
+        {
+            "facts": [
+                {
+                    "subject": "Ramipril",
+                    "attribute": "dose",
+                    "value": "5mg",
+                    "certainty": "stated",
+                    "evidence_segment_sequences": [],
+                }
+            ],
+            "decisions": [],
+            "tasks": [],
+        }
+    )
+
+    await _run_extraction_once(sessionmaker, conversation_uuid, provider)
+
+    async with sessionmaker() as session:
+        result = await session.execute(
+            select(ReviewIssue).where(
+                ReviewIssue.conversation_id == conversation_uuid,
+                ReviewIssue.uncertainty_category == UncertaintyCategory.MISSING_EVIDENCE.value,
+            )
+        )
+        issues = result.scalars().all()
+        assert len(issues) == 1
+        assert issues[0].status == ReviewIssueStatus.OPEN.value
+
+    await _run_extraction_once(sessionmaker, conversation_uuid, provider)
+
+    async with sessionmaker() as session:
+        result = await session.execute(
+            select(ReviewIssue).where(
+                ReviewIssue.conversation_id == conversation_uuid,
+                ReviewIssue.uncertainty_category == UncertaintyCategory.MISSING_EVIDENCE.value,
+            )
+        )
+        issues = list(result.scalars().all())
+        assert len(issues) == 2  # one per run -- never deleted
+        statuses = sorted(i.status for i in issues)
+        assert statuses == sorted(
+            [ReviewIssueStatus.ACKNOWLEDGED.value, ReviewIssueStatus.OPEN.value]
+        )

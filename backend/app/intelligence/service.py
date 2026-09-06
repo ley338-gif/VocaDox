@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import record_event
+from app.diarization.models import DetectedSpeaker
 from app.evidence.models import EvidenceType, FactEvidence
 from app.intelligence.contradictions import FactForContradictionCheck, detect_contradictions
 from app.intelligence.models import Certainty, ExtractedFact, FactCategory, FactStatus
@@ -25,7 +26,7 @@ from app.intelligence.schemas import NOT_MENTIONED
 from app.intelligence.uncertainty import classify as classify_uncertainty
 from app.profiles.models import ModelProfile
 from app.providers.llm import LLMProvider
-from app.review.models import ReviewIssue, ReviewIssueType
+from app.review.models import ReviewIssue, ReviewIssueStatus, ReviewIssueType
 from app.templates.models import TemplateVersion
 from app.templates.schema_builder import ResolvedCategory, resolve_categories
 from app.transcription.models import Transcript, TranscriptSegment
@@ -67,8 +68,40 @@ def _segment_text(segment: TranscriptSegment) -> str:
     return segment.corrected_text or segment.original_text
 
 
-def _build_transcript_text(segments: list[TranscriptSegment]) -> str:
-    pairs = [(s.sequence, _segment_text(s)) for s in segments]
+async def _load_speaker_labels(
+    session: AsyncSession, speaker_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """Resolves each `DetectedSpeaker.id` to the same `display_label ??
+    internal_label` a human reviewer already sees (see
+    app.diarization.service/the transcript UI's `SpeakerBadge`) — including
+    a real participant name once one has been assigned (`SpeakerAssignRow`
+    sets `display_label` to the participant's `display_name` on
+    assignment), so the extraction LLM is told the same identity a human
+    would use, never a separate/invented one."""
+    if not speaker_ids:
+        return {}
+    result = await session.execute(
+        select(DetectedSpeaker).where(DetectedSpeaker.id.in_(speaker_ids))
+    )
+    return {s.id: s.display_label or s.internal_label for s in result.scalars().all()}
+
+
+def _segment_line(segment: TranscriptSegment, speaker_labels: dict[uuid.UUID, str]) -> str:
+    """Prefixes the segment's text with its speaker's label when one is
+    resolvable, e.g. `[Dr. Müller] ...` — this is the ONLY mechanism by
+    which the extraction LLM learns who said what (see this module's
+    docstring and app.intelligence.prompts.SYSTEM_PROMPT); a segment with
+    no `speaker_id` (no diarization run, or a single-speaker conversation)
+    renders exactly as before, unprefixed."""
+    text = _segment_text(segment)
+    label = speaker_labels.get(segment.speaker_id) if segment.speaker_id else None
+    return f"[{label}] {text}" if label else text
+
+
+def _build_transcript_text(
+    segments: list[TranscriptSegment], speaker_labels: dict[uuid.UUID, str]
+) -> str:
+    pairs = [(s.sequence, _segment_line(s, speaker_labels)) for s in segments]
     text = render_transcript(pairs)
     if len(text) <= _MAX_TRANSCRIPT_CHARS:
         return text
@@ -148,6 +181,49 @@ async def _resolve_evidence(
     return True, avg_confidence, char_count
 
 
+async def _supersede_previous_facts(session: AsyncSession, *, conversation_id: uuid.UUID) -> None:
+    """A fresh extraction run always represents the conversation's current,
+    complete state, so every fact from an earlier run is marked
+    `FactStatus.SUPERSEDED` — never deleted (the audit trail, and any
+    `FactCorrection`s on it, stay intact), just hidden from every "current
+    state" read (Fakten tab, Document composition, the Aufgaben sync — see
+    each one's own `status != superseded` filter). A conversation being
+    extracted for the first time has nothing to supersede: a harmless
+    no-op, so first-extraction behavior is unchanged.
+
+    Also resolves the direct consequence for Review Issues: an OPEN issue
+    whose `related_fact_ids` are now entirely superseded is moved to
+    ACKNOWLEDGED (an existing, otherwise-unused ReviewIssueStatus) rather
+    than left open forever, which would otherwise permanently block
+    Document approval (`app.documents.service._open_blocking_issues`) over
+    a fact nobody can even see anymore. This deliberately never touches
+    `resolved_status`/`resolved_fact_id`/`resolved_by_user_id` — those stay
+    reserved for a real human Review Wizard action."""
+    result = await session.execute(
+        select(ExtractedFact).where(
+            ExtractedFact.conversation_id == conversation_id,
+            ExtractedFact.status != FactStatus.SUPERSEDED.value,
+        )
+    )
+    previous_facts = list(result.scalars().all())
+    if not previous_facts:
+        return
+    superseded_ids = {str(f.id) for f in previous_facts}
+    for fact in previous_facts:
+        fact.status = FactStatus.SUPERSEDED.value
+
+    open_issues_result = await session.execute(
+        select(ReviewIssue).where(
+            ReviewIssue.conversation_id == conversation_id,
+            ReviewIssue.status == ReviewIssueStatus.OPEN.value,
+        )
+    )
+    for issue in open_issues_result.scalars().all():
+        if issue.related_fact_ids and set(issue.related_fact_ids) <= superseded_ids:
+            issue.status = ReviewIssueStatus.ACKNOWLEDGED.value
+    await session.flush()
+
+
 async def run_extraction(
     session: AsyncSession,
     *,
@@ -189,9 +265,13 @@ async def run_extraction(
         ]
     effective_system_prompt = system_prompt or SYSTEM_PROMPT
 
+    await _supersede_previous_facts(session, conversation_id=conversation_id)
+
     segments = await _load_segments(session, transcript.id)
     segments_by_sequence = {s.sequence: s for s in segments}
-    transcript_text = _build_transcript_text(segments)
+    speaker_ids = {s.speaker_id for s in segments if s.speaker_id is not None}
+    speaker_labels = await _load_speaker_labels(session, speaker_ids)
+    transcript_text = _build_transcript_text(segments, speaker_labels)
 
     facts_by_category: dict[str, int] = {}
     created_facts: list[ExtractedFact] = []

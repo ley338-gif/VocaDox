@@ -101,3 +101,41 @@ async def test_recompose_creates_new_revision_never_mutates_prior(
     revisions = resp.json()
     assert [r["revision_number"] for r in revisions] == [1, 2]
     assert revisions[0]["id"] == revision_1_id
+
+
+async def test_recompose_after_reextraction_excludes_superseded_facts(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """A fact superseded by a later extraction run must never appear in a
+    freshly composed document -- otherwise re-processing a conversation
+    would duplicate every line in the Dokumentation."""
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id = await make_ready_conversation_with_transcript(
+        client, headers, seeded["org_a"], processing_env
+    )
+    _, sessionmaker, _queue, _storage = processing_env
+    import uuid as _uuid
+
+    async with sessionmaker() as session:
+        first_run_ids = await seed_facts_with_contradiction_and_clean_fact(
+            session, conversation_id=_uuid.UUID(conversation_id)
+        )
+    async with sessionmaker() as session:
+        second_run_ids = await seed_facts_with_contradiction_and_clean_fact(
+            session, conversation_id=_uuid.UUID(conversation_id)
+        )
+
+    resp = await client.post(
+        f"/api/v1/conversations/{conversation_id}/document/compose", json={}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    revision = resp.json()["current_revision"]
+
+    all_fact_ids_in_content = {
+        fid
+        for section in revision["structured_content"]
+        for statement in section["statements"]
+        for fid in statement["fact_ids"]
+    }
+    assert all_fact_ids_in_content == {str(v) for v in second_run_ids.values()}
+    assert not (all_fact_ids_in_content & {str(v) for v in first_run_ids.values()})
