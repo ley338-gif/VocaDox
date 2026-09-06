@@ -106,17 +106,36 @@ async def build_comparison(
 # -- Follow-ups / Tasks -------------------------------------------------
 
 
+# Category keys, across every template (app.templates.seed), whose facts
+# represent an actionable follow-up someone is meant to act on -- i.e.
+# should sync into the Aufgaben/Tasks list. The General template's builtin
+# "task" category and the Meeting template's "action_item" category are
+# the same concept (description + who + when) under different template-
+# defined keys/field names; Medical/Psychotherapy have no such category
+# today. Extend this set (and _assignee_from_value below, if a new
+# template uses yet another field name for "who") when a new template
+# adds its own actionable-item category, rather than assuming "task" is
+# the only one -- that assumption is exactly what caused Meeting-template
+# action items to never appear as tasks.
+_ACTIONABLE_FACT_CATEGORIES = frozenset({FactCategory.TASK.value, "action_item"})
+
+
+def _assignee_from_value(value: dict) -> str | None:
+    return value.get("assignee") or value.get("owner")
+
+
 async def sync_ai_extracted_tasks(session: AsyncSession, *, conversation: Conversation) -> int:
     """Idempotently ensure one `FollowUpTask(source=AI_EXTRACTED)` row
-    exists per `ExtractedFact(category="task")` on this conversation that
-    doesn't have one yet (matched by `source_fact_id`). Safe to call as
-    often as needed (e.g. on every task-list read) -- never creates a
-    duplicate, never overwrites a task a human has since edited/closed.
-    Returns the number of new rows created."""
+    exists per actionable `ExtractedFact` (see `_ACTIONABLE_FACT_CATEGORIES`)
+    on this conversation that doesn't have one yet (matched by
+    `source_fact_id`). Safe to call as often as needed (e.g. on every
+    task-list read) -- never creates a duplicate, never overwrites a task
+    a human has since edited/closed. Returns the number of new rows
+    created."""
     result = await session.execute(
         select(ExtractedFact).where(
             ExtractedFact.conversation_id == conversation.id,
-            ExtractedFact.category == FactCategory.TASK.value,
+            ExtractedFact.category.in_(_ACTIONABLE_FACT_CATEGORIES),
             ExtractedFact.status != "superseded",
         )
     )
@@ -138,7 +157,7 @@ async def sync_ai_extracted_tasks(session: AsyncSession, *, conversation: Conver
             continue
         value = fact.corrected_structured_value or fact.structured_value
         description = value.get("description") or "(no description)"
-        assignee = value.get("assignee")
+        assignee = _assignee_from_value(value)
         due_date = value.get("due_date")
         session.add(
             FollowUpTask(

@@ -66,6 +66,60 @@ async def test_ai_extracted_task_is_synced_from_existing_extracted_fact(
     assert len(resp2.json()) == 1
 
 
+async def test_ai_extracted_task_is_synced_from_meeting_action_item(
+    client: AsyncClient, app_env, seeded  # noqa: ANN001
+) -> None:
+    """The Meeting template's "action_item" category (owner/due_date, no
+    "assignee" key) must sync into the Tasks list exactly like the General
+    template's "task" category does -- regression test for a bug where the
+    sync only ever matched category=="task", so Meeting-template action
+    items never became a FollowUpTask."""
+    app, sessionmaker = app_env
+    headers = await login(client, "alice", "a very strong password 123")
+    org_a = seeded["org_a"]
+
+    resp = await client.post(
+        "/api/v1/conversations",
+        json={"title": "Team sync", "organization_id": org_a},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    conversation_id = resp.json()["id"]
+
+    async with sessionmaker() as session:
+        fact = ExtractedFact(
+            conversation_id=uuid.UUID(conversation_id),
+            processing_run_id=None,
+            category="action_item",
+            fact_type="action_item",
+            structured_value={
+                "description": "Set up the backup test environment",
+                "owner": "speaker_from_SEG_8",
+                "due_date": "tomorrow morning",
+                "priority": "NOT_MENTIONED",
+                "certainty": Certainty.STATED.value,
+                "evidence_segment_sequences": [],
+            },
+            certainty=Certainty.STATED.value,
+            confidence=None,
+            status=FactStatus.UNVERIFIED.value,
+        )
+        session.add(fact)
+        await session.commit()
+        fact_id = fact.id
+
+    resp = await client.get(f"/api/v1/conversations/{conversation_id}/tasks", headers=headers)
+    assert resp.status_code == 200, resp.text
+    tasks = resp.json()
+    assert len(tasks) == 1
+    task = tasks[0]
+    assert task["source"] == "ai_extracted"
+    assert task["source_fact_id"] == str(fact_id)
+    assert task["description"] == "Set up the backup test environment"
+    assert task["assignee"] == "speaker_from_SEG_8"
+    assert task["due_date"] == "tomorrow morning"
+
+
 async def test_user_created_task_full_lifecycle(
     client: AsyncClient, seeded  # noqa: ANN001
 ) -> None:
