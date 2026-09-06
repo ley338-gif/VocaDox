@@ -29,6 +29,7 @@ from app.identity.service import (
     create_local_user,
     get_or_create_group,
     get_role_by_name,
+    get_user_by_username,
 )
 from app.organizations.models import Organization, OrganizationMembership
 from app.platform.db import model_registry  # noqa: F401
@@ -37,6 +38,7 @@ from app.profiles.seed import apply_processing_profile_seed
 from app.profiles.seed import apply_seed as apply_model_profile_seed
 from app.templates.seed import apply_seed as apply_template_seed
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -131,6 +133,62 @@ async def seeded(app_env):
         await assign_role_to_group(session, group_id=admin_group.id, role_id=admin_role.id)
         await add_user_to_group(session, user_id=carol.id, group_id=admin_group.id)
         ids["carol_id"] = str(carol.id)
+
+        await session.commit()
+
+    return ids
+
+
+@pytest_asyncio.fixture
+async def team_seeded(app_env, seeded):
+    """Extends `seeded` with two users in the SAME organization (org_a) but
+    DIFFERENT teams, plus a Manager-role user (cross-team bypass) — isolates
+    team-scoping from organization-scoping, which the base `seeded` fixture
+    conflates (alice/bob differ in both org AND group at once)."""
+    app, sessionmaker = app_env
+    ids: dict[str, str] = {}
+    async with sessionmaker() as session:
+        org_a = (
+            await session.execute(select(Organization).where(Organization.slug == "org-a"))
+        ).scalar_one()
+
+        user_role = await get_role_by_name(session, "User")
+        assert user_role is not None
+        manager_role = await get_role_by_name(session, "Manager")
+        assert manager_role is not None
+
+        team_a = await get_or_create_group(session, name="Team A")
+        ids["team_a_id"] = str(team_a.id)
+        team_b = await get_or_create_group(session, name="Team B")
+        ids["team_b_id"] = str(team_b.id)
+
+        dave = await create_local_user(
+            session, username="dave", password="a third very strong pw 000", display_name="Dave"
+        )
+        await assign_role_to_group(session, group_id=team_b.id, role_id=user_role.id)
+        await add_user_to_group(session, user_id=dave.id, group_id=team_b.id)
+        session.add(OrganizationMembership(user_id=dave.id, organization_id=org_a.id))
+        ids["dave_id"] = str(dave.id)
+
+        # alice (from `seeded`) needs a real membership in team_a to be a
+        # useful "same team as the conversation" test subject -- her
+        # existing "Org A Clinicians" group from `seeded` is unrelated.
+        alice = await get_user_by_username(session, "alice")
+        assert alice is not None
+        await assign_role_to_group(session, group_id=team_a.id, role_id=user_role.id)
+        await add_user_to_group(session, user_id=alice.id, group_id=team_a.id)
+
+        erin = await create_local_user(
+            session,
+            username="erin",
+            password="a fourth very strong pw 111",
+            display_name="Erin",
+        )
+        manager_group = await get_or_create_group(session, name="Managers")
+        await assign_role_to_group(session, group_id=manager_group.id, role_id=manager_role.id)
+        await add_user_to_group(session, user_id=erin.id, group_id=manager_group.id)
+        session.add(OrganizationMembership(user_id=erin.id, organization_id=org_a.id))
+        ids["erin_id"] = str(erin.id)
 
         await session.commit()
 

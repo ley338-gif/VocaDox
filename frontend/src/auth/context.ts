@@ -1,11 +1,17 @@
 import { createContext } from "react";
 
+import type { GroupSummary } from "../api/client";
+
 export interface AuthUser {
   userId: string;
   username: string;
   displayName: string;
   email: string | null;
   permissions: string[];
+  /** The user's own team memberships (app.conversations.authz's team-
+   * scoped visibility reuses the existing Group model as "team") — used
+   * e.g. by NewConversationPage's team picker. */
+  groups: GroupSummary[];
 }
 
 export interface AuthState {

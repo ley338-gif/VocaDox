@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import (
@@ -41,6 +41,7 @@ async def create_conversation(
     privacy_mode: PrivacyMode = PrivacyMode.STANDARD,
     retention_policy_id: uuid.UUID | None = None,
     processing_profile_id: uuid.UUID | None = None,
+    group_id: uuid.UUID | None = None,
 ) -> Conversation:
     conversation = Conversation(
         organization_id=organization_id,
@@ -54,6 +55,7 @@ async def create_conversation(
         privacy_mode=privacy_mode.value,
         retention_policy_id=retention_policy_id,
         processing_profile_id=processing_profile_id,
+        group_id=group_id,
     )
     session.add(conversation)
     await session.flush()
@@ -74,15 +76,26 @@ async def list_conversations(
     session: AsyncSession,
     *,
     organization_ids: set[uuid.UUID] | None,
+    group_ids: set[uuid.UUID] | None = None,
     status_filter: str | None = None,
     type_filter: str | None = None,
     search: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Conversation], int]:
+    """`group_ids=None` means the caller can see every team (system:admin
+    or conversation:read-cross-team) -- no team filter applied. Otherwise a
+    conversation is visible if it has no team (group_id IS NULL, same
+    "org-wide" semantics as today's pre-team-scoping data) or its team is
+    in `group_ids` -- mirrors app.conversations.authz.authorize_
+    conversation_access's per-row logic for this cross-conversation list."""
     stmt = select(Conversation).where(Conversation.status != ConversationStatus.DELETED.value)
     if organization_ids is not None:
         stmt = stmt.where(Conversation.organization_id.in_(organization_ids))
+    if group_ids is not None:
+        stmt = stmt.where(
+            or_(Conversation.group_id.is_(None), Conversation.group_id.in_(group_ids))
+        )
     if status_filter:
         stmt = stmt.where(Conversation.status == status_filter)
     if type_filter:
@@ -99,14 +112,20 @@ async def list_conversations(
 
 
 async def conversation_status_counts(
-    session: AsyncSession, *, organization_ids: set[uuid.UUID] | None
+    session: AsyncSession,
+    *,
+    organization_ids: set[uuid.UUID] | None,
+    group_ids: set[uuid.UUID] | None = None,
 ) -> dict[str, int]:
     """Real per-status conversation counts (GROUP BY, never fabricated) for
     the app dashboard's KPI cards — mirrors the existing
     `app.administration.service.queue_counts()` aggregate-query pattern.
     Excludes DELETED conversations, matching `list_conversations`'s default
     scope. Statuses with zero conversations are simply absent from the
-    returned dict rather than included as 0."""
+    returned dict rather than included as 0. `group_ids` follows the same
+    "None = every team, otherwise NULL-team-or-in-set" semantics as
+    `list_conversations` — a non-privileged user's dashboard shouldn't show
+    cross-team totals either."""
     stmt = (
         select(Conversation.status, func.count())
         .where(Conversation.status != ConversationStatus.DELETED.value)
@@ -114,6 +133,10 @@ async def conversation_status_counts(
     )
     if organization_ids is not None:
         stmt = stmt.where(Conversation.organization_id.in_(organization_ids))
+    if group_ids is not None:
+        stmt = stmt.where(
+            or_(Conversation.group_id.is_(None), Conversation.group_id.in_(group_ids))
+        )
     result = await session.execute(stmt)
     return {status_value: int(count) for status_value, count in result.all()}
 

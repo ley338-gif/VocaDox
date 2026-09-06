@@ -53,6 +53,14 @@ class FollowUpTask(Base):
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Denormalized from the parent conversation's group_id at creation time,
+    # same reasoning as organization_id above — lets the org-wide Aufgaben
+    # list (list_tasks_for_organizations) apply the same team-scoping as
+    # app.conversations.authz without a join. NULL mirrors the parent
+    # conversation's "no team assigned, visible org-wide" state.
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     source: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     # Only set (and only meaningful) for source == AI_EXTRACTED; NULL for

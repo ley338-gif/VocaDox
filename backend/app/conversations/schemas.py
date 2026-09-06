@@ -23,6 +23,12 @@ class ConversationCreateRequest(BaseModel):
     # Omitted/None means the SYSTEM DEFAULT layer applies (see
     # app.profiles.resolver) — unchanged pre-Phase-6 behavior.
     processing_profile_id: uuid.UUID | None = None
+    # Post-GA team-scoped visibility (app.conversations.authz): the Group
+    # ("team") this conversation belongs to. None means visible to the
+    # whole organization, matching every pre-existing conversation — see
+    # that module's docstring. The router requires the caller be a member
+    # of this group unless they can bypass team scope.
+    group_id: uuid.UUID | None = None
 
     @field_validator("title")
     @classmethod
@@ -39,6 +45,7 @@ class ConversationUpdateRequest(BaseModel):
     external_reference: str | None = Field(default=None, max_length=255)
     external_reference_type: str | None = Field(default=None, max_length=64)
     privacy_mode: PrivacyMode | None = None
+    group_id: uuid.UUID | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -57,6 +64,7 @@ class ConversationResponse(BaseModel):
     privacy_mode: str
     retention_policy_id: uuid.UUID | None
     processing_profile_id: uuid.UUID | None = None
+    group_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 

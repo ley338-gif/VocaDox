@@ -36,6 +36,16 @@ PERMISSIONS: dict[str, str] = {
     "conversation:manage-participants": "Add/edit/remove conversation participants.",
     "conversation:manage-notes": "Add/edit/remove conversation notes.",
     "conversation:manage-markers": "Add/edit/remove conversation recording markers.",
+    # Post-GA: team-scoped visibility (app.conversations.authz). A
+    # conversation optionally belongs to a Group ("team", reusing the
+    # existing Group model rather than a new entity); by default a user
+    # only sees conversations/tasks with no team or their own team(s).
+    # This permission bypasses that restriction — same posture as
+    # system:admin already has, but without granting every other
+    # system:admin capability.
+    "conversation:read-cross-team": (
+        "View conversations and tasks across every team, not just the caller's own."
+    ),
     "media:read": "View/play conversation media.",
     "media:upload": "Upload media onto an existing conversation.",
     "media:delete": "Delete conversation media.",
@@ -155,6 +165,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "organization:manage",
             "audit:read",
             "conversation:read",
+            "conversation:read-cross-team",
             "conversation:update",
             "conversation:delete",
             "conversation:manage-participants",

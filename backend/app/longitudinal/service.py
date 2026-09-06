@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation
@@ -163,6 +163,7 @@ async def sync_ai_extracted_tasks(session: AsyncSession, *, conversation: Conver
             FollowUpTask(
                 organization_id=conversation.organization_id,
                 conversation_id=conversation.id,
+                group_id=conversation.group_id,
                 source=FollowUpSource.AI_EXTRACTED.value,
                 source_fact_id=fact.id,
                 description=description,
@@ -192,6 +193,7 @@ async def list_tasks_for_organizations(
     session: AsyncSession,
     *,
     organization_ids: set[uuid.UUID] | None,
+    group_ids: set[uuid.UUID] | None,
     status_filter: str | None = None,
 ) -> list[FollowUpTask]:
     """Cross-conversation task listing for the org-wide "Aufgaben" nav
@@ -200,10 +202,21 @@ async def list_tasks_for_organizations(
     `list_tasks_for_conversation`; that sync happens when a conversation's
     own Tasks tab is viewed). `organization_ids=None` means system:admin
     (no org filter), matching the scoping convention used by
-    `app.conversations.service.list_conversations`."""
+    `app.conversations.service.list_conversations`.
+
+    `group_ids=None` means the caller can see every team (system:admin or
+    conversation:read-cross-team) -- no team filter applied. Otherwise a
+    task is visible if it has no team (group_id IS NULL, same "org-wide"
+    semantics as an unscoped conversation) or its team is in `group_ids`,
+    using the denormalized FollowUpTask.group_id (see that model's
+    docstring) rather than joining Conversation."""
     stmt = select(FollowUpTask).order_by(FollowUpTask.created_at.desc())
     if organization_ids is not None:
         stmt = stmt.where(FollowUpTask.organization_id.in_(organization_ids))
+    if group_ids is not None:
+        stmt = stmt.where(
+            or_(FollowUpTask.group_id.is_(None), FollowUpTask.group_id.in_(group_ids))
+        )
     if status_filter:
         stmt = stmt.where(FollowUpTask.status == status_filter)
     result = await session.execute(stmt)
@@ -222,6 +235,7 @@ async def create_user_task(
     task = FollowUpTask(
         organization_id=conversation.organization_id,
         conversation_id=conversation.id,
+        group_id=conversation.group_id,
         source=FollowUpSource.USER_CREATED.value,
         source_fact_id=None,
         description=description,

@@ -73,6 +73,9 @@ export interface Conversation {
   privacy_mode: PrivacyMode;
   retention_policy_id: string | null;
   processing_profile_id: string | null;
+  // Post-GA team-scoped visibility (app.conversations.authz): the team
+  // ("Group") this conversation belongs to. null = visible org-wide.
+  group_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -176,6 +179,9 @@ export function createConversation(
     // ("General", "Meeting", ...). Omitted -> the SYSTEM DEFAULT
     // configuration hierarchy layer applies (see app.profiles.resolver).
     processing_profile_id?: string;
+    // Post-GA team-scoped visibility — the team this conversation belongs
+    // to. Omitted/null = visible to the whole organization.
+    group_id?: string | null;
   },
   csrfToken: string
 ): Promise<Conversation> {
@@ -191,6 +197,7 @@ export function updateConversation(
     external_reference: string;
     external_reference_type: string;
     privacy_mode: PrivacyMode;
+    group_id: string | null;
   }>,
   csrfToken: string
 ): Promise<Conversation> {

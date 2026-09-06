@@ -25,6 +25,7 @@ from app.identity.schemas import (
     GroupCreateRequest,
     GroupDetailResponse,
     GroupResponse,
+    GroupSummary,
     GroupUpdateRequest,
     LoginRequest,
     LoginResponse,
@@ -45,6 +46,7 @@ from app.identity.service import (
     list_members_of_group,
     list_role_ids_for_group,
     list_roles,
+    list_user_groups,
     list_users,
     set_group_roles,
     set_user_groups,
@@ -173,12 +175,14 @@ async def me(
     db: AsyncSession = Depends(get_session),
 ) -> CurrentUserResponse:
     permissions = await get_user_permissions(db, user.id)
+    groups = await list_user_groups(db, user.id)
     return CurrentUserResponse(
         user_id=user.id,
         username=user.username,
         display_name=user.display_name,
         email=user.email,
         permissions=sorted(permissions),
+        groups=[GroupSummary(id=g.id, name=g.name) for g in groups],
     )
 
 

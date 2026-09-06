@@ -18,6 +18,8 @@ from app.audit.service import record_event
 from app.conversations.authz import (
     assert_organization_member_or_admin,
     authorize_conversation_access,
+    can_bypass_team_scope,
+    user_group_ids,
 )
 from app.conversations.models import (
     ConversationMarker,
@@ -108,10 +110,12 @@ async def list_conversations_endpoint(
             )
         )
         org_ids = {row[0] for row in result.all()}
+    group_ids = None if can_bypass_team_scope(permissions) else await user_group_ids(db, user.id)
 
     items, total = await list_conversations(
         db,
         organization_ids=org_ids,
+        group_ids=group_ids,
         status_filter=status_filter,
         type_filter=type_filter,
         search=search,
@@ -151,8 +155,9 @@ async def conversation_stats_endpoint(
             )
         )
         org_ids = {row[0] for row in result.all()}
+    group_ids = None if can_bypass_team_scope(permissions) else await user_group_ids(db, user.id)
 
-    counts = await conversation_status_counts(db, organization_ids=org_ids)
+    counts = await conversation_status_counts(db, organization_ids=org_ids, group_ids=group_ids)
     return ConversationStatsResponse(counts=counts)
 
 
@@ -171,6 +176,12 @@ async def create_conversation_endpoint(
     await assert_organization_member_or_admin(
         db, user=user, organization_id=payload.organization_id
     )
+    if payload.group_id is not None and not can_bypass_team_scope(permissions):
+        if payload.group_id not in await user_group_ids(db, user.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="not a member of the target team",
+            )
 
     conversation = await create_conversation(
         db,
@@ -183,6 +194,7 @@ async def create_conversation_endpoint(
         external_reference_type=payload.external_reference_type,
         privacy_mode=payload.privacy_mode,
         processing_profile_id=payload.processing_profile_id,
+        group_id=payload.group_id,
     )
     await record_event(
         db,
@@ -218,6 +230,17 @@ async def update_conversation_endpoint(
     conversation = await authorize_conversation_access(
         db, user=user, conversation_id=conversation_id, permission_code="conversation:update"
     )
+    if payload.group_id is not None:
+        from app.identity.rbac import get_user_permissions
+
+        permissions = await get_user_permissions(db, user.id)
+        if not can_bypass_team_scope(permissions) and payload.group_id not in await user_group_ids(
+            db, user.id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="not a member of the target team",
+            )
     changed = payload.model_dump(exclude_unset=True)
     for field, value in changed.items():
         if hasattr(value, "value"):

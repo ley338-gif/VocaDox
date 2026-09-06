@@ -23,12 +23,23 @@ class LoginResponse(BaseModel):
     csrf_token: str
 
 
+class GroupSummary(BaseModel):
+    """Minimal team identity for a picker — never the full admin group
+    listing (`GET /admin/groups`, group:manage-gated). A regular user only
+    needs to know their OWN team memberships to pick one when creating a
+    conversation (app.conversations.authz's team-scoped visibility)."""
+
+    id: uuid.UUID
+    name: str
+
+
 class CurrentUserResponse(BaseModel):
     user_id: uuid.UUID
     username: str
     display_name: str
     email: str | None
     permissions: list[str]
+    groups: list[GroupSummary]
 
 
 class CsrfTokenResponse(BaseModel):

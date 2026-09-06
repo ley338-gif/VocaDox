@@ -1735,7 +1735,7 @@ export interface paths {
         /**
          * List Tasks Endpoint
          * @description Cross-conversation task list for the org-wide "Aufgaben" nav entry —
-         *     same permission + org-scoping pattern as
+         *     same permission + org/team-scoping pattern as
          *     `app.conversations.router.conversation_stats_endpoint`.
          */
         get: operations["list_tasks_endpoint_api_v1_tasks_get"];
@@ -2461,6 +2461,8 @@ export interface components {
             privacy_mode: components["schemas"]["PrivacyMode"];
             /** Processing Profile Id */
             processing_profile_id?: string | null;
+            /** Group Id */
+            group_id?: string | null;
         };
         /** ConversationListResponse */
         ConversationListResponse: {
@@ -2511,6 +2513,8 @@ export interface components {
             retention_policy_id: string | null;
             /** Processing Profile Id */
             processing_profile_id?: string | null;
+            /** Group Id */
+            group_id?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2548,6 +2552,8 @@ export interface components {
             /** External Reference Type */
             external_reference_type?: string | null;
             privacy_mode?: components["schemas"]["PrivacyMode"] | null;
+            /** Group Id */
+            group_id?: string | null;
         };
         /** CorrectionMetricsResponse */
         CorrectionMetricsResponse: {
@@ -2601,6 +2607,8 @@ export interface components {
             email: string | null;
             /** Permissions */
             permissions: string[];
+            /** Groups */
+            groups: components["schemas"]["GroupSummary"][];
         };
         /** DashboardResponse */
         DashboardResponse: {
@@ -2887,6 +2895,8 @@ export interface components {
              * Format: uuid
              */
             conversation_id: string;
+            /** Group Id */
+            group_id: string | null;
             /** Source */
             source: string;
             /** Source Fact Id */
@@ -2969,6 +2979,22 @@ export interface components {
             description: string | null;
             /** Organization Id */
             organization_id: string | null;
+        };
+        /**
+         * GroupSummary
+         * @description Minimal team identity for a picker — never the full admin group
+         *     listing (`GET /admin/groups`, group:manage-gated). A regular user only
+         *     needs to know their OWN team memberships to pick one when creating a
+         *     conversation (app.conversations.authz's team-scoped visibility).
+         */
+        GroupSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** GroupUpdateRequest */
         GroupUpdateRequest: {

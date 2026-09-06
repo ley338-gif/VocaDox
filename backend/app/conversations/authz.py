@@ -7,6 +7,16 @@ media) solely by knowing its UUID — see docs/security/threat-model.md,
 check (platform administrators can reach every organization's data by
 design — same posture as Phase 1's admin-gated `/admin` area) but it does
 NOT bypass the underlying permission check itself.
+
+**Team scoping (post-GA)**: a Conversation may optionally belong to a
+`Group` (reused as "Team" — see app.identity.models.Group's docstring;
+no separate Team entity was introduced). `group_id IS NULL` means "no
+team assigned, visible to the whole organization" (every pre-existing
+conversation, and any created without picking a team). A non-NULL
+`group_id` further restricts read access to that Group's members, unless
+the caller has `system:admin` or the `conversation:read-cross-team`
+permission (granted to the Manager role) — same bypass posture as
+`system:admin` already has for organization membership.
 """
 
 from __future__ import annotations
@@ -18,9 +28,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.models import Conversation
-from app.identity.models import User
+from app.identity.models import User, UserGroupMembership
 from app.identity.rbac import get_user_permissions
 from app.organizations.models import OrganizationMembership
+
+CROSS_TEAM_PERMISSION = "conversation:read-cross-team"
 
 
 async def _user_organization_ids(session: AsyncSession, user_id: uuid.UUID) -> set[uuid.UUID]:
@@ -30,6 +42,21 @@ async def _user_organization_ids(session: AsyncSession, user_id: uuid.UUID) -> s
         )
     )
     return {row[0] for row in result.all()}
+
+
+async def user_group_ids(session: AsyncSession, user_id: uuid.UUID) -> set[uuid.UUID]:
+    """A user's own team memberships — used both by `authorize_conversation_
+    access` below and by the cross-conversation list endpoints
+    (`list_conversations`, `list_tasks_for_organizations`) that can't go
+    through per-row authorization."""
+    result = await session.execute(
+        select(UserGroupMembership.group_id).where(UserGroupMembership.user_id == user_id)
+    )
+    return {row[0] for row in result.all()}
+
+
+def can_bypass_team_scope(permissions: set[str]) -> bool:
+    return "system:admin" in permissions or CROSS_TEAM_PERMISSION in permissions
 
 
 async def get_conversation_or_404(
@@ -73,6 +100,16 @@ async def authorize_conversation_access(
         # Deliberately 404, not 403: do not confirm the conversation exists
         # to a user outside its organization.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found")
+
+    if conversation.group_id is not None and not can_bypass_team_scope(permissions):
+        group_ids = await user_group_ids(session, user.id)
+        if conversation.group_id not in group_ids:
+            # Same 404-not-403 posture as the organization check above —
+            # a team boundary must not be distinguishable from "doesn't
+            # exist" either.
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="conversation not found"
+            )
 
     return conversation
 
