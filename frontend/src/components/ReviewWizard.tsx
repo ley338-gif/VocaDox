@@ -21,6 +21,7 @@ import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Textarea } from "../design-system/FormControls";
 import { EmptyState, Skeleton } from "../design-system/States";
+import { factSummary } from "../lib/factSummary";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import styles from "./FactsPanel.module.css";
 
@@ -32,12 +33,7 @@ function severityTone(severity: string): "neutral" | "warning" | "danger" {
 
 function factValueSummary(fact: ExtractedFact | undefined): string {
   if (!fact) return "?";
-  const value = fact.corrected_structured_value ?? fact.structured_value;
-  if (fact.category === "general_fact") {
-    return `${String(value.subject ?? "?")} — ${String(value.attribute ?? "?")}: ${String(value.value ?? "?")}`;
-  }
-  if (fact.category === "decision") return String(value.description ?? "?");
-  return String(value.description ?? "?");
+  return factSummary(fact.category, fact.corrected_structured_value ?? fact.structured_value);
 }
 
 export function ReviewWizard({

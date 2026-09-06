@@ -23,6 +23,7 @@ import { useAuth } from "../auth/useAuth";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { EmptyState, ProcessingBanner, Skeleton, Spinner } from "../design-system/States";
+import { factSummary } from "../lib/factSummary";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import styles from "./FactsPanel.module.css";
 
@@ -30,43 +31,6 @@ function severityTone(severity: ReviewIssueSeverity): "neutral" | "warning" | "d
   if (severity === "critical" || severity === "high") return "danger";
   if (severity === "medium") return "warning";
   return "neutral";
-}
-
-const GENERAL_FACT_KEYS = ["subject", "attribute", "value", "certainty", "evidence_segment_sequences"];
-const DECISION_KEYS = ["description", "decided_by", "certainty", "evidence_segment_sequences"];
-const TASK_KEYS = ["description", "assignee", "due_date", "certainty", "evidence_segment_sequences"];
-
-function isSubsetOf(value: Record<string, unknown>, allowed: string[]): boolean {
-  return Object.keys(value).every((key) => allowed.includes(key));
-}
-
-/**
- * Mirrors app.documents.service._render_statement's category rendering
- * exactly, including its generic "field: value" fallback for any
- * non-builtin category (e.g. the Meeting template's agenda_topic/
- * action_item) — this panel previously always assumed the 3 Phase-4
- * builtin categories' shape, so a template-defined category rendered as
- * "? (?, due ?)" (its fields silently didn't exist on that fact).
- */
-function factSummary(fact: ExtractedFact): string {
-  const v = fact.structured_value;
-  if (fact.category === "general_fact" && isSubsetOf(v, GENERAL_FACT_KEYS)) {
-    return `${String(v.subject ?? "?")} — ${String(v.attribute ?? "?")}: ${String(v.value ?? "?")}`;
-  }
-  if (fact.category === "decision" && isSubsetOf(v, DECISION_KEYS)) {
-    return String(v.description ?? "?");
-  }
-  if (fact.category === "task" && isSubsetOf(v, TASK_KEYS)) {
-    return (
-      `${String(v.description ?? "?")} ` +
-      `(assignee: ${String(v.assignee ?? "not mentioned")}, ` +
-      `due: ${String(v.due_date ?? "not mentioned")})`
-    );
-  }
-  const parts = Object.entries(v)
-    .filter(([key, value]) => !["certainty", "evidence_segment_sequences"].includes(key) && value !== null && value !== "")
-    .map(([key, value]) => `${key}: ${String(value)}`);
-  return parts.length > 0 ? parts.join("; ") : "(no details)";
 }
 
 function FactRow({
@@ -100,7 +64,7 @@ function FactRow({
           {fact.certainty !== "stated" && <Badge tone="neutral">{fact.certainty.replace("_", " ")}</Badge>}
         </button>
       </div>
-      <p style={{ margin: "var(--space-1) 0" }}>{factSummary(fact)}</p>
+      <p style={{ margin: "var(--space-1) 0" }}>{factSummary(fact.category, fact.structured_value)}</p>
       {expanded && (
         <div className={styles.evidence}>
           {evidenceQuery.isLoading && <Skeleton height="1rem" />}
