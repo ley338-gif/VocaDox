@@ -6,7 +6,6 @@ import {
   Clock,
   FileText,
   History,
-  Info,
   Link2,
   RefreshCw,
   Sparkles,
@@ -77,7 +76,6 @@ const TAB_LABELS: Record<Tab, string> = {
   timeline: "Verlauf",
   related: "Verwandt",
   tasks: "Aufgaben",
-  details: "Details",
   notes: "Notizen",
   activity: "Aktivität",
   recap: "Recap",
@@ -95,7 +93,6 @@ type Tab =
   | "timeline"
   | "related"
   | "tasks"
-  | "details"
   | "notes"
   | "activity"
   | "recap";
@@ -328,13 +325,12 @@ export function ConversationDetailPage() {
     ...(notesQuery.data ?? []).map((n) => ({ at: n.created_at, label: `Note: ${n.content}` })),
     ...(processingQuery.data?.jobs ?? []).map((j) => ({
       at: j.completed_at ?? j.started_at ?? j.queued_at,
-      label: `${j.job_type} — ${j.status}${j.failure_class ? ` (${j.failure_class})` : ""}`,
+      label:
+        `${j.job_type} — ${j.status} (attempt ${j.attempt}/${j.max_attempts})` +
+        (j.failure_class ? ` — ${j.failure_class}` : ""),
     })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   const recentTimelineEvents = timelineEvents.slice(-4).reverse();
-  const recentJobs = [...(processingQuery.data?.jobs ?? [])]
-    .sort((a, b) => new Date(b.queued_at).getTime() - new Date(a.queued_at).getTime())
-    .slice(0, 4);
   const recentNotes = (notesQuery.data ?? []).slice(0, 3);
 
   return (
@@ -484,40 +480,6 @@ export function ConversationDetailPage() {
                         <span>{event.label}</span>
                         <span style={{ color: "var(--text-muted)" }}>
                           {new Date(event.at).toLocaleString()}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-
-                <Card
-                  title={
-                    <span className={styles.overviewTileTitle}>
-                      <Info size={16} aria-hidden="true" /> Details
-                    </span>
-                  }
-                  actions={
-                    <Button variant="tertiary" type="button" onClick={() => setTab("details")}>
-                      Alle
-                    </Button>
-                  }
-                >
-                  {processingQuery.isLoading && <Skeleton height="2rem" />}
-                  {!processingQuery.isLoading && recentJobs.length === 0 && (
-                    <EmptyState title="Noch keine Verarbeitungsschritte" />
-                  )}
-                  <ul className={styles.list}>
-                    {recentJobs.map((job) => (
-                      <li key={job.id} className={styles.listItem}>
-                        <span>
-                          {job.job_type} — {job.status}
-                        </span>
-                        <span style={{ color: "var(--text-muted)" }}>
-                          {job.completed_at
-                            ? new Date(job.completed_at).toLocaleString()
-                            : job.started_at
-                              ? `gestartet ${new Date(job.started_at).toLocaleString()}`
-                              : `wartet seit ${new Date(job.queued_at).toLocaleString()}`}
                         </span>
                       </li>
                     ))}
@@ -773,32 +735,6 @@ export function ConversationDetailPage() {
           {tab === "tasks" && (
             <div className={styles.sideCard}>
               <TasksPanel conversationId={conversationId} />
-            </div>
-          )}
-
-          {tab === "details" && (
-            <div className={styles.sideCard}>
-              <p style={{ color: "var(--text-muted)" }}>
-                Processing provenance for this conversation — see the Facts/Document tabs for what
-                each processing run actually produced.
-              </p>
-              {processingQuery.isLoading && <p>Loading processing history…</p>}
-              <ul className={styles.list}>
-                {processingQuery.data?.jobs.map((job) => (
-                  <li key={job.id} className={styles.listItem}>
-                    <span>
-                      {job.job_type} — {job.status} (attempt {job.attempt}/{job.max_attempts})
-                    </span>
-                    <span style={{ color: "var(--text-muted)" }}>
-                      {job.completed_at
-                        ? new Date(job.completed_at).toLocaleString()
-                        : job.started_at
-                          ? `started ${new Date(job.started_at).toLocaleString()}`
-                          : `queued ${new Date(job.queued_at).toLocaleString()}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 
