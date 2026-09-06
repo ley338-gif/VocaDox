@@ -22,47 +22,16 @@ import {
   retryProcessing,
   transcriptExportUrl,
   type DetectedSpeaker,
-  type ProcessingJob,
 } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { TextInput } from "../design-system/FormControls";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
+import { STAGE_LABELS, stageFromJobs, type Stage } from "../lib/transcriptStage";
 import { SpeakerBadge } from "./SpeakerBadge";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import { TranscriptTurn } from "./TranscriptTurn";
 import styles from "./TranscriptPanel.module.css";
-
-type Stage = "idle" | "preparing" | "transcribing" | "diarizing" | "aligning" | "ready" | "failed";
-
-function stageFromJobs(jobs: ProcessingJob[], transcriptStatus: string | undefined): Stage {
-  if (transcriptStatus === "ready") return "ready";
-  if (transcriptStatus === "failed") return "failed";
-  const active = jobs.find((j) => j.status === "queued" || j.status === "running");
-  if (!active) return jobs.length === 0 ? "idle" : "failed";
-  switch (active.job_type) {
-    case "normalize":
-      return "preparing";
-    case "transcribe":
-      return "transcribing";
-    case "diarize":
-      return "diarizing";
-    case "align":
-      return "aligning";
-    default:
-      return "preparing";
-  }
-}
-
-const STAGE_LABELS: Record<Stage, string> = {
-  idle: "Nicht gestartet",
-  preparing: "Audio wird vorbereitet…",
-  transcribing: "Transkription läuft…",
-  diarizing: "Sprechererkennung läuft…",
-  aligning: "Transkript wird ausgerichtet…",
-  ready: "Bereit",
-  failed: "Fehlgeschlagen",
-};
 
 function speakerLabel(speakers: DetectedSpeaker[], speakerId: string | null): string {
   if (!speakerId) return "Unbekannter Sprecher";

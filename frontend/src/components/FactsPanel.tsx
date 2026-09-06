@@ -22,7 +22,7 @@ import {
 import { useAuth } from "../auth/useAuth";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
-import { EmptyState, Skeleton } from "../design-system/States";
+import { EmptyState, ProcessingBanner, Skeleton, Spinner } from "../design-system/States";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import styles from "./FactsPanel.module.css";
 
@@ -161,7 +161,7 @@ export function FactsPanel({
             disabled={extractMutation.isPending}
             onClick={() => extractMutation.mutate()}
           >
-            <Sparkles size={16} aria-hidden="true" />{" "}
+            {extractMutation.isPending ? <Spinner size={16} /> : <Sparkles size={16} aria-hidden="true" />}{" "}
             {extractMutation.isPending ? "Extrahiere…" : "Fakten extrahieren"}
           </Button>
         )}
@@ -172,6 +172,19 @@ export function FactsPanel({
         Evidenz zu sehen. Dies ist kein generiertes Dokument; siehe die Review-Hinweise unten für
         Unsicheres oder möglicherweise Widersprüchliches.
       </p>
+
+      {extractMutation.isPending && (
+        <ProcessingBanner
+          title="Fakten werden extrahiert…"
+          description="Das Sprachmodell analysiert das Transkript — das kann bis zu einer Minute dauern."
+        />
+      )}
+      {extractMutation.isError && (
+        <p role="alert" style={{ color: "var(--color-danger)", marginBottom: "var(--space-4)" }}>
+          Extraktion fehlgeschlagen:{" "}
+          {extractMutation.error instanceof Error ? extractMutation.error.message : "Unbekannter Fehler"}
+        </p>
+      )}
 
       {factsQuery.isLoading && <Skeleton height="4rem" />}
       {factsQuery.data && factsQuery.data.length === 0 && <EmptyState title="Noch keine Fakten extrahiert" />}

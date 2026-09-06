@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  AlertTriangle,
   CheckSquare,
   Clock,
   FileText,
@@ -39,7 +40,7 @@ import {
 import { getDocument } from "../api/documents";
 import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
 import { createKnownSpeaker, listKnownSpeakers } from "../api/people";
-import { assignSpeaker, getProcessingStatus, listSpeakers, processTranscript } from "../api/transcription";
+import { assignSpeaker, getProcessingStatus, getTranscript, listSpeakers, processTranscript } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
 import { DocumentContent } from "../components/DocumentContent";
@@ -61,10 +62,11 @@ import { Modal } from "../design-system/Modal";
 import { NavCard } from "../design-system/NavCard";
 import { PageHeader } from "../design-system/PageHeader";
 import { SidePanelCard } from "../design-system/SidePanelCard";
-import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
+import { EmptyState, ErrorState, ProcessingBanner, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { Tabs, type TabItem } from "../design-system/Tabs";
 import { CONVERSATION_TYPE_LABELS } from "../lib/conversationLabels";
+import { STAGE_LABELS, stageFromJobs } from "../lib/transcriptStage";
 import styles from "./ConversationDetailPage.module.css";
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -140,9 +142,24 @@ export function ConversationDetailPage() {
     queryFn: () => listNotes(conversationId),
     enabled: Boolean(conversationId),
   });
+  // Same query key TranscriptPanel/reprocessMutation use (dedupes the
+  // request) and the same polling condition, so a conversation that just
+  // finished uploading visibly shows "Transkription läuft…" on the
+  // Übersicht tab too, not only once the user clicks into Transkript.
   const processingQuery = useQuery({
-    queryKey: ["conversation-processing", conversationId],
+    queryKey: ["processing-status", conversationId],
     queryFn: () => getProcessingStatus(conversationId),
+    enabled: Boolean(conversationId),
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.jobs ?? [];
+      const active = jobs.some((j) => j.status === "queued" || j.status === "running");
+      return active ? 2000 : false;
+    },
+  });
+  const transcriptQuery = useQuery({
+    queryKey: ["transcript", conversationId],
+    queryFn: () => getTranscript(conversationId),
+    retry: false,
     enabled: Boolean(conversationId),
   });
 
@@ -281,7 +298,6 @@ export function ConversationDetailPage() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["processing-status", conversationId] });
-      void queryClient.invalidateQueries({ queryKey: ["conversation-processing", conversationId] });
       void queryClient.invalidateQueries({ queryKey: ["transcript", conversationId] });
       void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] });
       void queryClient.invalidateQueries({ queryKey: ["transcript-segments", conversationId] });
@@ -301,6 +317,7 @@ export function ConversationDetailPage() {
 
   const openTasks = (tasksQuery.data ?? []).filter((t) => t.status === "open");
   const documentSections = documentQuery.data?.current_revision?.structured_content ?? null;
+  const transcriptStage = stageFromJobs(processingQuery.data?.jobs ?? [], transcriptQuery.data?.status);
 
   return (
     <div>
@@ -353,6 +370,50 @@ export function ConversationDetailPage() {
       />
 
       <Tabs idPrefix="conv" items={tabItems} activeId={tab} onChange={(id) => setTab(id as Tab)} />
+
+      {tab === "overview" && transcriptStage !== "ready" && sourceMedia && (
+        <>
+          {(transcriptStage === "preparing" ||
+            transcriptStage === "transcribing" ||
+            transcriptStage === "diarizing" ||
+            transcriptStage === "aligning") && (
+            <ProcessingBanner
+              title={STAGE_LABELS[transcriptStage]}
+              description="Das Transkript wird automatisch weiterverarbeitet — diese Seite aktualisiert sich von selbst."
+            />
+          )}
+          {transcriptStage === "failed" && (
+            <div className={styles.overviewSummary} role="alert">
+              <EmptyState
+                icon={<AlertTriangle size={18} aria-hidden="true" />}
+                title="Transkription fehlgeschlagen"
+                description="Details und ein erneuter Versuch stehen im Transkript-Tab bereit."
+                action={
+                  <Button variant="secondary" type="button" onClick={() => setTab("transcript")}>
+                    Zum Transkript
+                  </Button>
+                }
+              />
+            </div>
+          )}
+          {transcriptStage === "idle" && (
+            <div className={styles.overviewSummary}>
+              <EmptyState
+                icon={<Sparkles size={18} aria-hidden="true" />}
+                title="Transkription noch nicht gestartet"
+                description="Audio liegt vor, wurde aber noch nicht transkribiert — das passiert nicht automatisch."
+                action={
+                  hasPermission("transcript:process") && (
+                    <Button variant="primary" type="button" onClick={() => setTab("transcript")}>
+                      Transkription starten
+                    </Button>
+                  )
+                }
+              />
+            </div>
+          )}
+        </>
+      )}
 
       <div className={styles.layout}>
         <div className={styles.mainColumn}>
