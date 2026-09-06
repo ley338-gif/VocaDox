@@ -100,6 +100,7 @@ class ParticipantCreateRequest(BaseModel):
     participant_type: ParticipantType = ParticipantType.UNKNOWN
     external_reference: str | None = Field(default=None, max_length=255)
     notes: str | None = None
+    known_speaker_id: uuid.UUID | None = None
 
 
 class ParticipantUpdateRequest(BaseModel):
@@ -107,6 +108,7 @@ class ParticipantUpdateRequest(BaseModel):
     participant_type: ParticipantType | None = None
     external_reference: str | None = Field(default=None, max_length=255)
     notes: str | None = None
+    known_speaker_id: uuid.UUID | None = None
 
 
 class ParticipantResponse(BaseModel):
@@ -116,6 +118,7 @@ class ParticipantResponse(BaseModel):
     participant_type: str
     external_reference: str | None
     notes: str | None
+    known_speaker_id: uuid.UUID | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

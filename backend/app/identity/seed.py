@@ -123,6 +123,20 @@ PERMISSIONS: dict[str, str] = {
         "Run the retention cleanup worker (dry-run or, explicitly, real deletion)."
     ),
     "retention-cleanup:read": "View past retention cleanup runs and their audit trail.",
+    # Post-GA: persistent cross-conversation speaker identity (see
+    # app/people/__init__.py) and the shareable participant-facing recap
+    # (see app/recap/__init__.py). Distinct from `speaker:*`/`document:*` —
+    # a KnownSpeaker is org-wide rather than per-conversation, and a Recap
+    # is a separate, explicitly-labeled-as-AI-generated artifact, never
+    # the same thing as the deterministic Document.
+    "known-speaker:read": "View known speakers (persistent cross-conversation identities).",
+    "known-speaker:manage": (
+        "Create, rename, and delete known speakers, and link them to conversation "
+        "participants."
+    ),
+    "recap:read": "View the shareable participant-facing recap for a conversation.",
+    "recap:generate": "Generate or regenerate the AI-drafted shareable recap for a conversation.",
+    "recap:approve": "Approve a shareable recap as ready to share.",
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -178,6 +192,11 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "webhook:write",
             "operations:read",
             "retention-cleanup:read",
+            "known-speaker:read",
+            "known-speaker:manage",
+            "recap:read",
+            "recap:generate",
+            "recap:approve",
         ],
     ),
     "Template Manager": (
@@ -217,6 +236,10 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "timeline:read",
             "task:read",
             "task:update",
+            "known-speaker:read",
+            "recap:read",
+            "recap:generate",
+            "recap:approve",
         ],
     ),
     "User": (
@@ -255,6 +278,10 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "task:read",
             "task:create",
             "task:update",
+            "known-speaker:read",
+            "known-speaker:manage",
+            "recap:read",
+            "recap:generate",
         ],
     ),
     "Auditor": (
@@ -274,6 +301,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "task:read",
             "operations:read",
             "retention-cleanup:read",
+            "known-speaker:read",
+            "recap:read",
         ],
     ),
     "API Service Account": (

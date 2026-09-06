@@ -704,6 +704,7 @@ async def create_participant_endpoint(
         participant_type=payload.participant_type,
         external_reference=payload.external_reference,
         notes=payload.notes,
+        known_speaker_id=payload.known_speaker_id,
     )
     await record_event(
         db,

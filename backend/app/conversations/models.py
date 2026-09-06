@@ -168,8 +168,11 @@ class Conversation(Base):
 class ConversationParticipant(Base):
     """No unnecessary healthcare-specific required fields; display_name is
     a free-form label ("Person A", "Arzt", "Patient") — real names are
-    never required. Speaker-cluster-to-participant mapping is a future
-    (human-reviewed) diarization feature, NOT implemented here."""
+    never required. Speaker-cluster-to-participant mapping is implemented
+    via `app.diarization.models.DetectedSpeaker.participant_id` (human-
+    reviewed, never automatic). `known_speaker_id` (post-GA) is the
+    separate, optional cross-conversation identity link — see
+    app.people.models.KnownSpeaker's docstring."""
 
     __tablename__ = "conversation_participants"
 
@@ -183,6 +186,9 @@ class ConversationParticipant(Base):
     )
     external_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    known_speaker_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("known_speakers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

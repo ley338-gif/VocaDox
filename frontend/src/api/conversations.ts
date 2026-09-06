@@ -103,6 +103,7 @@ export interface Participant {
   participant_type: ParticipantType;
   external_reference: string | null;
   notes: string | null;
+  known_speaker_id: string | null;
   created_at: string;
 }
 
@@ -279,10 +280,27 @@ export function listParticipants(conversationId: string): Promise<Participant[]>
 
 export function addParticipant(
   conversationId: string,
-  payload: { display_name: string; participant_type?: ParticipantType; notes?: string },
+  payload: {
+    display_name: string;
+    participant_type?: ParticipantType;
+    notes?: string;
+    known_speaker_id?: string | null;
+  },
   csrfToken: string
 ): Promise<Participant> {
   return request(`/conversations/${conversationId}/participants`, jsonInit("POST", payload, csrfToken));
+}
+
+export function updateParticipant(
+  conversationId: string,
+  participantId: string,
+  payload: { display_name?: string; known_speaker_id?: string | null },
+  csrfToken: string
+): Promise<Participant> {
+  return request(
+    `/conversations/${conversationId}/participants/${participantId}`,
+    jsonInit("PATCH", payload, csrfToken)
+  );
 }
 
 export function deleteParticipant(

@@ -150,6 +150,7 @@ async def add_participant(
     participant_type: ParticipantType = ParticipantType.UNKNOWN,
     external_reference: str | None = None,
     notes: str | None = None,
+    known_speaker_id: uuid.UUID | None = None,
 ) -> ConversationParticipant:
     participant = ConversationParticipant(
         conversation_id=conversation_id,
@@ -157,6 +158,7 @@ async def add_participant(
         participant_type=participant_type.value,
         external_reference=external_reference,
         notes=notes,
+        known_speaker_id=known_speaker_id,
     )
     session.add(participant)
     await session.flush()
