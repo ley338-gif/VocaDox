@@ -9,7 +9,6 @@ import {
   Info,
   Link2,
   RefreshCw,
-  Send,
   Sparkles,
   StickyNote,
   Trash2,
@@ -59,7 +58,6 @@ import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
 import { Modal } from "../design-system/Modal";
-import { NavCard } from "../design-system/NavCard";
 import { PageHeader } from "../design-system/PageHeader";
 import { SidePanelCard } from "../design-system/SidePanelCard";
 import { EmptyState, ErrorState, ProcessingBanner, Skeleton } from "../design-system/States";
@@ -85,7 +83,7 @@ const TAB_LABELS: Record<Tab, string> = {
   recap: "Recap",
 };
 
-const PRIMARY_TAB_IDS: Tab[] = ["overview", "transcript", "facts", "document", "review", "audio"];
+const PRIMARY_TAB_IDS: Tab[] = ["overview", "transcript", "facts", "document", "review", "recap", "audio"];
 
 type Tab =
   | "overview"
@@ -319,6 +317,26 @@ export function ConversationDetailPage() {
   const documentSections = documentQuery.data?.current_revision?.structured_content ?? null;
   const transcriptStage = stageFromJobs(processingQuery.data?.jobs ?? [], transcriptQuery.data?.status);
 
+  // Shared with the "Verlauf" tab below — the Übersicht tile shows the
+  // most recent few of the exact same events instead of a bare count.
+  const timelineEvents = [
+    { at: conversation.created_at, label: "Conversation created" },
+    ...(markersQuery.data ?? []).map((m) => ({
+      at: m.created_at,
+      label: `Marker at ${Math.round(m.timestamp_ms / 1000)}s${m.label ? ` — ${m.label}` : ""}`,
+    })),
+    ...(notesQuery.data ?? []).map((n) => ({ at: n.created_at, label: `Note: ${n.content}` })),
+    ...(processingQuery.data?.jobs ?? []).map((j) => ({
+      at: j.completed_at ?? j.started_at ?? j.queued_at,
+      label: `${j.job_type} — ${j.status}${j.failure_class ? ` (${j.failure_class})` : ""}`,
+    })),
+  ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  const recentTimelineEvents = timelineEvents.slice(-4).reverse();
+  const recentJobs = [...(processingQuery.data?.jobs ?? [])]
+    .sort((a, b) => new Date(b.queued_at).getTime() - new Date(a.queued_at).getTime())
+    .slice(0, 4);
+  const recentNotes = (notesQuery.data ?? []).slice(0, 3);
+
   return (
     <div>
       <PageHeader
@@ -446,45 +464,165 @@ export function ConversationDetailPage() {
                   {conversation.description}
                 </p>
               )}
-              <div className={styles.dashboardGrid}>
-                <NavCard
-                  icon={<History size={18} aria-hidden="true" />}
-                  title="Verlauf"
-                  description={`${processingQuery.data?.jobs.length ?? 0} Verarbeitungsschritte`}
-                  onClick={() => setTab("timeline")}
-                />
+              <div className={styles.overviewTilesGrid}>
+                <Card
+                  title={
+                    <span className={styles.overviewTileTitle}>
+                      <History size={16} aria-hidden="true" /> Verlauf
+                    </span>
+                  }
+                  actions={
+                    <Button variant="tertiary" type="button" onClick={() => setTab("timeline")}>
+                      Alle
+                    </Button>
+                  }
+                >
+                  {recentTimelineEvents.length === 0 && <EmptyState title="Noch keine Ereignisse" />}
+                  <ul className={styles.list}>
+                    {recentTimelineEvents.map((event, idx) => (
+                      <li key={idx} className={styles.listItem}>
+                        <span>{event.label}</span>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {new Date(event.at).toLocaleString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+
+                <Card
+                  title={
+                    <span className={styles.overviewTileTitle}>
+                      <Info size={16} aria-hidden="true" /> Details
+                    </span>
+                  }
+                  actions={
+                    <Button variant="tertiary" type="button" onClick={() => setTab("details")}>
+                      Alle
+                    </Button>
+                  }
+                >
+                  {processingQuery.isLoading && <Skeleton height="2rem" />}
+                  {!processingQuery.isLoading && recentJobs.length === 0 && (
+                    <EmptyState title="Noch keine Verarbeitungsschritte" />
+                  )}
+                  <ul className={styles.list}>
+                    {recentJobs.map((job) => (
+                      <li key={job.id} className={styles.listItem}>
+                        <span>
+                          {job.job_type} — {job.status}
+                        </span>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {job.completed_at
+                            ? new Date(job.completed_at).toLocaleString()
+                            : job.started_at
+                              ? `gestartet ${new Date(job.started_at).toLocaleString()}`
+                              : `wartet seit ${new Date(job.queued_at).toLocaleString()}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+
+                <Card
+                  title={
+                    <span className={styles.overviewTileTitle}>
+                      <StickyNote size={16} aria-hidden="true" /> Notizen
+                    </span>
+                  }
+                  actions={
+                    <Button variant="tertiary" type="button" onClick={() => setTab("notes")}>
+                      Alle
+                    </Button>
+                  }
+                >
+                  {notesQuery.data && notesQuery.data.length === 0 && <EmptyState title="Noch keine Notizen" />}
+                  <ul className={styles.list}>
+                    {recentNotes.map((note) => (
+                      <li key={note.id} className={styles.listItem}>
+                        <span>{note.content}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {notesQuery.data && notesQuery.data.length > recentNotes.length && (
+                    <p style={{ color: "var(--text-muted)", marginTop: "var(--space-2)" }}>
+                      +{notesQuery.data.length - recentNotes.length} weitere
+                    </p>
+                  )}
+                </Card>
+
+                <Card
+                  title={
+                    <span className={styles.overviewTileTitle}>
+                      <Activity size={16} aria-hidden="true" /> Aktivität
+                    </span>
+                  }
+                  actions={
+                    <Button variant="tertiary" type="button" onClick={() => setTab("activity")}>
+                      Alle
+                    </Button>
+                  }
+                >
+                  <ul className={styles.list}>
+                    <li className={styles.listItem}>
+                      <span>Erstellt</span>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        {new Date(conversation.created_at).toLocaleString()}
+                      </span>
+                    </li>
+                    {conversation.started_at && (
+                      <li className={styles.listItem}>
+                        <span>Aufnahme gestartet</span>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {new Date(conversation.started_at).toLocaleString()}
+                        </span>
+                      </li>
+                    )}
+                    {conversation.ended_at && (
+                      <li className={styles.listItem}>
+                        <span>Aufnahme/Upload beendet</span>
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {new Date(conversation.ended_at).toLocaleString()}
+                        </span>
+                      </li>
+                    )}
+                    <li className={styles.listItem}>
+                      <span>Zuletzt aktualisiert</span>
+                      <span style={{ color: "var(--text-muted)" }}>
+                        {new Date(conversation.updated_at).toLocaleString()}
+                      </span>
+                    </li>
+                  </ul>
+                </Card>
+
                 {conversation.external_reference && (
-                  <NavCard
-                    icon={<Link2 size={18} aria-hidden="true" />}
-                    title="Verwandt"
-                    description={`${timelineQuery.data?.conversations.length ?? 0} verknüpfte Gespräche`}
-                    onClick={() => setTab("related")}
-                  />
+                  <Card
+                    title={
+                      <span className={styles.overviewTileTitle}>
+                        <Link2 size={16} aria-hidden="true" /> Verwandt
+                      </span>
+                    }
+                    actions={
+                      <Button variant="tertiary" type="button" onClick={() => setTab("related")}>
+                        Alle
+                      </Button>
+                    }
+                  >
+                    {(timelineQuery.data?.conversations.length ?? 0) === 0 && (
+                      <EmptyState title="Keine verknüpften Gespräche" />
+                    )}
+                    <ul className={styles.list}>
+                      {(timelineQuery.data?.conversations ?? []).slice(0, 4).map((c) => (
+                        <li key={c.conversation_id} className={styles.listItem}>
+                          <span>{c.title}</span>
+                          <span style={{ color: "var(--text-muted)" }}>
+                            {new Date(c.occurred_at).toLocaleString()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
                 )}
-                <NavCard
-                  icon={<Info size={18} aria-hidden="true" />}
-                  title="Details"
-                  description="Verarbeitungs-Provenienz"
-                  onClick={() => setTab("details")}
-                />
-                <NavCard
-                  icon={<StickyNote size={18} aria-hidden="true" />}
-                  title="Notizen"
-                  description={`${notesQuery.data?.length ?? 0} Notizen`}
-                  onClick={() => setTab("notes")}
-                />
-                <NavCard
-                  icon={<Activity size={18} aria-hidden="true" />}
-                  title="Aktivität"
-                  description="Zeitpunkte & Status"
-                  onClick={() => setTab("activity")}
-                />
-                <NavCard
-                  icon={<Send size={18} aria-hidden="true" />}
-                  title="Recap"
-                  description="KI-Entwurf zum Teilen mit Teilnehmer:innen"
-                  onClick={() => setTab("recap")}
-                />
               </div>
             </div>
           )}
@@ -612,27 +750,12 @@ export function ConversationDetailPage() {
                 conversation longitudinal comparison is a later phase.
               </p>
               <ul className={styles.list}>
-                {[
-                  { at: conversation.created_at, label: "Conversation created" },
-                  ...(markersQuery.data ?? []).map((m) => ({
-                    at: m.created_at,
-                    label: `Marker at ${Math.round(m.timestamp_ms / 1000)}s${m.label ? ` — ${m.label}` : ""}`,
-                  })),
-                  ...(notesQuery.data ?? []).map((n) => ({ at: n.created_at, label: `Note: ${n.content}` })),
-                  ...(processingQuery.data?.jobs ?? []).map((j) => ({
-                    at: j.completed_at ?? j.started_at ?? j.queued_at,
-                    label: `${j.job_type} — ${j.status}${j.failure_class ? ` (${j.failure_class})` : ""}`,
-                  })),
-                ]
-                  .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
-                  .map((event, idx) => (
-                    <li key={idx} className={styles.listItem}>
-                      <span>{event.label}</span>
-                      <span style={{ color: "var(--text-muted)" }}>
-                        {new Date(event.at).toLocaleString()}
-                      </span>
-                    </li>
-                  ))}
+                {timelineEvents.map((event, idx) => (
+                  <li key={idx} className={styles.listItem}>
+                    <span>{event.label}</span>
+                    <span style={{ color: "var(--text-muted)" }}>{new Date(event.at).toLocaleString()}</span>
+                  </li>
+                ))}
               </ul>
             </div>
           )}
