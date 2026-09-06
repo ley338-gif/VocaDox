@@ -254,3 +254,36 @@ async def test_list_tasks_is_cross_conversation_and_org_scoped(
     bob_resp = await client.get("/api/v1/tasks", headers=bob_headers)
     assert bob_resp.status_code == 200
     assert bob_resp.json() == []
+
+
+async def test_deleting_conversation_removes_its_tasks(
+    client: AsyncClient, seeded  # noqa: ANN001
+) -> None:
+    """A deleted conversation's tasks must disappear from the org-wide
+    Aufgaben list too, not just stay listable via a stale reference to a
+    conversation that no longer exists."""
+    headers = await login(client, "alice", "a very strong password 123")
+    org_a = seeded["org_a"]
+
+    resp = await client.post(
+        "/api/v1/conversations",
+        json={"title": "To be deleted", "organization_id": org_a},
+        headers=headers,
+    )
+    conversation_id = resp.json()["id"]
+
+    resp = await client.post(
+        f"/api/v1/conversations/{conversation_id}/tasks",
+        json={"description": "Orphaned task"},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    resp = await client.get("/api/v1/tasks", headers=headers)
+    assert "Orphaned task" in {t["description"] for t in resp.json()}
+
+    resp = await client.delete(f"/api/v1/conversations/{conversation_id}", headers=headers)
+    assert resp.status_code == 204, resp.text
+
+    resp = await client.get("/api/v1/tasks", headers=headers)
+    assert "Orphaned task" not in {t["description"] for t in resp.json()}
