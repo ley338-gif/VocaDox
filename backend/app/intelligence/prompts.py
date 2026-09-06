@@ -22,7 +22,14 @@ SYSTEM_PROMPT = (
     "'evidence_segment_sequences' rather than guessing a segment number. All extracted text "
     "values (e.g. subject, attribute, value, decision text, task description) MUST be written "
     "in the same language the transcript itself is spoken in — never translate them to "
-    "English or any other language, regardless of the language of this instruction."
+    "English or any other language, regardless of the language of this instruction.\n\n"
+    "Some transcript lines are prefixed with the speaker who said them, e.g. '[Dr. Müller] "
+    "...' or '[SPEAKER_02] ...' — that bracketed label identifies who said that specific "
+    "line. When a field asks who decided something, who is responsible for a task, or "
+    "similar, use that EXACT bracketed label verbatim as the value. Never invent a name, and "
+    "never construct a placeholder that merely references a segment number (e.g. "
+    f"'speaker_from_SEG_8') — if the relevant line has no bracketed speaker label, use "
+    f"'{NOT_MENTIONED}' instead."
 )
 
 _CATEGORY_INSTRUCTIONS: dict[str, str] = {
@@ -34,13 +41,14 @@ _CATEGORY_INSTRUCTIONS: dict[str, str] = {
     ),
     "decision": (
         "Extract concrete decisions that were made during the conversation (not proposals or "
-        "open questions). For each decision, note who decided it if stated, otherwise "
-        f"'{NOT_MENTIONED}'."
+        "open questions). For each decision, note who decided it — using the speaker label "
+        f"for the line where they made it, if stated — otherwise '{NOT_MENTIONED}'."
     ),
     "task": (
         "Extract concrete tasks, action items, or follow-ups that someone is expected to do "
-        "after this conversation. For each, note who is responsible (assignee) and when it is "
-        f"due, using '{NOT_MENTIONED}' for either field if not stated."
+        "after this conversation. For each, note who is responsible (assignee) — using the "
+        "speaker label for the line where they took it on — and when it is due, using "
+        f"'{NOT_MENTIONED}' for either field if not stated."
     ),
 }
 

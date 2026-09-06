@@ -47,7 +47,13 @@ from app.audit.service import record_event
 from app.documents.models import Document, DocumentRevision, DocumentRevisionStatus
 from app.documents.state_machine import transition
 from app.identity.models import User
-from app.intelligence.models import ExtractedFact, FactCategory, FactCorrection, FactReviewStatus
+from app.intelligence.models import (
+    ExtractedFact,
+    FactCategory,
+    FactCorrection,
+    FactReviewStatus,
+    FactStatus,
+)
 from app.platform.version import APPLICATION_VERSION
 from app.processing.models import ProcessingRun, RunStatus, RunType
 from app.profiles.resolver import NoSystemDefaultProfileError, resolve_effective_config
@@ -168,6 +174,7 @@ async def compose_document(
         .where(
             ExtractedFact.conversation_id == conversation_id,
             ExtractedFact.review_status != FactReviewStatus.REMOVED.value,
+            ExtractedFact.status != FactStatus.SUPERSEDED.value,
         )
         .order_by(ExtractedFact.category.asc(), ExtractedFact.created_at.asc())
     )

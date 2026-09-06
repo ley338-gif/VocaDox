@@ -24,7 +24,7 @@ from app.intelligence.api_schemas import (
     FactEvidenceResponse,
     ReviewIssueResponse,
 )
-from app.intelligence.models import ExtractedFact
+from app.intelligence.models import ExtractedFact, FactStatus
 from app.media.models import MediaAsset, MediaKind
 from app.platform.config import get_settings
 from app.platform.db.session import get_session
@@ -113,7 +113,10 @@ async def list_facts_endpoint(
     )
     result = await db.execute(
         select(ExtractedFact)
-        .where(ExtractedFact.conversation_id == conversation_id)
+        .where(
+            ExtractedFact.conversation_id == conversation_id,
+            ExtractedFact.status != FactStatus.SUPERSEDED.value,
+        )
         .order_by(ExtractedFact.created_at.asc())
     )
     return [ExtractedFactResponse.model_validate(f) for f in result.scalars().all()]

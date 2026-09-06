@@ -29,7 +29,9 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.intelligence.prompts import SYSTEM_PROMPT, get_builtin_category_instruction
+from app.templates.models import PromptVersion
 from app.templates.service import (
+    create_draft_prompt_version,
     create_prompt,
     create_template,
     get_prompt_by_key,
@@ -77,8 +79,9 @@ _MEETING_CATEGORIES = [
         "item_field": "decisions",
         "instruction": (
             "Extract concrete decisions made during this meeting (not proposals or open "
-            "questions). For each, note who decided it and the stated rationale/reasoning if "
-            "any, otherwise 'NOT_MENTIONED' for either field."
+            "questions). For each, note who decided it — using the speaker label for the "
+            "line where they made it — and the stated rationale/reasoning if any, otherwise "
+            "'NOT_MENTIONED' for either field."
         ),
         "fields": [
             {"name": "description", "max_length": 1024},
@@ -100,14 +103,16 @@ _MEETING_CATEGORIES = [
         "item_field": "action_items",
         "instruction": (
             "Extract concrete action items with a clear owner that someone committed to doing "
-            "after this meeting. For each, note the owner, due date, and priority if stated, "
-            "using 'NOT_MENTIONED' for any field that wasn't. Capture the due date exactly as "
+            "after this meeting. For each, note the owner — using the speaker label for the "
+            "line where they committed to it — due date, and priority if stated, using "
+            "'NOT_MENTIONED' for any field that wasn't. Capture the due date exactly as "
             "spoken, including relative or informal time references (e.g. 'tomorrow morning', "
             "'by end of week', 'next Monday', 'morgen Vormittag') — a relative phrase still "
             "counts as stated; only use 'NOT_MENTIONED' if no time reference was said at all. "
             "If a speaker commits to doing something themselves (e.g. 'I can take care of "
-            "that', 'I'll do it', 'ich kann das übernehmen'), record them as the owner even "
-            "though they are only referred to in the first person, not by name."
+            "that', 'I'll do it', 'ich kann das übernehmen'), record their speaker label as "
+            "the owner even though they only referred to themselves in the first person, not "
+            "by name."
         ),
         "fields": [
             {"name": "description", "max_length": 1024},
@@ -263,8 +268,41 @@ async def _seed_template(
     presentation: list[dict],
     publish: bool,
 ) -> None:
+    instructions = {
+        c["key"]: (
+            get_builtin_category_instruction(c["key"]) if c.get("builtin") else c["instruction"]
+        )
+        for c in categories
+    }
+    prompt_key = f"extraction-{key}"
+
     existing = await get_template_by_key(session, key)
     if existing is not None:
+        # The template/categories/presentation themselves are immutable
+        # once created (a real content change there needs a new Template
+        # Version through the Admin Portal, like any other). But the
+        # extraction PROMPT wording is source-controlled here and DOES need
+        # a way to actually reach an already-seeded install: re-running
+        # this seed (`python -m app.templates.seed`, same idempotent
+        # "safe on every startup" pattern as app.identity.seed) detects
+        # when the currently-published PromptVersion's content has drifted
+        # from these source constants and publishes a fresh version — the
+        # same create-draft-then-publish flow the Admin Portal itself uses
+        # — so a prompt wording fix (like this one) actually changes
+        # extraction behavior instead of only affecting brand new installs.
+        if publish:
+            # Foundation-only templates (publish=False — medical_consultation/
+            # psychotherapy) keep their prompt DRAFT and untouched by any of
+            # this, exactly as `_seed_template`'s create path already does —
+            # "not yet a real, selectable option" per spec §42 is a deliberate,
+            # standing state, not something an unrelated wording fix elsewhere
+            # should silently publish.
+            await _republish_prompt_if_drifted(
+                session,
+                prompt_key=prompt_key,
+                system_prompt=SYSTEM_PROMPT,
+                instructions=instructions,
+            )
         return
 
     template = await create_template(
@@ -277,13 +315,6 @@ async def _seed_template(
         review_rules=None,
         created_by=None,  # type: ignore[arg-type]
     )
-    instructions = {
-        c["key"]: (
-            get_builtin_category_instruction(c["key"]) if c.get("builtin") else c["instruction"]
-        )
-        for c in categories
-    }
-    prompt_key = f"extraction-{key}"
     if await get_prompt_by_key(session, prompt_key) is None:
         await create_prompt(
             session,
@@ -309,6 +340,37 @@ async def _seed_template(
             )
 
 
+async def _republish_prompt_if_drifted(
+    session: AsyncSession,
+    *,
+    prompt_key: str,
+    system_prompt: str,
+    instructions: dict[str, str],
+) -> None:
+    prompt = await get_prompt_by_key(session, prompt_key)
+    if prompt is None:
+        return  # a DRAFT-only (unpublished) template's prompt; nothing to drift-check yet
+    current = (
+        await session.get(PromptVersion, prompt.current_published_version_id)
+        if prompt.current_published_version_id is not None
+        else None
+    )
+    if (
+        current is not None
+        and current.system_prompt == system_prompt
+        and current.category_instructions == instructions
+    ):
+        return
+    new_version = await create_draft_prompt_version(
+        session,
+        prompt=prompt,
+        system_prompt=system_prompt,
+        category_instructions=instructions,
+        created_by=None,  # type: ignore[arg-type]
+    )
+    await publish_prompt_version(session, prompt=prompt, version=new_version, published_by=None)
+
+
 async def _reseed_cli() -> int:  # pragma: no cover - trivial CLI wrapper
     from app.platform.db import model_registry  # noqa: F401
     from app.platform.db.session import get_sessionmaker
@@ -317,7 +379,7 @@ async def _reseed_cli() -> int:  # pragma: no cover - trivial CLI wrapper
     async with sessionmaker() as session:
         await apply_seed(session)
         await session.commit()
-    print("Template/prompt seed applied (created if none existed).")
+    print("Template/prompt seed applied (created if none existed, prompts republished if changed).")
     return 0
 
 

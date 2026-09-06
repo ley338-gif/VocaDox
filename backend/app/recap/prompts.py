@@ -22,8 +22,17 @@ SYSTEM_PROMPT = (
     "given to you below — never invent, assume, or add any detail not present in them. "
     f"Never include internal annotations or the literal placeholder '{NOT_MENTIONED}' — "
     "simply omit anything not stated. Write in the SAME language the notes below are "
-    "written in, never translate them. Keep it concise (a few short paragraphs), use plain "
-    "prose (no headings, no bullet lists), and use a friendly, professional tone."
+    "written in, never translate them. Keep the main part concise (a few short paragraphs), "
+    "use plain prose (no headings, no bullet lists) for it, and use a friendly, professional "
+    "tone.\n\n"
+    "One explicit exception to the prose-only rule: if the notes contain any open tasks, "
+    "action items, or follow-ups, end the recap with one short, clearly separated section "
+    "titled with a short heading meaning \"Next steps\" in the notes' own language (e.g. "
+    "'Nächste Schritte' for German), listing each one on its own line as a plain '- ' "
+    f"bullet, including who is responsible and the due date only when the notes actually "
+    f"state them (never write '{NOT_MENTIONED}' or any other placeholder for an unstated "
+    "one — just omit that part of the line). Omit this section entirely if the notes "
+    "contain no open tasks/action items/follow-ups."
 )
 
 
