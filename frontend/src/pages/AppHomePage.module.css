@@ -1,6 +1,8 @@
-.actions {
-  display: flex;
-  gap: var(--space-3);
+.quickActions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
 .statGrid {
@@ -21,5 +23,15 @@
   .columns {
     grid-template-columns: 1fr;
   }
+}
+
+.rowTitle {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.rowSubtitle {
+  color: var(--text-muted);
+  font-size: var(--font-caption-size);
 }
 
