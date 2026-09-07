@@ -14,6 +14,7 @@ from app.administration.router import router as administration_router
 from app.analytics.router import router as analytics_router
 from app.ask.router import router as ask_router
 from app.audit.router import router as audit_router
+from app.completeness.router import router as completeness_router
 from app.conversations.router import router as conversations_router
 from app.diarization.router import router as diarization_router
 from app.documents.router import router as documents_router
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     app.include_router(organizations_router, prefix=settings.api_prefix)
     app.include_router(transcription_router, prefix=settings.api_prefix)
     app.include_router(diarization_router, prefix=settings.api_prefix)
+    app.include_router(completeness_router, prefix=settings.api_prefix)
     app.include_router(intelligence_router, prefix=settings.api_prefix)
     app.include_router(documents_router, prefix=settings.api_prefix)
     app.include_router(administration_router, prefix=settings.api_prefix)

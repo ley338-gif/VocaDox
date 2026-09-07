@@ -717,6 +717,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Completeness Endpoint */
+        get: operations["get_completeness_endpoint_api_v1_conversations__conversation_id__completeness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/process/extract": {
         parameters: {
             query?: never;
@@ -2624,6 +2641,17 @@ export interface components {
             /** File */
             file: string;
         };
+        /** CategoryCoverageResponse */
+        CategoryCoverageResponse: {
+            /** Category */
+            category: string;
+            /** Title */
+            title: string;
+            /** Covered */
+            covered: boolean;
+            /** Fact Count */
+            fact_count: number;
+        };
         /** ComparisonItemResponse */
         ComparisonItemResponse: {
             status: components["schemas"]["ComparisonStatus"];
@@ -2663,6 +2691,37 @@ export interface components {
          * @enum {string}
          */
         ComparisonStatus: "new" | "changed" | "not_mentioned" | "contradicted";
+        /** CompletenessResponse */
+        CompletenessResponse: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Template Key */
+            template_key: string | null;
+            /** Template Name */
+            template_name: string | null;
+            /** Template Version Id */
+            template_version_id: string | null;
+            /** Categories */
+            categories: components["schemas"]["CategoryCoverageResponse"][];
+            /** Category Coverage Ratio */
+            category_coverage_ratio: number;
+            /** Decisions Total */
+            decisions_total: number;
+            /** Decisions Missing Decided By */
+            decisions_missing_decided_by: number;
+            /** Tasks Total */
+            tasks_total: number;
+            /** Tasks Missing Assignee */
+            tasks_missing_assignee: number;
+            /** Overall Score */
+            overall_score: number;
+            /** Speaking Shares */
+            speaking_shares: components["schemas"]["SpeakingShareResponse"][];
+            longest_monologue: components["schemas"]["MonologueSpanResponse"] | null;
+        };
         /**
          * ComponentHealth
          * @description One dependency's real, live-checked status — never a fabricated
@@ -3735,6 +3794,22 @@ export interface components {
             };
             llm: components["schemas"]["LLMProviderStatusResponse"];
         };
+        /** MonologueSpanResponse */
+        MonologueSpanResponse: {
+            /**
+             * Speaker Id
+             * Format: uuid
+             */
+            speaker_id: string;
+            /** Label */
+            label: string;
+            /** Start Ms */
+            start_ms: number;
+            /** End Ms */
+            end_ms: number;
+            /** Duration Ms */
+            duration_ms: number;
+        };
         /** NoteCreateRequest */
         NoteCreateRequest: {
             /** Content */
@@ -4738,6 +4813,20 @@ export interface components {
              * Format: uuid
              */
             known_speaker_id: string;
+        };
+        /** SpeakingShareResponse */
+        SpeakingShareResponse: {
+            /**
+             * Speaker Id
+             * Format: uuid
+             */
+            speaker_id: string;
+            /** Label */
+            label: string;
+            /** Speaking Ms */
+            speaking_ms: number;
+            /** Share */
+            share: number;
         };
         /** SpeechProviderStatusResponse */
         SpeechProviderStatusResponse: {
@@ -6950,6 +7039,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetectedSpeakerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_completeness_endpoint_api_v1_conversations__conversation_id__completeness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletenessResponse"];
                 };
             };
             /** @description Validation Error */
