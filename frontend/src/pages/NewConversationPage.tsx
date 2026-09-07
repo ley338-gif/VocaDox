@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Mic, Upload } from "lucide-react";
+import { CalendarDays, Mic, Upload } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -13,9 +13,20 @@ import { Button } from "../design-system/Button";
 import { FormField } from "../design-system/FormField";
 import { Checkbox, Select, TextInput } from "../design-system/FormControls";
 import { ErrorState } from "../design-system/States";
+import { type CalendarEvent, parseIcs, upcomingEvents } from "../lib/icsParser";
 import styles from "./NewConversationPage.module.css";
 
 type Mode = "record" | "upload";
+
+function formatEventTime(date: Date): string {
+  return date.toLocaleString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export function NewConversationPage() {
   const navigate = useNavigate();
@@ -35,6 +46,43 @@ export function NewConversationPage() {
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Post-GA P2-2 "Kalender-Automatik": parsed entirely client-side from a
+  // locally-picked .ics file — no calendar data ever reaches the backend
+  // until the user explicitly creates a conversation, and no runtime
+  // network call or account/secret is involved at all (see
+  // docs/architecture/adr/0037-calendar-ics-import.md).
+  const [showCalendarImport, setShowCalendarImport] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [selectedEventUid, setSelectedEventUid] = useState<string | null>(null);
+
+  function handleIcsFile(icsFile: File | undefined) {
+    setCalendarError(null);
+    setCalendarEvents([]);
+    setSelectedEventUid(null);
+    if (!icsFile) return;
+    icsFile
+      .text()
+      .then((text) => {
+        const events = upcomingEvents(parseIcs(text));
+        if (events.length === 0) {
+          setCalendarError(
+            "Keine bevorstehenden Termine in dieser Datei gefunden (nur Termine der " +
+              "nächsten 30 Tage werden angezeigt)."
+          );
+          return;
+        }
+        setCalendarEvents(events);
+      })
+      .catch(() => setCalendarError("Datei konnte nicht als Kalenderdatei (.ics) gelesen werden."));
+  }
+
+  function handleSelectEvent(event: CalendarEvent) {
+    setSelectedEventUid(event.uid);
+    setTitle(event.summary);
+    setConversationType("meeting");
+    setMode("record");
+  }
 
   const { data: organizations } = useQuery({
     queryKey: ["organizations"],
@@ -114,7 +162,54 @@ export function NewConversationPage() {
           <h3>Audio hochladen</h3>
           <p style={{ color: "var(--text-muted)" }}>Eine vorhandene Audiodatei hochladen (WebM, WAV, MP3, M4A).</p>
         </button>
+        <button
+          type="button"
+          className={`${styles.choiceCard} ${showCalendarImport ? styles.selected : ""}`}
+          onClick={() => setShowCalendarImport(true)}
+        >
+          <CalendarDays size={24} aria-hidden="true" />
+          <h3>Aus Kalender übernehmen</h3>
+          <p style={{ color: "var(--text-muted)" }}>
+            Titel aus einer Kalenderdatei (.ics) für einen bevorstehenden Termin übernehmen.
+          </p>
+        </button>
       </div>
+
+      {showCalendarImport && (
+        <div className={styles.form} style={{ marginBottom: "var(--space-6)" }}>
+          <FormField label="Kalenderdatei (.ics)">
+            <input
+              type="file"
+              accept=".ics,text/calendar"
+              onChange={(event) => handleIcsFile(event.target.files?.[0])}
+            />
+          </FormField>
+          <p style={{ color: "var(--text-muted)", fontSize: "var(--font-body-sm-size)" }}>
+            Wird ausschließlich lokal in Ihrem Browser gelesen — nichts aus der Kalenderdatei wird
+            übertragen, bevor Sie unten ein Gespräch erstellen.
+          </p>
+          {calendarError && <ErrorState message={calendarError} />}
+          {calendarEvents.length > 0 && (
+            <ul className={styles.calendarEventList}>
+              {calendarEvents.map((event) => (
+                <li key={event.uid}>
+                  <button
+                    type="button"
+                    className={`${styles.calendarEventItem} ${
+                      selectedEventUid === event.uid ? styles.selected : ""
+                    }`}
+                    onClick={() => handleSelectEvent(event)}
+                  >
+                    <strong>{event.summary}</strong>
+                    <span>{formatEventTime(event.start)}</span>
+                    {event.location && <span>{event.location}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {mode && (
         <div className={styles.form}>
