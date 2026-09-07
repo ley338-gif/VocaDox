@@ -17,10 +17,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import record_event
+from app.conversations.models import Conversation
 from app.diarization.models import DetectedSpeaker
 from app.evidence.models import EvidenceType, FactEvidence
 from app.intelligence.contradictions import FactForContradictionCheck, detect_contradictions
-from app.intelligence.models import Certainty, ExtractedFact, FactCategory, FactStatus
+from app.intelligence.models import (
+    Certainty,
+    ExtractedFact,
+    FactCategory,
+    FactRedactionEvent,
+    FactStatus,
+)
 from app.intelligence.prompts import SYSTEM_PROMPT, build_prompt_from_instruction, render_transcript
 from app.intelligence.rendering import render_fact_statement
 from app.intelligence.schemas import NOT_MENTIONED
@@ -418,3 +425,65 @@ async def run_extraction(
         review_issues_created=total_review_issues,
         facts_by_category=facts_by_category,
     )
+
+
+async def _resync_search_entry(session: AsyncSession, fact: ExtractedFact) -> None:
+    """Re-renders this fact's search index entry after its redaction
+    state changes — render_fact_statement already returns the redacted
+    placeholder when appropriate, so this is the same upsert every other
+    fact-mutation call site already performs, just triggered by a
+    redaction event instead of creation/correction."""
+    conversation = await session.get(Conversation, fact.conversation_id)
+    if conversation is None:
+        return
+    await upsert_search_entry(
+        session,
+        conversation_id=conversation.id,
+        organization_id=conversation.organization_id,
+        group_id=conversation.group_id,
+        source_type=SearchSourceType.EXTRACTED_FACT,
+        source_id=fact.id,
+        content=render_fact_statement(fact),
+    )
+
+
+async def redact_fact(
+    session: AsyncSession,
+    fact: ExtractedFact,
+    *,
+    reason: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> FactRedactionEvent:
+    """Post-GA P3-2: hides this fact's content from every shared/rendered
+    output (Document composition, search, Ask VocaDox — all go through
+    render_fact_statement) while leaving the fact row, its evidence
+    links, and this very audit trail fully intact — see
+    ExtractedFact.is_redacted's docstring for why that's the "evidence
+    chain preserved" the roadmap asks for. A no-op event is still
+    recorded if the fact was already redacted, so the audit trail
+    reflects every explicit action taken, not just state transitions."""
+    fact.is_redacted = True
+    event = FactRedactionEvent(
+        fact_id=fact.id, redacted=True, reason=reason, actor_user_id=actor_user_id
+    )
+    session.add(event)
+    await session.flush()
+    await _resync_search_entry(session, fact)
+    return event
+
+
+async def unredact_fact(
+    session: AsyncSession,
+    fact: ExtractedFact,
+    *,
+    reason: str | None,
+    actor_user_id: uuid.UUID | None,
+) -> FactRedactionEvent:
+    fact.is_redacted = False
+    event = FactRedactionEvent(
+        fact_id=fact.id, redacted=False, reason=reason, actor_user_id=actor_user_id
+    )
+    session.add(event)
+    await session.flush()
+    await _resync_search_entry(session, fact)
+    return event

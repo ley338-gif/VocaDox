@@ -15,8 +15,9 @@ contained follow-up (see the module docstring's own disclosure norm).
 
 from __future__ import annotations
 
+import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,9 +25,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.documents.models import Document, DocumentRevision
 from app.identity.models import User
 from app.providers.llm import LLMProvider
-from app.recap.models import Recap, RecapRevision, RecapStatus
+from app.recap.models import Recap, RecapRevision, RecapShareLink, RecapStatus
 from app.recap.prompts import SYSTEM_PROMPT, build_prompt
 from app.transcription.models import Transcript
+
+# Bounded so a share link can never be effectively permanent -- an admin
+# picks from a small set of concrete durations (see the router's request
+# schema), not an arbitrary value.
+MAX_SHARE_LINK_TTL_HOURS = 30 * 24
 
 
 class RecapNotComposableError(RuntimeError):
@@ -132,3 +138,88 @@ async def approve_recap(
     recap.status = RecapStatus.APPROVED.value
     await session.flush()
     return recap
+
+
+# -- Share links (post-GA P3-2) ----------------------------------------
+
+
+class ShareLinkNotAvailableError(RuntimeError):
+    """Raised when a share link is requested for a recap that isn't
+    currently approved -- matches export_recap_endpoint's own "must be
+    approved" gate; sharing something not yet approved would defeat the
+    point of the approval step."""
+
+
+async def create_share_link(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    recap: Recap,
+    ttl_hours: int,
+    created_by_user_id: uuid.UUID | None,
+) -> RecapShareLink:
+    if recap.current_revision_id is None:
+        raise ShareLinkNotAvailableError("no revision to share")
+    revision = await session.get(RecapRevision, recap.current_revision_id)
+    if revision is None or revision.status != RecapStatus.APPROVED.value:
+        raise ShareLinkNotAvailableError("recap must be approved before it can be shared")
+    ttl_hours = min(max(ttl_hours, 1), MAX_SHARE_LINK_TTL_HOURS)
+
+    link = RecapShareLink(
+        conversation_id=conversation_id,
+        token=secrets.token_urlsafe(32),
+        expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours),
+        created_by_user_id=created_by_user_id,
+    )
+    session.add(link)
+    await session.flush()
+    return link
+
+
+async def list_share_links(
+    session: AsyncSession, *, conversation_id: uuid.UUID
+) -> list[RecapShareLink]:
+    result = await session.execute(
+        select(RecapShareLink)
+        .where(RecapShareLink.conversation_id == conversation_id)
+        .order_by(RecapShareLink.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def revoke_share_link(session: AsyncSession, link: RecapShareLink) -> None:
+    link.revoked_at = datetime.now(UTC)
+    await session.flush()
+
+
+async def get_valid_share_link(session: AsyncSession, *, token: str) -> RecapShareLink | None:
+    """Returns the link only if it is neither expired nor revoked --
+    every other distinction (doesn't exist / expired / revoked) is
+    deliberately collapsed into the same "not available" outcome by the
+    caller, matching this project's established never-distinguish-404-
+    reasons posture for anything reachable without normal authorization."""
+    result = await session.execute(select(RecapShareLink).where(RecapShareLink.token == token))
+    link = result.scalar_one_or_none()
+    if link is None:
+        return None
+    if link.revoked_at is not None:
+        return None
+    # SQLite (the test suite's DB, see tests/conversations/conftest.py's
+    # app_env fixture) round-trips DateTime(timezone=True) values as
+    # naive -- Postgres returns them tz-aware. Every datetime this table
+    # ever stores was written as `datetime.now(UTC) + ...`, so a naive
+    # value read back is always really UTC; normalizing here keeps this
+    # comparison correct under both dialects instead of raising
+    # "can't compare offset-naive and offset-aware datetimes" on SQLite.
+    expires_at = link.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if expires_at <= datetime.now(UTC):
+        return None
+    return link
+
+
+async def record_share_link_access(session: AsyncSession, link: RecapShareLink) -> None:
+    link.access_count += 1
+    link.last_accessed_at = datetime.now(UTC)
+    await session.flush()

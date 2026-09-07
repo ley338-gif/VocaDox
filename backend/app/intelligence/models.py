@@ -24,7 +24,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, ForeignKey, String, Uuid, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.db.session import Base
@@ -118,11 +118,52 @@ class ExtractedFact(Base):
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Post-GA P3-2: orthogonal to `review_status` above — a fact can be
+    # CONFIRMED (genuinely correct, evidenced) and redacted at the same
+    # time; redaction is about who is allowed to SEE it, never about
+    # whether it is true. Only ever set via
+    # app.intelligence.service.redact_fact/unredact_fact, which also
+    # writes a FactRedactionEvent row below — this column is the current-
+    # state cache, that table is the audit trail. Deliberately NEVER
+    # consulted by `GET .../facts` (app.intelligence.api_schemas.
+    # ExtractedFactResponse) — the internal, permission-gated Facts view
+    # always shows the real content so a reviewer can verify what's
+    # redacted and why; only the shared/rendered outputs
+    # (app.intelligence.rendering.render_fact_statement, and therefore
+    # Document composition, search indexing, and Ask VocaDox) black it
+    # out. This is the "evidence chain preserved" the roadmap asks for:
+    # nothing about this fact or its evidence is ever deleted.
+    is_redacted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class FactRedactionEvent(Base):
+    """Audit trail for one redact/un-redact event — one row per event,
+    never overwritten, mirrors `FactCorrection`'s own discipline exactly.
+    `redacted=True` means this event redacted the fact; `False` means
+    this event lifted an earlier redaction — the sequence of rows is the
+    complete history, `ExtractedFact.is_redacted` is only ever the
+    latest state."""
+
+    __tablename__ = "fact_redaction_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    fact_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("extracted_facts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    redacted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
 

@@ -15,7 +15,9 @@ import {
   getFactEvidence,
   listFacts,
   listReviewIssues,
+  redactFact,
   triggerExtraction,
+  unredactFact,
   type ExtractedFact,
   type ReviewIssueSeverity,
 } from "../api/intelligence";
@@ -37,10 +39,14 @@ function FactRow({
   fact,
   conversationId,
   audioPlayerRef,
+  canRedact,
+  onToggleRedaction,
 }: {
   fact: ExtractedFact;
   conversationId: string;
   audioPlayerRef: React.RefObject<AudioPlayerHandle | null>;
+  canRedact: boolean;
+  onToggleRedaction: (fact: ExtractedFact) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const evidenceQuery = useQuery({
@@ -62,7 +68,13 @@ function FactRow({
           <Badge tone="purple">{fact.category.replace("_", " ")}</Badge>
           <Badge tone={fact.status === "verified" ? "success" : "warning"}>{fact.status}</Badge>
           {fact.certainty !== "stated" && <Badge tone="neutral">{fact.certainty.replace("_", " ")}</Badge>}
+          {fact.is_redacted && <Badge tone="danger">geschwärzt</Badge>}
         </button>
+        {canRedact && (
+          <Button variant="tertiary" type="button" onClick={() => onToggleRedaction(fact)}>
+            {fact.is_redacted ? "Schwärzung aufheben" : "Schwärzen"}
+          </Button>
+        )}
       </div>
       <p style={{ margin: "var(--space-1) 0" }}>{factSummary(fact.category, fact.structured_value)}</p>
       {expanded && (
@@ -114,6 +126,14 @@ export function FactsPanel({
     },
   });
 
+  const redactionMutation = useMutation({
+    mutationFn: (fact: ExtractedFact) =>
+      fact.is_redacted
+        ? unredactFact(conversationId, fact.id, undefined, csrfToken ?? "")
+        : redactFact(conversationId, fact.id, undefined, csrfToken ?? ""),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["facts", conversationId] }),
+  });
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
@@ -154,7 +174,14 @@ export function FactsPanel({
       {factsQuery.data && factsQuery.data.length === 0 && <EmptyState title="Noch keine Fakten extrahiert" />}
       <ul className={styles.list}>
         {factsQuery.data?.map((fact) => (
-          <FactRow key={fact.id} fact={fact} conversationId={conversationId} audioPlayerRef={audioPlayerRef} />
+          <FactRow
+            key={fact.id}
+            fact={fact}
+            conversationId={conversationId}
+            audioPlayerRef={audioPlayerRef}
+            canRedact={hasPermission("fact:redact")}
+            onToggleRedaction={(f) => redactionMutation.mutate(f)}
+          />
         ))}
       </ul>
 
