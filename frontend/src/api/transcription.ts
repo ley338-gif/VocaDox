@@ -164,6 +164,18 @@ export function correctSegment(
   );
 }
 
+export function reassignSegmentSpeaker(
+  conversationId: string,
+  segmentId: string,
+  body: { speaker_id: string; through_segment_id?: string },
+  csrfToken: string
+): Promise<TranscriptSegment[]> {
+  return request<TranscriptSegment[]>(
+    `/conversations/${conversationId}/transcript/segments/${segmentId}/speaker`,
+    jsonInit("PATCH", body, csrfToken)
+  );
+}
+
 export function listSpeakers(conversationId: string): Promise<DetectedSpeaker[]> {
   return request<DetectedSpeaker[]>(`/conversations/${conversationId}/speakers`);
 }

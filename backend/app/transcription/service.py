@@ -18,6 +18,7 @@ from app.transcription.models import (
     Transcript,
     TranscriptSegment,
     TranscriptSegmentCorrection,
+    TranscriptSegmentSpeakerCorrection,
     TranscriptStatus,
 )
 
@@ -227,6 +228,30 @@ async def set_review_status(
 ) -> None:
     segment.review_status = status.value
     await session.flush()
+
+
+async def reassign_segment_speaker(
+    session: AsyncSession,
+    segment: TranscriptSegment,
+    *,
+    speaker_id: uuid.UUID,
+    user_id: uuid.UUID | None,
+) -> TranscriptSegmentSpeakerCorrection:
+    """Moves a single, mis-clustered segment onto a different, already-
+    detected speaker -- independent of relabeling a whole DetectedSpeaker
+    cluster (app.diarization.service.assign_speaker). Records an audit
+    row with the previous speaker id (may be None) before applying the
+    new one, mirroring `correct_segment`'s non-destructive pattern."""
+    correction = TranscriptSegmentSpeakerCorrection(
+        segment_id=segment.id,
+        corrected_by_user_id=user_id,
+        previous_speaker_id=segment.speaker_id,
+        new_speaker_id=speaker_id,
+    )
+    session.add(correction)
+    segment.speaker_id = speaker_id
+    await session.flush()
+    return correction
 
 
 async def now_utc() -> datetime:  # small seam for testability

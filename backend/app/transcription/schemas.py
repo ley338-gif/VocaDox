@@ -91,6 +91,15 @@ class SegmentCorrectionRequest(BaseModel):
     review_status: SegmentReviewStatus | None = None
 
 
+class SegmentSpeakerReassignRequest(BaseModel):
+    speaker_id: uuid.UUID
+    # None = only the segment named in the URL; otherwise every segment
+    # from it through this one (inclusive, by sequence order) is
+    # reassigned in one call -- a diarization clustering mistake often
+    # spans several consecutive segments, not just one.
+    through_segment_id: uuid.UUID | None = None
+
+
 class SegmentCorrectionResponse(BaseModel):
     id: uuid.UUID
     segment_id: uuid.UUID
