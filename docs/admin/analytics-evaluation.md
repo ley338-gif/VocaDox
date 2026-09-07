@@ -76,6 +76,39 @@ mechanism, including the honest finding that `qwen3:14b` was NOT
 compatible with the current `OllamaLLMProvider`'s `/api/generate`-based
 prompting at these settings.
 
+## Quality report (post-GA P1-4) — `POST /admin/evaluation/quality-report`
+
+Permission: `evaluation:run`. The Evaluation Lab's customer-facing
+counterpart to the model/prompt comparisons above — a real, exportable
+quality report suitable for procurement, a Datenschutzbeauftragter, or
+EU AI Act documentation. Unlike every comparison type above, it does not
+run the synthetic fixture: it runs the current speech provider against
+the *real* audio of an admin-named list of already-processed
+conversations (`conversation_ids` in the request body, 1–20) and
+measures Word Error Rate against each conversation's own transcript as
+ground truth (same "real audio + reviewed transcript" approach as the
+Fachwortschatz comparison, ADR-0031), plus the same extraction-quality
+metrics `GET /admin/analytics/quality` computes, scoped to exactly that
+sample (`app.analytics.service.quality_metrics`'s new `conversation_ids`
+parameter).
+
+The sample is always **explicitly named by the admin, never
+auto-selected** — see ADR-0034 for why. A conversation missing audio or
+a ready transcript is skipped (visible in the response's `skipped` list
+with a reason), never silently dropped or treated as a failure of the
+whole report.
+
+Nothing is persisted — the report is computed fresh on every call, which
+is what makes it reproducible: the same `conversation_ids`, called again
+against unchanged data, produces the same numbers. `format=json`
+(default) returns the structured report; `format=pdf`/`format=docx`
+return a downloadable file (`app.documents.export_formats`, the same
+renderer Document/Recap export already use) — see the Admin Portal's
+Evaluation Lab → "Qualitätsbericht" tab.
+
+Per this module's existing privacy discipline, conversations are
+identified in the report **by id only, never by title or content**.
+
 ## Model Lifecycle — `/admin/model-profiles/{id}/lifecycle[-transition]`
 
 Permission: `analytics:read` to view, `model-profile:promote` to

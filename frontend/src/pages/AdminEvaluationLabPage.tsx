@@ -3,7 +3,10 @@ import { useState } from "react";
 
 import {
   type EvalResult,
+  type QualityReport,
   type VocabularyEvalResult,
+  fetchQualityReportExport,
+  generateQualityReport,
   listEvaluationRuns,
   runModelComparison,
   runPromptComparison,
@@ -42,15 +45,22 @@ export function AdminEvaluationLabPage() {
   const queryClient = useQueryClient();
   const canRun = hasPermission("evaluation:run");
 
-  const [mode, setMode] = useState<"model" | "prompt" | "vocabulary">("model");
+  const [mode, setMode] = useState<"model" | "prompt" | "vocabulary" | "quality-report">("model");
   const [modelA, setModelA] = useState("");
   const [modelB, setModelB] = useState("");
   const [promptA, setPromptA] = useState("");
   const [promptB, setPromptB] = useState("");
   const [promptModel, setPromptModel] = useState("");
   const [vocabConversationId, setVocabConversationId] = useState("");
+  const [qualityReportIdsText, setQualityReportIdsText] = useState("");
+  const [qualityReport, setQualityReport] = useState<QualityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+
+  const qualityReportConversationIds = qualityReportIdsText
+    .split(/[\s,]+/)
+    .map((id) => id.trim())
+    .filter(Boolean);
 
   const modelProfilesQuery = useQuery({
     queryKey: ["admin", "model-profiles"],
@@ -112,6 +122,36 @@ export function AdminEvaluationLabPage() {
     }
   }
 
+  async function handleGenerateQualityReport() {
+    if (!csrfToken || qualityReportConversationIds.length === 0) return;
+    setError(null);
+    setRunning(true);
+    try {
+      const report = await generateQualityReport(qualityReportConversationIds, csrfToken);
+      setQualityReport(report);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bericht konnte nicht erstellt werden.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function handleExportQualityReport(format: "pdf" | "docx") {
+    if (!csrfToken || qualityReportConversationIds.length === 0) return;
+    setError(null);
+    try {
+      const blob = await fetchQualityReportExport(qualityReportConversationIds, format, csrfToken);
+      const url = URL.createObjectURL(blob);
+      const a = window.document.createElement("a");
+      a.href = url;
+      a.download = `quality-report.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Export fehlgeschlagen.");
+    }
+  }
+
   return (
     <AdminLayout>
       <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
@@ -128,11 +168,12 @@ export function AdminEvaluationLabPage() {
           <Tabs
             idPrefix="evallab-mode"
             activeId={mode}
-            onChange={(id) => setMode(id as "model" | "prompt" | "vocabulary")}
+            onChange={(id) => setMode(id as "model" | "prompt" | "vocabulary" | "quality-report")}
             items={[
               { id: "model", label: "Modellvergleich" },
               { id: "prompt", label: "Promptvergleich" },
               { id: "vocabulary", label: "Fachwortschatz" },
+              { id: "quality-report", label: "Qualitätsbericht" },
             ]}
           />
 
@@ -222,6 +263,118 @@ export function AdminEvaluationLabPage() {
                 {running ? "Läuft…" : "Vergleich starten"}
               </Button>
             </div>
+          </TabPanel>
+
+          <TabPanel id="quality-report" activeId={mode} idPrefix="evallab-mode">
+            <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
+              Erstellt einen exportierbaren Qualitätsnachweis (Wortfehlerrate + Extraktionsgüte)
+              über eine von Ihnen benannte Stichprobe bereits geprüfter Gespräche — geeignet für
+              Beschaffung, Datenschutzbeauftragte und EU-AI-Act-Dokumentation. Bis zu 20
+              Gesprächs-IDs, durch Komma oder Zeilenumbruch getrennt.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+              <textarea
+                value={qualityReportIdsText}
+                onChange={(e) => setQualityReportIdsText(e.target.value)}
+                placeholder="Gesprächs-IDs…"
+                rows={3}
+                style={{
+                  width: "100%",
+                  maxWidth: "40rem",
+                  font: "inherit",
+                  padding: "var(--space-2)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--surface-raised)",
+                  color: "var(--text-primary)",
+                }}
+              />
+              <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                <Button
+                  onClick={() => void handleGenerateQualityReport()}
+                  disabled={running || qualityReportConversationIds.length === 0}
+                >
+                  {running ? "Läuft…" : "Bericht erstellen"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => void handleExportQualityReport("pdf")}
+                  disabled={qualityReportConversationIds.length === 0}
+                >
+                  Als PDF exportieren
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => void handleExportQualityReport("docx")}
+                  disabled={qualityReportConversationIds.length === 0}
+                >
+                  Als DOCX exportieren
+                </Button>
+              </div>
+            </div>
+
+            {qualityReport && (
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <p>
+                  <strong>Spracherkennung:</strong> {qualityReport.speech_provider} /{" "}
+                  {qualityReport.speech_model}
+                  {qualityReport.speech_model_revision ? ` (${qualityReport.speech_model_revision})` : ""}
+                </p>
+                <p>
+                  <strong>Mittlere Wortfehlerrate:</strong>{" "}
+                  {qualityReport.mean_word_error_rate === null
+                    ? "keine auswertbaren Gespräche"
+                    : formatPct(qualityReport.mean_word_error_rate)}{" "}
+                  ({qualityReport.conversation_results.length} ausgewertet,{" "}
+                  {qualityReport.skipped.length} übersprungen)
+                </p>
+                {qualityReport.conversation_results.length > 0 && (
+                  <table style={{ width: "100%", marginTop: "var(--space-3)", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
+                        <th>Gespräch</th>
+                        <th>Wortfehlerrate</th>
+                        <th>Referenzwörter</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qualityReport.conversation_results.map((r) => (
+                        <tr key={r.conversation_id}>
+                          <td>{r.conversation_id}</td>
+                          <td>{formatPct(r.word_error_rate)}</td>
+                          <td>{r.reference_word_count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {qualityReport.skipped.length > 0 && (
+                  <div style={{ marginTop: "var(--space-3)" }}>
+                    <strong>Übersprungen:</strong>
+                    <ul>
+                      {qualityReport.skipped.map((s) => (
+                        <li key={s.conversation_id}>
+                          {s.conversation_id}: {s.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p style={{ marginTop: "var(--space-3)" }}>
+                  <strong>Extraktionsgüte dieser Stichprobe:</strong>{" "}
+                  {qualityReport.quality_metrics.transcript_segments_corrected} von{" "}
+                  {qualityReport.quality_metrics.transcript_segments_total} Transkript-Segmenten
+                  korrigiert
+                  {qualityReport.quality_metrics.fact_corrected_or_removed_rate !== null && (
+                    <>
+                      {" · "}
+                      {formatPct(qualityReport.quality_metrics.fact_corrected_or_removed_rate)}{" "}
+                      der Fakten korrigiert/entfernt
+                    </>
+                  )}
+                </p>
+              </div>
+            )}
           </TabPanel>
           {error && (
             <div style={{ marginTop: "var(--space-3)" }}>

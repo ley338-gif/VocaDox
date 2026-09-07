@@ -169,6 +169,55 @@ export function runVocabularyComparison(
   );
 }
 
+// -- Quality report (post-GA P1-4) -----------------------------------------
+
+export interface ConversationWerResult {
+  conversation_id: string;
+  word_error_rate: number;
+  reference_word_count: number;
+}
+
+export interface SkippedConversation {
+  conversation_id: string;
+  reason: string;
+}
+
+export interface QualityReport {
+  generated_at: string;
+  speech_provider: string;
+  speech_model: string;
+  speech_model_revision: string | null;
+  conversation_results: ConversationWerResult[];
+  skipped: SkippedConversation[];
+  mean_word_error_rate: number | null;
+  quality_metrics: QualityMetrics;
+}
+
+export function generateQualityReport(
+  conversationIds: string[],
+  csrfToken: string
+): Promise<QualityReport> {
+  return request(
+    "/admin/evaluation/quality-report",
+    jsonInit("POST", { conversation_ids: conversationIds }, csrfToken)
+  );
+}
+
+export async function fetchQualityReportExport(
+  conversationIds: string[],
+  format: "pdf" | "docx",
+  csrfToken: string
+): Promise<Blob> {
+  const response = await fetch(`${API_PREFIX}/admin/evaluation/quality-report?format=${format}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify({ conversation_ids: conversationIds }),
+  });
+  if (!response.ok) throw new ApiError(response.status, response.statusText);
+  return response.blob();
+}
+
 // -- Model Lifecycle ------------------------------------------------------
 
 export interface LifecycleEvent {
