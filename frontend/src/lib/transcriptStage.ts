@@ -11,8 +11,19 @@ export type Stage = "idle" | "preparing" | "transcribing" | "diarizing" | "align
 export function stageFromJobs(jobs: ProcessingJob[], transcriptStatus: string | undefined): Stage {
   if (transcriptStatus === "ready") return "ready";
   if (transcriptStatus === "failed") return "failed";
-  const active = jobs.find((j) => j.status === "queued" || j.status === "running");
-  if (!active) return jobs.length === 0 ? "idle" : "failed";
+  if (jobs.length === 0) return "idle";
+  // A real failure is a job that actually reports status "failed" -- NOT
+  // merely "no job is queued/running right now". The pipeline enqueues
+  // normalize -> transcribe -> diarize -> align one at a time, so there is
+  // a real, brief gap between one job succeeding and the next one being
+  // created where NONE is active yet everything is fine; misreading that
+  // gap as "failed" was a real bug (a spurious "Transkription
+  // fehlgeschlagen" flash that self-corrected on the next poll/reload).
+  if (jobs.some((j) => j.status === "failed")) return "failed";
+  // `jobs` is ordered by queued_at DESC (see GET .../process/status), so
+  // jobs[0] is the most recently queued/created job -- during the gap
+  // above, that's still the best signal for "how far did we get".
+  const active = jobs.find((j) => j.status === "queued" || j.status === "running") ?? jobs[0];
   switch (active.job_type) {
     case "normalize":
       return "preparing";
