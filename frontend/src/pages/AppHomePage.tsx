@@ -3,8 +3,8 @@ import { AlertCircle, CheckCircle2, Inbox, Mic, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { getConversationStats, listConversations } from "../api/conversations";
-import { listTasks } from "../api/longitudinal";
 import { useAuth } from "../auth/useAuth";
+import { OpenTasksCard } from "../components/OpenTasksCard";
 import { Button } from "../design-system/Button";
 import { Card, StatCard } from "../design-system/Card";
 import { PageHeader } from "../design-system/PageHeader";
@@ -39,18 +39,13 @@ const RECENT_COLUMNS: DataTableColumn<RecentConversationRow>[] = [
  * which set the precedent of real-only health/queue numbers).
  */
 export function AppHomePage() {
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const statsQuery = useQuery({ queryKey: ["conversation-stats"], queryFn: getConversationStats });
   const recentQuery = useQuery({
     queryKey: ["conversations", "recent"],
     queryFn: () => listConversations({ limit: 5 }),
-  });
-  const tasksQuery = useQuery({
-    queryKey: ["tasks", { status: "open" }],
-    queryFn: () => listTasks("open"),
-    enabled: hasPermission("task:read"),
   });
 
   const counts = statsQuery.data?.counts ?? {};
@@ -116,29 +111,7 @@ export function AppHomePage() {
           />
         </Card>
 
-        {hasPermission("task:read") && (
-          <Card title="Offene Aufgaben">
-            {tasksQuery.isLoading ? (
-              <Skeleton height="1rem" />
-            ) : tasksQuery.isError ? (
-              <ErrorState message="Aufgaben konnten nicht geladen werden." />
-            ) : (tasksQuery.data ?? []).length === 0 ? (
-              <EmptyState title="Keine offenen Aufgaben" />
-            ) : (
-              <ul className={styles.taskList}>
-                {(tasksQuery.data ?? []).slice(0, 6).map((task) => (
-                  <li key={task.id} className={styles.taskItem}>
-                    <span className={styles.taskDescription}>{task.description}</span>
-                    <span className={styles.taskMeta}>
-                      {task.source === "ai_extracted" ? "Automatisch erstellt" : "Manuell erstellt"}
-                      {task.due_date ? ` · Fällig: ${task.due_date}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
+        <OpenTasksCard limit={6} />
       </div>
     </div>
   );

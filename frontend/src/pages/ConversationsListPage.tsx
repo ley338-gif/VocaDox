@@ -5,9 +5,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
-  Clock,
   Inbox,
-  ListChecks,
   Mic,
   Plus,
   Upload,
@@ -18,10 +16,8 @@ import { useNavigate, useSearchParams } from "react-router";
 
 import type { Conversation, ConversationStatus } from "../api/conversations";
 import { getConversation, getConversationStats, listConversations } from "../api/conversations";
-import type { FollowUpTask } from "../api/longitudinal";
-import { listTasks } from "../api/longitudinal";
 import { search as searchContent, type SearchResult } from "../api/search";
-import { useAuth } from "../auth/useAuth";
+import { OpenTasksCard } from "../components/OpenTasksCard";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
@@ -48,23 +44,6 @@ const CONVERSATION_STATUS_ICON: Record<ConversationStatus, { icon: ReactNode; to
   failed: { icon: <AlertCircle size={16} aria-hidden="true" />, tone: "danger" },
   deleted: { icon: <Circle size={16} aria-hidden="true" />, tone: "neutral" },
 };
-
-// Same tone StatusBadge would show for this task's real `status` (open =
-// warning, matching STATUS_MAP) -- only the glyph varies by due_date, so
-// this never disagrees in color with the task's own StatusBadge shown
-// elsewhere (e.g. the conversation's Aufgaben tab).
-const TASK_STATUS_TONE: Record<FollowUpTask["status"], "warning" | "success" | "neutral"> = {
-  open: "warning",
-  done: "success",
-  dismissed: "neutral",
-};
-
-function taskIcon(task: FollowUpTask) {
-  return {
-    icon: task.due_date ? <Clock size={16} aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />,
-    tone: TASK_STATUS_TONE[task.status],
-  };
-}
 
 const SEARCH_SOURCE_LABELS: Record<SearchResult["source_type"], string> = {
   transcript_segment: "Transkript",
@@ -201,7 +180,6 @@ const COLUMNS: DataTableColumn<Conversation>[] = [
 
 export function ConversationsListPage() {
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [statusTab, setStatusTab] = useState<StatusTab>("all");
@@ -251,12 +229,6 @@ export function ConversationsListPage() {
   const recentConversations = recentQueries
     .map((q, index) => (q.data ? { conversation: q.data, openedAt: recentEntries[index].openedAt } : null))
     .filter((entry): entry is { conversation: Conversation; openedAt: string } => entry !== null);
-
-  const tasksQuery = useQuery({
-    queryKey: ["tasks", { status: "open" }],
-    queryFn: () => listTasks("open"),
-    enabled: hasPermission("task:read"),
-  });
 
   return (
     <div>
@@ -395,44 +367,7 @@ export function ConversationsListPage() {
             )}
           </Card>
 
-          {hasPermission("task:read") && (
-            <Card
-              title="Meine Aufgaben"
-              actions={
-                <Button variant="tertiary" type="button" onClick={() => navigate("/app/tasks")}>
-                  Alle anzeigen
-                </Button>
-              }
-            >
-              {tasksQuery.isLoading ? (
-                <Skeleton height="1rem" />
-              ) : tasksQuery.isError ? (
-                <ErrorState message="Aufgaben konnten nicht geladen werden." />
-              ) : (tasksQuery.data ?? []).length === 0 ? (
-                <EmptyState icon={<ListChecks size={20} aria-hidden="true" />} title="Keine offenen Aufgaben" />
-              ) : (
-                <ul className={styles.taskList}>
-                  {(tasksQuery.data ?? []).slice(0, 4).map((task) => (
-                    <li key={task.id} className={styles.taskItem}>
-                      <button
-                        type="button"
-                        className={styles.taskLink}
-                        onClick={() =>
-                          navigate(`/app/conversations/${task.conversation_id}`, { state: { tab: "tasks" } })
-                        }
-                      >
-                        <IconAvatar {...taskIcon(task)} />
-                        <span className={styles.taskBody}>
-                          <span className={styles.taskDescription}>{task.description}</span>
-                          {task.due_date && <span className={styles.taskMeta}>Fällig: {task.due_date}</span>}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          )}
+          <OpenTasksCard limit={4} />
         </aside>
       </div>
     </div>
