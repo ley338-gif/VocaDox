@@ -5,13 +5,7 @@ import { getStorageUsage } from "../api/admin";
 import { AdminLayout } from "../components/AdminLayout";
 import { Card, StatCard } from "../design-system/Card";
 import { Skeleton } from "../design-system/States";
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const exp = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  return `${(bytes / 1024 ** exp).toFixed(1)} ${units[exp]}`;
-}
+import { formatBytes } from "../lib/formatBytes";
 
 /**
  * Phase 7 Admin Portal Storage page: real disk usage figures (an actual

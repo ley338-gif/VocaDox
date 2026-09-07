@@ -14,6 +14,7 @@ import {
 } from "../api/admin";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
+import { RevealSecretBanner } from "../components/RevealSecretBanner";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
@@ -130,36 +131,11 @@ export function AdminServiceAccountsPage() {
       </p>
 
       {revealedKey && (
-        <div
-          style={{
-            border: "1px solid var(--color-warning)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginBottom: "var(--space-4)",
-            background: "color-mix(in srgb, var(--color-warning) 10%, var(--surface-raised))",
-          }}
-        >
-          <strong>API-Key für "{revealedKey.name}" — jetzt kopieren, er wird nicht erneut angezeigt:</strong>
-          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-            <code
-              style={{
-                flex: 1,
-                padding: "var(--space-2)",
-                background: "var(--surface-sunken)",
-                borderRadius: "var(--radius-sm)",
-                overflowWrap: "anywhere",
-              }}
-            >
-              {revealedKey.api_key}
-            </code>
-            <Button variant="secondary" onClick={() => navigator.clipboard.writeText(revealedKey.api_key)}>
-              Kopieren
-            </Button>
-            <Button variant="secondary" onClick={() => setRevealedKey(null)}>
-              Schließen
-            </Button>
-          </div>
-        </div>
+        <RevealSecretBanner
+          label={`API-Key für "${revealedKey.name}"`}
+          value={revealedKey.api_key}
+          onClose={() => setRevealedKey(null)}
+        />
       )}
 
       <DataTable
