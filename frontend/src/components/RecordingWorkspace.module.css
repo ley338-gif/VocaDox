@@ -5,7 +5,7 @@
   padding: var(--space-6);
   background: var(--surface-raised);
   border: 1px solid var(--border-default);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 
 .consentBox {

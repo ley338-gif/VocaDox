@@ -379,16 +379,16 @@ export function ConversationDetailPage() {
   // Shared with the "Verlauf" tab below — the Übersicht tile shows the
   // most recent few of the exact same events instead of a bare count.
   const timelineEvents = [
-    { at: conversation.created_at, label: "Conversation created" },
+    { at: conversation.created_at, label: "Gespräch erstellt" },
     ...(markersQuery.data ?? []).map((m) => ({
       at: m.created_at,
-      label: `Marker at ${Math.round(m.timestamp_ms / 1000)}s${m.label ? ` — ${m.label}` : ""}`,
+      label: `Marker bei ${Math.round(m.timestamp_ms / 1000)}s${m.label ? ` — ${m.label}` : ""}`,
     })),
-    ...(notesQuery.data ?? []).map((n) => ({ at: n.created_at, label: `Note: ${n.content}` })),
+    ...(notesQuery.data ?? []).map((n) => ({ at: n.created_at, label: `Notiz: ${n.content}` })),
     ...(processingQuery.data?.jobs ?? []).map((j) => ({
       at: j.completed_at ?? j.started_at ?? j.queued_at,
       label:
-        `${j.job_type} — ${j.status} (attempt ${j.attempt}/${j.max_attempts})` +
+        `${j.job_type} — ${j.status} (Versuch ${j.attempt}/${j.max_attempts})` +
         (j.failure_class ? ` — ${j.failure_class}` : ""),
     })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
@@ -405,14 +405,14 @@ export function ConversationDetailPage() {
             <StatusBadge status={conversation.status} />
             <span className={styles.metaItem}>{CONVERSATION_TYPE_LABELS[conversation.conversation_type]}</span>
             <span className={styles.metaItem}>
-              <Clock size={13} aria-hidden="true" /> {new Date(conversation.created_at).toLocaleString()}
+              <Clock size={16} aria-hidden="true" /> {new Date(conversation.created_at).toLocaleString()}
             </span>
             {conversation.duration_ms !== null && (
               <span className={styles.metaItem}>{Math.round(conversation.duration_ms / 1000)}s</span>
             )}
             {participantsQuery.data && (
               <span className={styles.metaItem}>
-                <Users size={13} aria-hidden="true" /> {participantsQuery.data.length} Teilnehmer
+                <Users size={16} aria-hidden="true" /> {participantsQuery.data.length} Teilnehmer
               </span>
             )}
             {conversation.privacy_mode === "restricted" && <Badge tone="warning">Eingeschränkt</Badge>}
@@ -676,35 +676,39 @@ export function ConversationDetailPage() {
                   />
                 )
               ) : (
-                <div className={styles.emptyState}>
-                  <p>No audio yet.</p>
-                  <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
-                    <Button variant="primary" type="button" onClick={() => setShowRecorder(true)}>
-                      Start recording
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => document.getElementById("audio-upload-fallback-input")?.click()}
-                    >
-                      Upload audio file
-                    </Button>
-                    <input
-                      id="audio-upload-fallback-input"
-                      type="file"
-                      accept="audio/webm,audio/wav,audio/x-wav,audio/mpeg,audio/mp4,audio/x-m4a,.webm,.wav,.mp3,.m4a"
-                      style={{ display: "none" }}
-                      onChange={(event) => {
-                        const selected = event.target.files?.[0];
-                        if (!selected || !csrfToken) return;
-                        void uploadMedia(conversationId, selected, csrfToken).then(() => {
-                          void queryClient.invalidateQueries({ queryKey: ["conversation-media", conversationId] });
-                          void queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] });
-                        });
-                      }}
-                    />
-                  </div>
-                </div>
+                <EmptyState
+                  icon={<Sparkles size={18} aria-hidden="true" />}
+                  title="Noch kein Audio"
+                  description="Nehmen Sie Audio direkt auf oder laden Sie eine vorhandene Datei hoch."
+                  action={
+                    <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
+                      <Button variant="primary" type="button" onClick={() => setShowRecorder(true)}>
+                        Aufnahme starten
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => document.getElementById("audio-upload-fallback-input")?.click()}
+                      >
+                        Audiodatei hochladen
+                      </Button>
+                      <input
+                        id="audio-upload-fallback-input"
+                        type="file"
+                        accept="audio/webm,audio/wav,audio/x-wav,audio/mpeg,audio/mp4,audio/x-m4a,.webm,.wav,.mp3,.m4a"
+                        style={{ display: "none" }}
+                        onChange={(event) => {
+                          const selected = event.target.files?.[0];
+                          if (!selected || !csrfToken) return;
+                          void uploadMedia(conversationId, selected, csrfToken).then(() => {
+                            void queryClient.invalidateQueries({ queryKey: ["conversation-media", conversationId] });
+                            void queryClient.invalidateQueries({ queryKey: ["conversation", conversationId] });
+                          });
+                        }}
+                      />
+                    </div>
+                  }
+                />
               )}
             </div>
           )}
@@ -773,9 +777,10 @@ export function ConversationDetailPage() {
           {tab === "timeline" && (
             <div className={styles.sideCard}>
               <p style={{ color: "var(--text-muted)" }}>
-                Chronological processing/event timeline for this conversation only — cross-
-                conversation longitudinal comparison is a later phase.
+                Chronologischer Verlauf für dieses Gespräch — gesprächsübergreifender Vergleich findet
+                sich im Tab "Verwandt".
               </p>
+              {timelineEvents.length === 0 && <EmptyState title="Noch keine Ereignisse" />}
               <ul className={styles.list}>
                 {timelineEvents.map((event, idx) => (
                   <li key={idx} className={styles.listItem}>
@@ -805,19 +810,20 @@ export function ConversationDetailPage() {
 
           {tab === "notes" && (
             <div className={styles.sideCard}>
-              {notesQuery.data && notesQuery.data.length === 0 && <p>No notes yet.</p>}
+              {notesQuery.data && notesQuery.data.length === 0 && <EmptyState title="Noch keine Notizen" />}
               <ul className={styles.list} style={{ marginBottom: "var(--space-3)" }}>
                 {notesQuery.data?.map((note) => (
                   <li key={note.id} className={styles.listItem}>
                     <span>{note.content}</span>
                     {hasPermission("conversation:manage-notes") && (
-                      <button
+                      <Button
+                        variant="tertiary"
                         type="button"
-                        aria-label="Remove note"
+                        aria-label="Notiz entfernen"
                         onClick={() => removeNoteMutation.mutate(note.id)}
                       >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
+                        <Trash2 size={16} aria-hidden="true" />
+                      </Button>
                     )}
                   </li>
                 ))}
@@ -825,8 +831,8 @@ export function ConversationDetailPage() {
               {hasPermission("conversation:manage-notes") && (
                 <div className={styles.addRow}>
                   <TextInput
-                    placeholder="Add a note…"
-                    aria-label="Note content"
+                    placeholder="Notiz hinzufügen…"
+                    aria-label="Notizinhalt"
                     value={noteContent}
                     onChange={(event) => setNoteContent(event.target.value)}
                   />
@@ -836,7 +842,7 @@ export function ConversationDetailPage() {
                     disabled={!noteContent.trim()}
                     onClick={() => addNoteMutation.mutate()}
                   >
-                    Add
+                    Hinzufügen
                   </Button>
                 </div>
               )}
@@ -847,29 +853,29 @@ export function ConversationDetailPage() {
             <div className={styles.sideCard}>
               <ul className={styles.list}>
                 <li className={styles.listItem}>
-                  <span>Created</span>
+                  <span>Erstellt</span>
                   <span>{new Date(conversation.created_at).toLocaleString()}</span>
                 </li>
                 {conversation.started_at && (
                   <li className={styles.listItem}>
-                    <span>Recording started</span>
+                    <span>Aufnahme gestartet</span>
                     <span>{new Date(conversation.started_at).toLocaleString()}</span>
                   </li>
                 )}
                 {conversation.ended_at && (
                   <li className={styles.listItem}>
-                    <span>Recording/upload ended</span>
+                    <span>Aufnahme/Upload beendet</span>
                     <span>{new Date(conversation.ended_at).toLocaleString()}</span>
                   </li>
                 )}
                 <li className={styles.listItem}>
-                  <span>Last updated</span>
+                  <span>Zuletzt aktualisiert</span>
                   <span>{new Date(conversation.updated_at).toLocaleString()}</span>
                 </li>
               </ul>
               <p style={{ marginTop: "var(--space-3)", color: "var(--text-muted)" }}>
-                Full event-level audit history is available to Auditor/System Admin roles via the
-                admin area in a later phase.
+                Die vollständige Audit-Historie auf Event-Ebene steht Auditor-/System-Admin-Rollen im
+                Administrationsbereich zur Verfügung.
               </p>
             </div>
           )}
@@ -893,13 +899,14 @@ export function ConversationDetailPage() {
                     {Math.round(marker.timestamp_ms / 1000)}s {marker.label ? `— ${marker.label}` : ""}
                   </span>
                   {hasPermission("conversation:manage-markers") && (
-                    <button
+                    <Button
+                      variant="tertiary"
                       type="button"
                       aria-label="Marker entfernen"
                       onClick={() => removeMarkerMutation.mutate(marker.id)}
                     >
-                      <Trash2 size={14} aria-hidden="true" />
-                    </button>
+                      <Trash2 size={16} aria-hidden="true" />
+                    </Button>
                   )}
                 </li>
               ))}
@@ -919,7 +926,7 @@ export function ConversationDetailPage() {
             )}
           </Card>
 
-          <SidePanelCard icon={<Users size={14} aria-hidden="true" />} title="Teilnehmer">
+          <SidePanelCard icon={<Users size={16} aria-hidden="true" />} title="Teilnehmer">
             {participantsQuery.data && participantsQuery.data.length === 0 && (
               <EmptyState title="Noch keine Teilnehmer" />
             )}
@@ -939,24 +946,26 @@ export function ConversationDetailPage() {
                     {!participant.known_speaker_id &&
                       hasPermission("known-speaker:manage") &&
                       hasPermission("conversation:manage-participants") && (
-                        <button
+                        <Button
+                          variant="tertiary"
                           type="button"
                           aria-label={`${participant.display_name} als bekannte Person merken`}
                           title="Als bekannte Person merken"
                           disabled={rememberParticipantMutation.isPending}
                           onClick={() => rememberParticipantMutation.mutate(participant)}
                         >
-                          <UserCheck size={14} aria-hidden="true" />
-                        </button>
+                          <UserCheck size={16} aria-hidden="true" />
+                        </Button>
                       )}
                     {hasPermission("conversation:manage-participants") && (
-                      <button
+                      <Button
+                        variant="tertiary"
                         type="button"
                         aria-label={`${participant.display_name} entfernen`}
                         onClick={() => removeParticipantMutation.mutate(participant.id)}
                       >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
+                        <Trash2 size={16} aria-hidden="true" />
+                      </Button>
                     )}
                   </span>
                 </li>
@@ -1053,7 +1062,7 @@ export function ConversationDetailPage() {
                       disabled={reprocessMutation.isPending}
                       onClick={() => reprocessMutation.mutate()}
                     >
-                      <RefreshCw size={14} aria-hidden="true" /> Neu verarbeiten
+                      <RefreshCw size={16} aria-hidden="true" /> Neu verarbeiten
                     </Button>
                   </div>
                 )}
@@ -1062,7 +1071,7 @@ export function ConversationDetailPage() {
           </SidePanelCard>
 
           {hasPermission("fact:read") && (
-            <SidePanelCard icon={<Gauge size={14} aria-hidden="true" />} title="Vollständigkeit">
+            <SidePanelCard icon={<Gauge size={16} aria-hidden="true" />} title="Vollständigkeit">
               <CompletenessPanel
                 completeness={completenessQuery.data}
                 isLoading={completenessQuery.isLoading}
@@ -1072,7 +1081,7 @@ export function ConversationDetailPage() {
 
           {hasPermission("task:read") && (
             <SidePanelCard
-              icon={<CheckSquare size={14} aria-hidden="true" />}
+              icon={<CheckSquare size={16} aria-hidden="true" />}
               title="Nächste Schritte"
               action={
                 <Button variant="tertiary" type="button" onClick={() => setTab("tasks")}>

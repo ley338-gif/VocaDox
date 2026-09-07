@@ -26,6 +26,7 @@ import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
 import { IconAvatar } from "../design-system/IconAvatar";
+import { PageHeader } from "../design-system/PageHeader";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { DataTable, type DataTableColumn } from "../design-system/Table";
@@ -48,13 +49,21 @@ const CONVERSATION_STATUS_ICON: Record<ConversationStatus, { icon: ReactNode; to
   deleted: { icon: <Circle size={16} aria-hidden="true" />, tone: "neutral" },
 };
 
+// Same tone StatusBadge would show for this task's real `status` (open =
+// warning, matching STATUS_MAP) -- only the glyph varies by due_date, so
+// this never disagrees in color with the task's own StatusBadge shown
+// elsewhere (e.g. the conversation's Aufgaben tab).
+const TASK_STATUS_TONE: Record<FollowUpTask["status"], "warning" | "success" | "neutral"> = {
+  open: "warning",
+  done: "success",
+  dismissed: "neutral",
+};
+
 function taskIcon(task: FollowUpTask) {
-  // No dedicated "urgency" field on a task — a due date is the one real
-  // signal available to distinguish "needs attention soon" from a plain
-  // open item, matching the two icon styles in the reference mockup.
-  return task.due_date
-    ? { icon: <Clock size={16} aria-hidden="true" />, tone: "warning" as const }
-    : { icon: <Circle size={16} aria-hidden="true" />, tone: "info" as const };
+  return {
+    icon: task.due_date ? <Clock size={16} aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />,
+    tone: TASK_STATUS_TONE[task.status],
+  };
 }
 
 const SEARCH_SOURCE_LABELS: Record<SearchResult["source_type"], string> = {
@@ -251,15 +260,15 @@ export function ConversationsListPage() {
 
   return (
     <div>
-      <div className={styles.header}>
-        <div>
-          <h1 style={{ fontSize: "var(--font-h1-size)" }}>Gespräche</h1>
-          <p className={styles.subtitle}>Alle aufgenommenen und transkribierten Gespräche im Überblick.</p>
-        </div>
-        <Button variant="primary" type="button" onClick={() => navigate("/app/conversations/new")}>
-          <Plus size={16} aria-hidden="true" /> Neues Gespräch
-        </Button>
-      </div>
+      <PageHeader
+        title="Gespräche"
+        meta="Alle aufgenommenen und transkribierten Gespräche im Überblick."
+        actions={
+          <Button variant="primary" type="button" onClick={() => navigate("/app/conversations/new")}>
+            <Plus size={16} aria-hidden="true" /> Neues Gespräch
+          </Button>
+        }
+      />
 
       <div className={styles.searchSection}>
         <TextInput

@@ -7,6 +7,7 @@ import { listTasks } from "../api/longitudinal";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { Card, StatCard } from "../design-system/Card";
+import { PageHeader } from "../design-system/PageHeader";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { DataTable, type DataTableColumn } from "../design-system/Table";
@@ -59,17 +60,19 @@ export function AppHomePage() {
 
   return (
     <div>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Willkommen, {user?.displayName}</h1>
-        <div className={styles.actions}>
-          <Button variant="primary" onClick={() => navigate("/app/conversations/new")}>
-            <Plus size={16} aria-hidden="true" /> Neues Gespräch
-          </Button>
-          <Button variant="secondary" onClick={() => navigate("/app/conversations")}>
-            Alle Gespräche
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title={`Willkommen, ${user?.displayName ?? ""}`}
+        actions={
+          <div className={styles.actions}>
+            <Button variant="primary" onClick={() => navigate("/app/conversations/new")}>
+              <Plus size={16} aria-hidden="true" /> Neues Gespräch
+            </Button>
+            <Button variant="secondary" onClick={() => navigate("/app/conversations")}>
+              Alle Gespräche
+            </Button>
+          </div>
+        }
+      />
 
       <div className={styles.statGrid}>
         {statsQuery.isLoading ? (

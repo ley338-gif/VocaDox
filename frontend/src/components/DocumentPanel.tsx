@@ -92,65 +92,72 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
-        <h4 style={{ margin: 0 }}>Dokumentation</h4>
-        <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          {hasPermission("document:edit") && (
-            <Button
-              variant="secondary"
-              type="button"
-              disabled={composeMutation.isPending}
-              onClick={() => composeMutation.mutate()}
-            >
-              {composeMutation.isPending ? <Spinner size={16} /> : <RefreshCw size={16} aria-hidden="true" />}{" "}
-              {composeMutation.isPending ? "Wird erstellt…" : revision ? "Neu zusammenstellen" : "Dokument erstellen"}
-            </Button>
-          )}
-          {revision && (
-            <>
-              <Button variant="tertiary" type="button" onClick={() => void handleExport("text")}>
-                <Download size={16} aria-hidden="true" /> .txt
-              </Button>
-              <Button variant="tertiary" type="button" onClick={() => void handleExport("json")}>
-                <Download size={16} aria-hidden="true" /> .json
-              </Button>
-              <a className={panelStyles.exportLink} href={documentExportUrl(conversationId, "docx")}>
-                <Download size={16} aria-hidden="true" /> .docx
-              </a>
-              <a className={panelStyles.exportLink} href={documentExportUrl(conversationId, "pdf")}>
-                <Download size={16} aria-hidden="true" /> .pdf
-              </a>
-              <a
-                className={panelStyles.exportLink}
-                href={documentExportUrl(conversationId, "fhir")}
-                title="FHIR R4 DocumentReference — für den Import in ein Praxisverwaltungs-/Klinikinformationssystem"
+      <Card
+        title="Dokumentation"
+        actions={
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            {hasPermission("document:edit") && (
+              <Button
+                variant="secondary"
+                type="button"
+                disabled={composeMutation.isPending}
+                onClick={() => composeMutation.mutate()}
               >
-                <Download size={16} aria-hidden="true" /> FHIR
-              </a>
-            </>
-          )}
-        </div>
-      </div>
+                {composeMutation.isPending ? <Spinner size={16} /> : <RefreshCw size={16} aria-hidden="true" />}{" "}
+                {composeMutation.isPending
+                  ? "Wird erstellt…"
+                  : revision
+                    ? "Neu zusammenstellen"
+                    : "Dokument erstellen"}
+              </Button>
+            )}
+            {revision && (
+              <>
+                <Button variant="tertiary" type="button" onClick={() => void handleExport("text")}>
+                  <Download size={16} aria-hidden="true" /> .txt
+                </Button>
+                <Button variant="tertiary" type="button" onClick={() => void handleExport("json")}>
+                  <Download size={16} aria-hidden="true" /> .json
+                </Button>
+                <a className={panelStyles.exportLink} href={documentExportUrl(conversationId, "docx")}>
+                  <Download size={16} aria-hidden="true" /> .docx
+                </a>
+                <a className={panelStyles.exportLink} href={documentExportUrl(conversationId, "pdf")}>
+                  <Download size={16} aria-hidden="true" /> .pdf
+                </a>
+                <a
+                  className={panelStyles.exportLink}
+                  href={documentExportUrl(conversationId, "fhir")}
+                  title="FHIR R4 DocumentReference — für den Import in ein Praxisverwaltungs-/Klinikinformationssystem"
+                >
+                  <Download size={16} aria-hidden="true" /> FHIR
+                </a>
+              </>
+            )}
+          </div>
+        }
+      >
+        {documentQuery.isLoading && <Skeleton height="8rem" />}
 
-      {documentQuery.isLoading && <Skeleton height="8rem" />}
-
-      {documentQuery.isError && (
-        <EmptyState
-          icon={<FileText size={20} aria-hidden="true" />}
-          title="Noch kein Dokument erstellt"
-          description="Automatisch erstellt — eine deterministische Darstellung der aktuellen Fakten dieses Gesprächs, nie ein KI-generierter Bericht."
-        />
-      )}
+        {documentQuery.isError && (
+          <EmptyState
+            icon={<FileText size={20} aria-hidden="true" />}
+            title="Noch kein Dokument erstellt"
+            description="Automatisch erstellt — eine deterministische Darstellung der aktuellen Fakten dieses Gesprächs, nie ein KI-generierter Bericht."
+          />
+        )}
+      </Card>
 
       {revision && (
         <Card
+          className={panelStyles.spacedCard}
           title={`Revision ${revision.revision_number}`}
           actions={
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
               <StatusBadge status={revision.status} />
               {revision.status === "approved" && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--color-success)" }}>
-                  <CheckCircle2 size={14} aria-hidden="true" />
+                  <CheckCircle2 size={16} aria-hidden="true" />
                 </span>
               )}
             </div>
@@ -188,8 +195,7 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
       )}
 
       {revisionsQuery.data && revisionsQuery.data.length > 0 && (
-        <>
-          <h4 style={{ marginTop: "var(--space-6)" }}>Revisionsverlauf</h4>
+        <Card className={panelStyles.spacedCard} title="Revisionsverlauf">
           <ul className={panelStyles.list}>
             {revisionsQuery.data.map((r) => (
               <li key={r.id} className={panelStyles.item}>
@@ -208,7 +214,7 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
               </li>
             ))}
           </ul>
-        </>
+        </Card>
       )}
     </div>
   );

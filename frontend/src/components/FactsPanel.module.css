@@ -7,6 +7,10 @@
   gap: var(--space-3);
 }
 
+.spacedCard {
+  margin-top: var(--space-6);
+}
+
 .exportLink {
   display: inline-flex;
   align-items: center;

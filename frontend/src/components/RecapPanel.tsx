@@ -73,7 +73,7 @@ function ShareLinksSection({ conversationId }: { conversationId: string }) {
   return (
     <div className={styles.shareLinks}>
       <p className={styles.shareLinksHeading}>
-        <Link2 size={14} aria-hidden="true" /> Freigabe-Links (zeitlich begrenzt, kein Login
+        <Link2 size={16} aria-hidden="true" /> Freigabe-Links (zeitlich begrenzt, kein Login
         erforderlich)
       </p>
       <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
@@ -108,20 +108,22 @@ function ShareLinksSection({ conversationId }: { conversationId: string }) {
                 <span className={styles.shareLinkMeta}>
                   läuft ab am {formatExpiry(link.expires_at)} · {link.access_count}× abgerufen
                 </span>
-                <button
+                <Button
+                  variant="tertiary"
                   type="button"
                   aria-label="Link kopieren"
                   onClick={() => void navigator.clipboard.writeText(url)}
                 >
-                  <Copy size={14} aria-hidden="true" />
-                </button>
-                <button
+                  <Copy size={16} aria-hidden="true" />
+                </Button>
+                <Button
+                  variant="tertiary"
                   type="button"
                   aria-label="Link widerrufen"
                   onClick={() => revokeMutation.mutate(link.id)}
                 >
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>
+                  <Trash2 size={16} aria-hidden="true" />
+                </Button>
               </li>
             );
           })}
@@ -157,46 +159,49 @@ export function RecapPanel({ conversationId }: { conversationId: string }) {
 
   return (
     <div>
-      <div className={styles.header}>
-        <h4 style={{ margin: 0 }}>Recap für Teilnehmer</h4>
-        {hasPermission("recap:generate") && (
-          <Button
-            variant="secondary"
-            type="button"
-            disabled={generateMutation.isPending}
-            onClick={() => generateMutation.mutate()}
-          >
-            {generateMutation.isPending ? <Spinner size={16} /> : <RefreshCw size={16} aria-hidden="true" />}{" "}
-            {generateMutation.isPending ? "Wird erstellt…" : revision ? "Neu erstellen" : "Recap erstellen"}
-          </Button>
+      <Card
+        title="Recap für Teilnehmer"
+        actions={
+          hasPermission("recap:generate") && (
+            <Button
+              variant="secondary"
+              type="button"
+              disabled={generateMutation.isPending}
+              onClick={() => generateMutation.mutate()}
+            >
+              {generateMutation.isPending ? <Spinner size={16} /> : <RefreshCw size={16} aria-hidden="true" />}{" "}
+              {generateMutation.isPending ? "Wird erstellt…" : revision ? "Neu erstellen" : "Recap erstellen"}
+            </Button>
+          )
+        }
+      >
+        <p className={styles.disclosure}>
+          <Sparkles size={13} aria-hidden="true" /> KI-generiert aus der Dokumentation dieses
+          Gesprächs — vor dem Teilen prüfen. Kein Ersatz für die Dokumentation, sondern ein
+          kurzer, leicht verständlicher Text zum Weitergeben an die Gesprächspartner:in.
+        </p>
+
+        {recapQuery.isLoading && <Skeleton height="6rem" />}
+
+        {recapQuery.isError && !notComposable && (
+          <EmptyState
+            icon={<Sparkles size={20} aria-hidden="true" />}
+            title="Noch kein Recap erstellt"
+            description="Erstellt einen KI-Entwurf auf Basis der aktuellen Dokumentation."
+          />
         )}
-      </div>
 
-      <p className={styles.disclosure}>
-        <Sparkles size={13} aria-hidden="true" /> KI-generiert aus der Dokumentation dieses
-        Gesprächs — vor dem Teilen prüfen. Kein Ersatz für die Dokumentation, sondern ein
-        kurzer, leicht verständlicher Text zum Weitergeben an die Gesprächspartner:in.
-      </p>
-
-      {recapQuery.isLoading && <Skeleton height="6rem" />}
-
-      {recapQuery.isError && !notComposable && (
-        <EmptyState
-          icon={<Sparkles size={20} aria-hidden="true" />}
-          title="Noch kein Recap erstellt"
-          description="Erstellt einen KI-Entwurf auf Basis der aktuellen Dokumentation."
-        />
-      )}
-
-      {notComposable && (
-        <ErrorState
-          title="Dokumentation fehlt noch"
-          message="Das Recap wird aus der Dokumentation erstellt — zuerst im Dokumentation-Tab zusammenstellen."
-        />
-      )}
+        {notComposable && (
+          <ErrorState
+            title="Dokumentation fehlt noch"
+            message="Das Recap wird aus der Dokumentation erstellt — zuerst im Dokumentation-Tab zusammenstellen."
+          />
+        )}
+      </Card>
 
       {revision && (
         <Card
+          className={styles.revisionCard}
           title={`Revision ${revision.revision_number}`}
           actions={<StatusBadge status={revision.status} />}
         >
