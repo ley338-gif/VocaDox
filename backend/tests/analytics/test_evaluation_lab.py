@@ -70,6 +70,81 @@ async def test_model_comparison_404_on_unknown_profile(client: AsyncClient, seed
     assert resp.status_code == 404
 
 
+async def test_vocabulary_comparison_requires_permission(client: AsyncClient, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "alice", "a very strong password 123")
+    resp = await client.post(
+        "/api/v1/admin/evaluation/vocabulary-comparison",
+        json={"conversation_id": "00000000-0000-0000-0000-000000000001"},
+        headers=headers,
+    )
+    assert resp.status_code == 403
+
+
+async def test_vocabulary_comparison_fails_without_vocabulary_configured(
+    client: AsyncClient, seeded, processing_env  # noqa: ANN001
+) -> None:
+    from tests.processing.conftest import create_conversation_with_source_audio, run_all_jobs
+
+    headers = await login(client, "carol", "yet another strong pw 789")
+    _, sessionmaker, queue, storage = processing_env
+    conversation_id, _media_id = await create_conversation_with_source_audio(
+        client, headers, organization_id=seeded["org_a"]
+    )
+    resp = await client.post(
+        f"/api/v1/conversations/{conversation_id}/process/transcript", json={}, headers=headers
+    )
+    assert resp.status_code == 202
+    await run_all_jobs(sessionmaker, queue, storage)
+
+    resp = await client.post(
+        "/api/v1/admin/evaluation/vocabulary-comparison",
+        json={"conversation_id": conversation_id},
+        headers=headers,
+    )
+    assert resp.status_code == 409, resp.text
+
+
+async def test_vocabulary_comparison_end_to_end(
+    client: AsyncClient, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """Post-GA P0-3: measures Word Error Rate with vs without the
+    resolved vocabulary applied, against the conversation's own reviewed
+    transcript. FakeSpeechProvider is deterministic, so both WERs come
+    out equal here -- this proves the mechanism/plumbing, same "no real
+    model needed in CI" precedent every other Evaluation Lab test uses."""
+    from tests.processing.conftest import create_conversation_with_source_audio, run_all_jobs
+
+    headers = await login(client, "carol", "yet another strong pw 789")
+    _, sessionmaker, queue, storage = processing_env
+    conversation_id, _media_id = await create_conversation_with_source_audio(
+        client, headers, organization_id=seeded["org_a"]
+    )
+    resp = await client.post(
+        f"/api/v1/conversations/{conversation_id}/process/transcript", json={}, headers=headers
+    )
+    assert resp.status_code == 202
+    await run_all_jobs(sessionmaker, queue, storage)
+
+    resp = await client.post(
+        f"/api/v1/vocabulary?organization_id={seeded['org_a']}",
+        json={"name": "Org-weit", "terms": ["Ramipril"], "initial_prompt": "Arztgespräch."},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+
+    resp = await client.post(
+        "/api/v1/admin/evaluation/vocabulary-comparison",
+        json={"conversation_id": conversation_id},
+        headers=headers,
+    )
+    assert resp.status_code == 201, resp.text
+    run = resp.json()
+    assert run["run_type"] == "vocabulary_comparison"
+    assert run["status"] == "completed"
+    assert "word_error_rate" in run["result_a"]
+    assert "word_error_rate" in run["result_b"]
+
+
 async def test_model_comparison_runs_real_metrics_and_is_listable(
     client: AsyncClient, seeded  # noqa: ANN001
 ) -> None:

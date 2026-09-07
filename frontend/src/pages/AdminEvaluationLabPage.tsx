@@ -3,9 +3,11 @@ import { useState } from "react";
 
 import {
   type EvalResult,
+  type VocabularyEvalResult,
   listEvaluationRuns,
   runModelComparison,
   runPromptComparison,
+  runVocabularyComparison,
 } from "../api/analytics";
 import { listModelProfiles } from "../api/profiles";
 import { listPromptVersions, listPrompts } from "../api/templates";
@@ -13,10 +15,16 @@ import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
-import { Select } from "../design-system/FormControls";
+import { Select, TextInput } from "../design-system/FormControls";
 import { ErrorState } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { TabPanel, Tabs } from "../design-system/Tabs";
+
+function isVocabularyResult(
+  result: EvalResult | VocabularyEvalResult
+): result is VocabularyEvalResult {
+  return "word_error_rate" in result;
+}
 
 /**
  * Phase 8 Evaluation Lab (spec §50): runs the same synthetic fixture
@@ -34,12 +42,13 @@ export function AdminEvaluationLabPage() {
   const queryClient = useQueryClient();
   const canRun = hasPermission("evaluation:run");
 
-  const [mode, setMode] = useState<"model" | "prompt">("model");
+  const [mode, setMode] = useState<"model" | "prompt" | "vocabulary">("model");
   const [modelA, setModelA] = useState("");
   const [modelB, setModelB] = useState("");
   const [promptA, setPromptA] = useState("");
   const [promptB, setPromptB] = useState("");
   const [promptModel, setPromptModel] = useState("");
+  const [vocabConversationId, setVocabConversationId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -89,6 +98,20 @@ export function AdminEvaluationLabPage() {
     }
   }
 
+  async function handleRunVocabularyComparison() {
+    if (!csrfToken || !vocabConversationId.trim()) return;
+    setError(null);
+    setRunning(true);
+    try {
+      await runVocabularyComparison(vocabConversationId.trim(), csrfToken);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "evaluation", "runs"] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Vergleich fehlgeschlagen.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   return (
     <AdminLayout>
       <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
@@ -105,10 +128,11 @@ export function AdminEvaluationLabPage() {
           <Tabs
             idPrefix="evallab-mode"
             activeId={mode}
-            onChange={(id) => setMode(id as "model" | "prompt")}
+            onChange={(id) => setMode(id as "model" | "prompt" | "vocabulary")}
             items={[
               { id: "model", label: "Modellvergleich" },
               { id: "prompt", label: "Promptvergleich" },
+              { id: "vocabulary", label: "Fachwortschatz" },
             ]}
           />
 
@@ -175,6 +199,30 @@ export function AdminEvaluationLabPage() {
               </Button>
             </div>
           </TabPanel>
+
+          <TabPanel id="vocabulary" activeId={mode} idPrefix="evallab-mode">
+            <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
+              Führt die echte Spracherkennung auf dem Original-Audio eines bereits transkribierten
+              Gesprächs zweimal aus — einmal ohne, einmal mit dem für dessen Organisation/Vorlage
+              hinterlegten Fachwortschatz — und vergleicht die Wortfehlerrate gegen das geprüfte
+              Transkript. Setzt voraus, dass für das Gespräch bereits ein Fachwortschatz-Eintrag
+              existiert.
+            </p>
+            <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap" }}>
+              <TextInput
+                placeholder="Gesprächs-ID…"
+                value={vocabConversationId}
+                onChange={(e) => setVocabConversationId(e.target.value)}
+                style={{ minWidth: "22rem" }}
+              />
+              <Button
+                onClick={() => void handleRunVocabularyComparison()}
+                disabled={running || !vocabConversationId.trim()}
+              >
+                {running ? "Läuft…" : "Vergleich starten"}
+              </Button>
+            </div>
+          </TabPanel>
           {error && (
             <div style={{ marginTop: "var(--space-3)" }}>
               <ErrorState message={error} />
@@ -198,44 +246,63 @@ export function AdminEvaluationLabPage() {
               {run.error_message_safe && (
                 <p style={{ color: "var(--color-danger)" }}>{run.error_message_safe}</p>
               )}
-              {run.result_a && run.result_b && (
-                <table style={{ width: "100%", marginTop: "var(--space-3)", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
-                      <th>Metrik</th>
-                      <th>{run.result_a.label}</th>
-                      <th>{run.result_b.label}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <MetricRow label="Fakten gefunden" a={run.result_a} b={run.result_b} field="facts_matched" total="facts_expected" />
-                    <tr>
-                      <td>Evidenzverknüpfung</td>
-                      <td>{formatPct(run.result_a.evidence_linkage_rate)}</td>
-                      <td>{formatPct(run.result_b.evidence_linkage_rate)}</td>
-                    </tr>
-                    <MetricRow
-                      label="Widersprüche"
-                      a={run.result_a}
-                      b={run.result_b}
-                      field="contradictions_detected"
-                      total="contradictions_expected"
-                    />
-                    <MetricRow
-                      label="JSON gültig"
-                      a={run.result_a}
-                      b={run.result_b}
-                      field="json_valid_categories"
-                      total="json_total_categories"
-                    />
-                    <tr>
-                      <td>Latenz</td>
-                      <td>{run.result_a.latency_seconds.toFixed(1)}s</td>
-                      <td>{run.result_b.latency_seconds.toFixed(1)}s</td>
-                    </tr>
-                  </tbody>
-                </table>
-              )}
+              {run.result_a &&
+                run.result_b &&
+                (isVocabularyResult(run.result_a) && isVocabularyResult(run.result_b) ? (
+                  <table style={{ width: "100%", marginTop: "var(--space-3)", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
+                        <th>Metrik</th>
+                        <th>{String(run.subject_a.label ?? "ohne Glossar")}</th>
+                        <th>{String(run.subject_b.label ?? "mit Glossar")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Wortfehlerrate</td>
+                        <td>{formatPct(run.result_a.word_error_rate)}</td>
+                        <td>{formatPct(run.result_b.word_error_rate)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ) : !isVocabularyResult(run.result_a) && !isVocabularyResult(run.result_b) ? (
+                  <table style={{ width: "100%", marginTop: "var(--space-3)", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
+                        <th>Metrik</th>
+                        <th>{run.result_a.label}</th>
+                        <th>{run.result_b.label}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <MetricRow label="Fakten gefunden" a={run.result_a} b={run.result_b} field="facts_matched" total="facts_expected" />
+                      <tr>
+                        <td>Evidenzverknüpfung</td>
+                        <td>{formatPct(run.result_a.evidence_linkage_rate)}</td>
+                        <td>{formatPct(run.result_b.evidence_linkage_rate)}</td>
+                      </tr>
+                      <MetricRow
+                        label="Widersprüche"
+                        a={run.result_a}
+                        b={run.result_b}
+                        field="contradictions_detected"
+                        total="contradictions_expected"
+                      />
+                      <MetricRow
+                        label="JSON gültig"
+                        a={run.result_a}
+                        b={run.result_b}
+                        field="json_valid_categories"
+                        total="json_total_categories"
+                      />
+                      <tr>
+                        <td>Latenz</td>
+                        <td>{run.result_a.latency_seconds.toFixed(1)}s</td>
+                        <td>{run.result_b.latency_seconds.toFixed(1)}s</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ) : null)}
             </Card>
           ))}
         </div>

@@ -363,6 +363,31 @@ async def execute_transcribe(
     normalized = await _resolve_normalized_media(session, job)
     path = await storage.open_path(normalized.storage_key)
 
+    # Post-GA P0-3: resolve the conversation's custom vocabulary (org-wide,
+    # optionally narrowed to its effective Template) the same way every
+    # other per-conversation config resolves -- see
+    # app.profiles.resolver.resolve_effective_config. Never raises: a
+    # conversation with no system-default ProcessingProfile seeded yet
+    # (or no vocabulary configured at all) transcribes exactly as before
+    # this feature existed.
+    from app.profiles.resolver import NoSystemDefaultProfileError, resolve_effective_config
+    from app.vocabulary.service import resolve_vocabulary, vocabulary_to_hotwords
+
+    vocabulary_entry = None
+    conversation = await session.get(Conversation, job.conversation_id)
+    if conversation is not None:
+        try:
+            effective = await resolve_effective_config(session, conversation)
+            vocabulary_entry = await resolve_vocabulary(
+                session,
+                organization_id=conversation.organization_id,
+                template_id=effective.template_id,
+            )
+        except NoSystemDefaultProfileError:
+            pass
+    hotwords = vocabulary_to_hotwords(vocabulary_entry)
+    initial_prompt = vocabulary_entry.initial_prompt if vocabulary_entry else None
+
     status = speech_provider.status()
     run = ProcessingRun(
         conversation_id=job.conversation_id,
@@ -376,13 +401,17 @@ async def execute_transcribe(
         configuration_snapshot={
             "device": status.device,
             "language_hint": (job.job_metadata or {}).get("language_hint"),
+            "vocabulary": vocabulary_entry.as_snapshot() if vocabulary_entry else None,
         },
     )
     session.add(run)
     await session.flush()
 
     result = await speech_provider.transcribe(
-        str(path), language_hint=(job.job_metadata or {}).get("language_hint")
+        str(path),
+        language_hint=(job.job_metadata or {}).get("language_hint"),
+        hotwords=hotwords,
+        initial_prompt=initial_prompt,
     )
 
     run.status = RunStatus.SUCCEEDED.value

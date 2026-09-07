@@ -29,6 +29,11 @@ from app.platform.db.session import Base
 class EvaluationRunType(StrEnum):
     MODEL_COMPARISON = "model_comparison"
     PROMPT_COMPARISON = "prompt_comparison"
+    # Post-GA P0-3: real speech-to-text run on an already-reviewed
+    # conversation's own audio, once with its resolved custom vocabulary
+    # applied and once without -- Word Error Rate against the human-
+    # corrected transcript as ground truth (app.analytics.wer).
+    VOCABULARY_COMPARISON = "vocabulary_comparison"
 
 
 class EvaluationRunStatus(StrEnum):

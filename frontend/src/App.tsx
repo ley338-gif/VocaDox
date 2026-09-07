@@ -25,6 +25,7 @@ import { AdminSpeechPage } from "./pages/AdminSpeechPage";
 import { AdminStoragePage } from "./pages/AdminStoragePage";
 import { AdminTemplatesPage } from "./pages/AdminTemplatesPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { AdminVocabularyPage } from "./pages/AdminVocabularyPage";
 import { AdminWebhooksPage } from "./pages/AdminWebhooksPage";
 import { AdminWorkersPage } from "./pages/AdminWorkersPage";
 import { AppHomePage } from "./pages/AppHomePage";
@@ -168,6 +169,14 @@ export function App() {
             element={
               <RequirePermission code="template:read">
                 <AdminPromptsPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/admin/vocabulary"
+            element={
+              <RequirePermission code="vocabulary:read">
+                <AdminVocabularyPage />
               </RequirePermission>
             }
           />
