@@ -386,11 +386,19 @@ to this list rather than building it opportunistically.
   under-exercised, higher-risk content-inclusion path under this phase's
   time budget.
 
-- **Future FHIR/HL7/PVS/KIS/CRM/Meeting-Platform adapters — architecture
+- **Future HL7/PVS/KIS/CRM/Meeting-Platform adapters — architecture
   only, no implementation** (spec: prepare, do not implement
-  prematurely). The extension point is exactly the Webhook mechanism this
-  phase ships: a future adapter is a *webhook receiver process* (deployed
-  separately, outside this repo's trust boundary) that:
+  prematurely). Post-GA P3-1 (ADR-0039) implemented the one exception:
+  a real, local FHIR R4 `DocumentReference` export
+  (`GET .../document/export?format=fhir`, `app.documents.fhir_export`)
+  — a downloadable file, no network call, no FHIR server client. This
+  covers exactly that one resource type; everything else below (other
+  FHIR resources like `Composition`, an actual FHIR REST push, HL7 v2,
+  PVS/KIS/CRM vendor APIs, a meeting-platform integration) remains
+  future/architecture-only, via the extension point below. The extension
+  point is exactly the Webhook mechanism this phase ships: a future
+  adapter is a *webhook receiver process* (deployed separately, outside
+  this repo's trust boundary) that:
   1. Is registered as an ordinary `Webhook` row, subscribed to the event
      types it cares about (e.g. `document.approved` for a FHIR
      `DocumentReference`/`Composition` export, `conversation.created` for
@@ -404,15 +412,21 @@ to this list rather than building it opportunistically.
      transcript/document/fact data it then translates into the target
      system's wire format (FHIR resources, HL7 v2 messages, a PVS/KIS/CRM
      vendor API call, a meeting-platform webhook of its own).
-  4. Never runs inside the VocaDox backend process — no FHIR/HL7 parsing
-     or generation library is a dependency of this repository, and no
+  4. Never runs inside the VocaDox backend process — no HL7 parsing or
+     generation library is a dependency of this repository, and no
      connector-specific UI exists in the Admin Portal beyond the
-     general-purpose Service Account/Webhook management this phase adds.
+     general-purpose Service Account/Webhook management this phase adds
+     (the FHIR export's own export-format button on the Document panel
+     is the one exception, added alongside its P3-1 implementation).
 
   This mirrors ADR-0005's provider-abstraction pattern (define the real
   interface — here, "subscribe to events + call the scoped REST API" —
   before any concrete implementation exists) rather than speculatively
-  building FHIR/HL7 code with no real deployment to validate it against.
+  building HL7/PVS/KIS/CRM code with no real deployment to validate it
+  against — the same reasoning that led P3-1 to implement only the one
+  FHIR resource type (`DocumentReference`) it could verify with
+  confidence in this environment, rather than the whole FHIR surface
+  speculatively (see ADR-0039).
 
 ## Phase 11 additions (Operations)
 

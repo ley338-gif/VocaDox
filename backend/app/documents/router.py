@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.authz import authorize_conversation_access
+from app.conversations.models import ConversationParticipant, ParticipantType
 from app.documents.api_schemas import (
     ApprovalBlockedResponse,
     ComposeRequest,
@@ -23,6 +24,7 @@ from app.documents.api_schemas import (
     ResolveReviewIssueRequest,
 )
 from app.documents.export_formats import ExportSection, render_docx, render_pdf
+from app.documents.fhir_export import render_fhir_document_reference
 from app.documents.models import Document, DocumentRevision
 from app.documents.service import (
     ApprovalBlockedError,
@@ -169,7 +171,7 @@ async def export_document_endpoint(
     docs/architecture/adr's compliance notes / PHASE_5_VALIDATION_REPORT.md
     for why PDF/DOCX generation is deliberately deferred rather than adding
     an unresearched new dependency under time pressure."""
-    await authorize_conversation_access(
+    conversation = await authorize_conversation_access(
         db, user=user, conversation_id=conversation_id, permission_code="document:read"
     )
     document = await _get_document_or_404(db, conversation_id)
@@ -184,7 +186,17 @@ async def export_document_endpoint(
     revision_status = revision.status
     revision_content = revision.structured_content
     revision_text = revision.rendered_text
+    revision_created_at = revision.created_at
     document_id = document.id
+    # Same "capture primitives before commit" rule as the revision fields
+    # above — `conversation` (returned by authorize_conversation_access)
+    # would otherwise be an expired ORM object by the time the fhir
+    # branch below runs, after `db.commit()`.
+    conversation_title = conversation.title
+    conversation_started_at = conversation.started_at
+    conversation_ended_at = conversation.ended_at
+    conversation_external_reference = conversation.external_reference
+    conversation_external_reference_type = conversation.external_reference_type
 
     from app.audit.service import record_event
 
@@ -228,6 +240,34 @@ async def export_document_endpoint(
         return Response(
             content=content,
             media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    if format == "fhir":
+        participant_result = await db.execute(
+            select(ConversationParticipant.display_name).where(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.participant_type == ParticipantType.PATIENT.value,
+            )
+        )
+        subject_display = participant_result.scalars().first()
+        resource = render_fhir_document_reference(
+            document_id=document_id,
+            conversation_title=conversation_title,
+            subject_display=subject_display,
+            revision_number=revision_number,
+            revision_status=revision_status,
+            rendered_text=revision_text,
+            generated_at=revision_created_at,
+            started_at=conversation_started_at,
+            ended_at=conversation_ended_at,
+            external_reference=conversation_external_reference,
+            external_reference_type=conversation_external_reference_type,
+        )
+        filename = f"document-{document_id}-r{revision_number}.fhir.json"
+        return Response(
+            content=_json.dumps(resource, indent=2),
+            media_type="application/fhir+json",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
