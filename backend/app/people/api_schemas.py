@@ -23,6 +23,8 @@ class KnownSpeakerResponse(BaseModel):
     organization_id: uuid.UUID
     display_name: str
     notes: str | None
+    has_voiceprint: bool
+    voiceprint_sample_count: int
     created_at: datetime
     updated_at: datetime
 

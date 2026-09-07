@@ -43,6 +43,8 @@ export interface KnownSpeaker {
   organization_id: string;
   display_name: string;
   notes: string | null;
+  has_voiceprint: boolean;
+  voiceprint_sample_count: number;
   created_at: string;
   updated_at: string;
 }

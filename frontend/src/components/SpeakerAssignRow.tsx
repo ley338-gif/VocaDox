@@ -1,7 +1,9 @@
 import { useState } from "react";
 
 import type { Participant } from "../api/conversations";
+import type { KnownSpeaker } from "../api/people";
 import type { DetectedSpeaker } from "../api/transcription";
+import { Button } from "../design-system/Button";
 import { Select, TextInput } from "../design-system/FormControls";
 import { speakerColor } from "../lib/speakerColor";
 import styles from "./SpeakerAssignRow.module.css";
@@ -12,12 +14,25 @@ const NONE_VALUE = "";
 interface SpeakerAssignRowProps {
   speaker: DetectedSpeaker;
   participants: Participant[];
+  knownSpeakers: KnownSpeaker[];
   onAssign: (input: { participantId: string | null; label: string | null }) => void;
+  onAcceptSuggestion: () => void;
+  onEnroll: (knownSpeakerId: string) => void;
 }
 
-export function SpeakerAssignRow({ speaker, participants, onAssign }: SpeakerAssignRowProps) {
+export function SpeakerAssignRow({
+  speaker,
+  participants,
+  knownSpeakers,
+  onAssign,
+  onAcceptSuggestion,
+  onEnroll,
+}: SpeakerAssignRowProps) {
   const [customMode, setCustomMode] = useState(Boolean(speaker.display_label) && !speaker.participant_id);
   const [customLabel, setCustomLabel] = useState(speaker.display_label ?? "");
+  const [enrollTarget, setEnrollTarget] = useState("");
+
+  const suggestedKnownSpeaker = knownSpeakers.find((k) => k.id === speaker.suggested_known_speaker_id);
 
   return (
     <div className={styles.row}>
@@ -57,6 +72,48 @@ export function SpeakerAssignRow({ speaker, participants, onAssign }: SpeakerAss
             onChange={(event) => setCustomLabel(event.target.value)}
             onBlur={() => onAssign({ participantId: null, label: customLabel || null })}
           />
+        )}
+
+        {suggestedKnownSpeaker && (
+          <div className={styles.suggestionRow}>
+            <span className={styles.suggestionText}>
+              Vorschlag: {suggestedKnownSpeaker.display_name}
+              {typeof speaker.suggested_confidence === "number"
+                ? ` (${Math.round(speaker.suggested_confidence * 100)}% Übereinstimmung)`
+                : ""}
+            </span>
+            <Button variant="tertiary" type="button" onClick={onAcceptSuggestion}>
+              Übernehmen
+            </Button>
+          </div>
+        )}
+
+        {speaker.has_voiceprint && knownSpeakers.length > 0 && (
+          <div className={styles.enrollRow}>
+            <Select
+              aria-label={`${speaker.internal_label} — Stimmprofil zuordnen`}
+              value={enrollTarget}
+              onChange={(event) => setEnrollTarget(event.target.value)}
+            >
+              <option value="">Stimmprofil speichern als…</option>
+              {knownSpeakers.map((known) => (
+                <option key={known.id} value={known.id}>
+                  {known.display_name}
+                </option>
+              ))}
+            </Select>
+            <Button
+              variant="tertiary"
+              type="button"
+              disabled={!enrollTarget}
+              onClick={() => {
+                onEnroll(enrollTarget);
+                setEnrollTarget("");
+              }}
+            >
+              Speichern
+            </Button>
+          </div>
         )}
       </div>
     </div>

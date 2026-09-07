@@ -42,6 +42,11 @@ class SpeakerTurn:
 class DiarizationResult:
     turns: list[SpeakerTurn]
     speaker_count: int
+    # Per-speaker-label voice embedding vector (post-GA P1-2 voiceprint
+    # enrollment), when the provider exposes one. `None` for providers
+    # that don't compute embeddings; individual labels may also be absent
+    # from the dict if extraction failed for just that speaker.
+    speaker_embeddings: dict[str, list[float]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +92,12 @@ class FakeDiarizationProvider(DiarizationProvider):
                 SpeakerTurn(2.5, 5.0, "SPEAKER_01", 0.93),
             ],
             speaker_count=2,
+            # Fixed, deterministic, clearly-distinguishable stand-in vectors
+            # so voiceprint-matching tests never depend on real acoustics.
+            speaker_embeddings={
+                "SPEAKER_00": [1.0, 0.0, 0.0, 0.0],
+                "SPEAKER_01": [0.0, 1.0, 0.0, 0.0],
+            },
         )
 
     def status(self) -> DiarizationProviderStatus:
@@ -239,7 +250,32 @@ class PyannoteDiarizationProvider(DiarizationProvider):
                         # placeholder rather than a fabricated calibrated value.
                     )
                 )
-            return DiarizationResult(turns=turns, speaker_count=len(labels))
+
+            # post-GA P1-2: pyannote.audio 4.x's `DiarizeOutput` also carries
+            # `speaker_embeddings`, a per-speaker embedding array aligned to
+            # `diarization.labels()`'s sorted label order (documented
+            # pyannote.audio 4.x behavior) — previously computed and
+            # discarded (see alembic/versions/0013_known_speakers.py). Kept
+            # best-effort: any shape/attribute surprise here degrades to "no
+            # voiceprint suggestion this run", never a hard failure of
+            # diarization itself, since a wrong-shaped embedding used
+            # verbatim would risk exactly the silent-misattribution failure
+            # mode that migration's docstring warns about.
+            speaker_embeddings: dict[str, list[float]] | None = None
+            raw_embeddings = getattr(output, "speaker_embeddings", None)
+            if raw_embeddings is not None:
+                try:
+                    sorted_labels = diarization.labels()
+                    speaker_embeddings = {
+                        label: [float(x) for x in vector]
+                        for label, vector in zip(sorted_labels, raw_embeddings, strict=True)
+                    }
+                except (TypeError, ValueError):
+                    speaker_embeddings = None
+
+            return DiarizationResult(
+                turns=turns, speaker_count=len(labels), speaker_embeddings=speaker_embeddings
+            )
 
         return await asyncio.to_thread(_run)
 

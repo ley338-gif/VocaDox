@@ -16,6 +16,9 @@ class DetectedSpeakerResponse(BaseModel):
     participant_id: uuid.UUID | None
     assigned_by_user_id: uuid.UUID | None
     assigned_at: datetime | None
+    has_voiceprint: bool
+    suggested_known_speaker_id: uuid.UUID | None
+    suggested_confidence: float | None
     created_at: datetime
     updated_at: datetime
 
@@ -25,3 +28,7 @@ class DetectedSpeakerResponse(BaseModel):
 class SpeakerAssignmentRequest(BaseModel):
     participant_id: uuid.UUID | None = None
     display_label: str | None = Field(default=None, max_length=255)
+
+
+class SpeakerEnrollRequest(BaseModel):
+    known_speaker_id: uuid.UUID

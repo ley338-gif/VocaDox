@@ -38,7 +38,15 @@ import {
 import { getDocument } from "../api/documents";
 import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
 import { createKnownSpeaker, listKnownSpeakers } from "../api/people";
-import { assignSpeaker, getProcessingStatus, getTranscript, listSpeakers, processTranscript } from "../api/transcription";
+import {
+  acceptSpeakerSuggestion,
+  assignSpeaker,
+  enrollSpeakerVoiceprint,
+  getProcessingStatus,
+  getTranscript,
+  listSpeakers,
+  processTranscript,
+} from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
 import { DocumentContent } from "../components/DocumentContent";
@@ -291,6 +299,23 @@ export function ConversationDetailPage() {
         csrfToken ?? ""
       ),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] }),
+  });
+
+  const acceptSuggestionMutation = useMutation({
+    mutationFn: (speakerId: string) => acceptSpeakerSuggestion(conversationId, speakerId, csrfToken ?? ""),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["conversation-participants", conversationId] });
+    },
+  });
+
+  const enrollVoiceprintMutation = useMutation({
+    mutationFn: (vars: { speakerId: string; knownSpeakerId: string }) =>
+      enrollSpeakerVoiceprint(conversationId, vars.speakerId, vars.knownSpeakerId, csrfToken ?? ""),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["known-speakers", organizationId] });
+    },
   });
 
   const reprocessMutation = useMutation({
@@ -1047,8 +1072,13 @@ export function ConversationDetailPage() {
               key={speaker.id}
               speaker={speaker}
               participants={participantsQuery.data ?? []}
+              knownSpeakers={knownSpeakersQuery.data ?? []}
               onAssign={({ participantId, label }) =>
                 assignSpeakerMutation.mutate({ speakerId: speaker.id, participantId, label })
+              }
+              onAcceptSuggestion={() => acceptSuggestionMutation.mutate(speaker.id)}
+              onEnroll={(knownSpeakerId) =>
+                enrollVoiceprintMutation.mutate({ speakerId: speaker.id, knownSpeakerId })
               }
             />
           ))}

@@ -110,6 +110,9 @@ export interface DetectedSpeaker {
   participant_id: string | null;
   assigned_by_user_id: string | null;
   assigned_at: string | null;
+  has_voiceprint: boolean;
+  suggested_known_speaker_id: string | null;
+  suggested_confidence: number | null;
 }
 
 export function processTranscript(
@@ -189,6 +192,38 @@ export function assignSpeaker(
   return request<DetectedSpeaker>(
     `/conversations/${conversationId}/speakers/${speakerId}`,
     jsonInit("PATCH", body, csrfToken)
+  );
+}
+
+/**
+ * Post-GA P1-2: folds this speaker's voice embedding into the given
+ * KnownSpeaker's running-average voiceprint — an explicit "this voice
+ * really is this person" action, never automatic.
+ */
+export function enrollSpeakerVoiceprint(
+  conversationId: string,
+  speakerId: string,
+  knownSpeakerId: string,
+  csrfToken: string
+): Promise<DetectedSpeaker> {
+  return request<DetectedSpeaker>(
+    `/conversations/${conversationId}/speakers/${speakerId}/enroll`,
+    jsonInit("POST", { known_speaker_id: knownSpeakerId }, csrfToken)
+  );
+}
+
+/**
+ * Post-GA P1-2: turns a pending confidence-scored suggestion
+ * (`suggested_known_speaker_id`) into a real participant assignment.
+ */
+export function acceptSpeakerSuggestion(
+  conversationId: string,
+  speakerId: string,
+  csrfToken: string
+): Promise<DetectedSpeaker> {
+  return request<DetectedSpeaker>(
+    `/conversations/${conversationId}/speakers/${speakerId}/accept-suggestion`,
+    { method: "POST", headers: { "X-CSRF-Token": csrfToken } }
   );
 }
 

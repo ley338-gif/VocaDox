@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import record_event
 from app.conversations.models import Conversation, ConversationStatus
 from app.conversations.state_machine import is_valid_transition
-from app.diarization.service import persist_diarization_result
+from app.diarization.service import persist_diarization_result, suggest_known_speakers
 from app.identity.models import User
 from app.media.metadata import extract_audio_metadata
 from app.media.models import MediaAsset, MediaKind, MediaSourceType
@@ -478,9 +478,19 @@ async def execute_diarize(
     run.raw_output = diarization_result_to_dict(result)
     await session.flush()
 
-    await persist_diarization_result(
+    label_to_speaker_id = await persist_diarization_result(
         session, conversation_id=job.conversation_id, diarization_run_id=run.id, result=result
     )
+
+    conversation = await session.get(Conversation, job.conversation_id)
+    if conversation is not None:
+        # post-GA P1-2: confidence-scored suggestions only, never a silent
+        # assignment — see app.diarization.service.suggest_known_speakers.
+        await suggest_known_speakers(
+            session,
+            organization_id=conversation.organization_id,
+            speaker_ids=list(label_to_speaker_id.values()),
+        )
 
     await record_event(
         session,
