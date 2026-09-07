@@ -123,9 +123,9 @@ async def test_reseeding_after_prompt_drift_publishes_a_new_version(app_env) -> 
 
 
 async def test_reseeding_never_touches_unpublished_foundation_templates(app_env) -> None:  # noqa: ANN001
-    """medical_consultation/psychotherapy are seeded DRAFT-only (never
-    published) -- their prompt has no current_published_version_id, so the
-    drift check has nothing to compare against and must not raise."""
+    """psychotherapy is seeded DRAFT-only (never published) -- its prompt
+    has no current_published_version_id, so the drift check has nothing
+    to compare against and must not raise."""
     _, sessionmaker = app_env
     async with sessionmaker() as session:
         await apply_seed(session)
@@ -134,6 +134,6 @@ async def test_reseeding_never_touches_unpublished_foundation_templates(app_env)
         await session.commit()
 
     async with sessionmaker() as session:
-        prompt = await get_prompt_by_key(session, "extraction-medical_consultation")
+        prompt = await get_prompt_by_key(session, "extraction-psychotherapy")
         assert prompt is not None
         assert prompt.current_published_version_id is None

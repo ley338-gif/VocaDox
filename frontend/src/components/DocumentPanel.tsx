@@ -40,7 +40,14 @@ import { StatusBadge } from "../design-system/StatusBadge";
 import { DocumentContent } from "./DocumentContent";
 import panelStyles from "./FactsPanel.module.css";
 
-export function DocumentPanel({ conversationId }: { conversationId: string }) {
+export function DocumentPanel({
+  conversationId,
+  conversationTitle,
+}: {
+  conversationId: string;
+  /** Used only to build the "letter" layout's subject line (post-GA). */
+  conversationTitle?: string;
+}) {
   const { csrfToken, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [approveError, setApproveError] = useState<string | null>(null);
@@ -154,6 +161,7 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
           title={`Revision ${revision.revision_number}`}
           actions={
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              {revision.document_layout === "letter" && <StatusBadge status="letter" label="Brief-Format" />}
               <StatusBadge status={revision.status} />
               {revision.status === "approved" && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--color-success)" }}>
@@ -170,7 +178,12 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
             </p>
           )}
 
-          <DocumentContent sections={revision.structured_content} />
+          <DocumentContent
+            sections={revision.structured_content}
+            layout={revision.document_layout}
+            conversationTitle={conversationTitle}
+            generatedAt={revision.created_at}
+          />
 
           {hasPermission("document:approve") && revision.status !== "approved" && (
             <div style={{ marginTop: "var(--space-4)" }}>

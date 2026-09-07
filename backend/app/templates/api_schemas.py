@@ -19,6 +19,7 @@ class TemplateVersionResponse(BaseModel):
     extraction_categories: list[dict[str, Any]]
     presentation: list[dict[str, Any]]
     review_rules: dict[str, Any] | None
+    document_layout: str
     created_by_user_id: uuid.UUID | None
     created_at: datetime
     published_at: datetime | None
@@ -46,12 +47,14 @@ class TemplateCreateRequest(BaseModel):
     extraction_categories: list[dict[str, Any]]
     presentation: list[dict[str, Any]]
     review_rules: dict[str, Any] | None = None
+    document_layout: str = "sections"
 
 
 class TemplateVersionCreateRequest(BaseModel):
     extraction_categories: list[dict[str, Any]]
     presentation: list[dict[str, Any]]
     review_rules: dict[str, Any] | None = None
+    document_layout: str = "sections"
 
 
 class PromptVersionResponse(BaseModel):

@@ -12,12 +12,19 @@ Seeds, per spec §42's Phase 6 scope:
     (agenda_topic/decision-with-rationale/action_item-with-owner), proving
     the Template Engine actually drives different extraction behavior, not
     a renamed copy of general.
-  - **medical_consultation**, **psychotherapy** (DRAFT only, never
-    published) — data-model-ready foundation per the brief ("prepared...
-    not necessarily fully field-complete... do not over-engineer"). Being
-    left unpublished means no ProcessingProfile can reference them yet
+  - **medical_consultation** (published v1, post-GA) — same
+    symptom/medication/diagnosis foundation, now composed with
+    `document_layout="letter"` (a formal Arztbrief: Betreff, Diagnose,
+    Verlauf/Anamnese, Prozedere/Empfehlung, prose paragraphs instead of
+    bullets — see app.documents.service.compose_document and
+    app.documents.export_formats) instead of the generic flat-section
+    layout every other template uses.
+  - **psychotherapy** (DRAFT only, never published) — data-model-ready
+    foundation per the brief ("prepared... not necessarily fully
+    field-complete... do not over-engineer"). Being left unpublished
+    means no ProcessingProfile can reference it yet
     (`get_published_version` raises) — a deliberate, honest signal that
-    they are not real, selectable options in this phase.
+    it is not a real, selectable option in this phase.
 
 A matching Prompt/PromptVersion is seeded per template's extraction
 categories (spec §43) so `ProcessingRun.prompt_version_id` has something
@@ -29,9 +36,10 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.intelligence.prompts import SYSTEM_PROMPT, get_builtin_category_instruction
-from app.templates.models import PromptVersion
+from app.templates.models import PromptVersion, TemplateVersion
 from app.templates.service import (
     create_draft_prompt_version,
+    create_draft_version,
     create_prompt,
     create_template,
     get_prompt_by_key,
@@ -178,9 +186,9 @@ _MEDICAL_CATEGORIES = [
     },
 ]
 _MEDICAL_PRESENTATION = [
-    {"category": "symptom", "title": "Symptoms"},
-    {"category": "medication", "title": "Medications"},
-    {"category": "diagnosis", "title": "Diagnoses"},
+    {"category": "symptom", "title": "Verlauf / Anamnese"},
+    {"category": "diagnosis", "title": "Diagnose"},
+    {"category": "medication", "title": "Prozedere / Empfehlung"},
 ]
 
 _PSYCHOTHERAPY_CATEGORIES = [
@@ -242,10 +250,15 @@ async def apply_seed(session: AsyncSession) -> None:
         session,
         key="medical_consultation",
         name="Medical Consultation",
-        description="Foundation only (spec §42) — data-model-ready, not published/selectable yet.",
+        description=(
+            "Symptom/Diagnose/Medikation-Extraktion, komponiert als formaler Arztbrief "
+            "(Betreff, Diagnose, Verlauf/Anamnese, Prozedere/Empfehlung) statt der generischen "
+            "Abschnitts-Ansicht — post-GA, wählbar über ein Verarbeitungsprofil."
+        ),
         categories=_MEDICAL_CATEGORIES,
         presentation=_MEDICAL_PRESENTATION,
-        publish=False,
+        publish=True,
+        document_layout="letter",
     )
     await _seed_template(
         session,
@@ -267,6 +280,7 @@ async def _seed_template(
     categories: list[dict],
     presentation: list[dict],
     publish: bool,
+    document_layout: str = "sections",
 ) -> None:
     instructions = {
         c["key"]: (
@@ -291,11 +305,45 @@ async def _seed_template(
         # — so a prompt wording fix (like this one) actually changes
         # extraction behavior instead of only affecting brand new installs.
         if publish:
-            # Foundation-only templates (publish=False — medical_consultation/
-            # psychotherapy) keep their prompt DRAFT and untouched by any of
-            # this, exactly as `_seed_template`'s create path already does —
-            # "not yet a real, selectable option" per spec §42 is a deliberate,
-            # standing state, not something an unrelated wording fix elsewhere
+            versions = await list_template_versions(session, existing.id)
+            current = (
+                await session.get(TemplateVersion, existing.current_published_version_id)
+                if existing.current_published_version_id is not None
+                else None
+            )
+            # Two cases share one fix: (a) a template previously seeded
+            # DRAFT-only (medical_consultation before this change) that is
+            # now meant to be a real, selectable option, and (b) a template
+            # that WAS already published in some environments with a
+            # STALE version (e.g. medical_consultation published directly
+            # via the Admin Portal before it gained a letter layout/German
+            # titles here). Both need a fresh DRAFT version carrying
+            # today's source content, published over the stale one — same
+            # create-then-publish flow the Admin Portal itself uses, never
+            # mutating any existing version's content in place.
+            drifted = current is None or (
+                current.presentation != presentation
+                or current.extraction_categories != categories
+                or current.document_layout != document_layout
+            )
+            if drifted:
+                new_version = await create_draft_version(
+                    session,
+                    template=existing,
+                    extraction_categories=categories,
+                    presentation=presentation,
+                    review_rules=versions[-1].review_rules if versions else None,
+                    document_layout=document_layout,
+                    created_by=None,  # type: ignore[arg-type]
+                )
+                await publish_template_version(
+                    session, template=existing, version=new_version, published_by=None
+                )
+            # Foundation-only templates (publish=False — psychotherapy) keep
+            # their prompt DRAFT and untouched by any of this, exactly as
+            # `_seed_template`'s create path already does — "not yet a real,
+            # selectable option" per spec §42 is a deliberate, standing
+            # state, not something an unrelated wording fix elsewhere
             # should silently publish.
             await _republish_prompt_if_drifted(
                 session,
@@ -313,6 +361,7 @@ async def _seed_template(
         extraction_categories=categories,
         presentation=presentation,
         review_rules=None,
+        document_layout=document_layout,
         created_by=None,  # type: ignore[arg-type]
     )
     if await get_prompt_by_key(session, prompt_key) is None:

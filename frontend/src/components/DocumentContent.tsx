@@ -1,5 +1,12 @@
-import type { DocumentSection } from "../api/documents";
+import type { DocumentLayout, DocumentSection } from "../api/documents";
 import styles from "./DocumentContent.module.css";
+
+// Static chrome for the "letter" layout — never fact-derived, so it
+// deliberately stays out of `structured_content` (every statement there
+// must trace back to real fact_ids). Mirrored in the backend's
+// app.documents.router._letter_chrome for DOCX/PDF export.
+const LETTER_SALUTATION = "Sehr geehrte Kolleginnen und Kollegen,";
+const LETTER_CLOSING = "Mit freundlichen kollegialen Grüßen";
 
 /**
  * Renders a document revision's `structured_content` (section title +
@@ -7,12 +14,25 @@ import styles from "./DocumentContent.module.css";
  * `rendered_text` string — the structure already exists server-side
  * (see backend app.documents.service.compose_document), this just stops
  * discarding it on the way to the screen.
+ *
+ * `layout="letter"` (post-GA — a profile/template choice, e.g. the
+ * "Medical Consultation" template) renders the exact same sections as a
+ * formal letter instead: a subject line, salutation, prose paragraphs
+ * (no bullets) per section, and a closing line.
  */
 export function DocumentContent({
   sections,
+  layout = "sections",
+  conversationTitle,
+  generatedAt,
   maxStatements,
 }: {
   sections: DocumentSection[];
+  layout?: DocumentLayout;
+  /** Required to build the letter's subject line; ignored for "sections". */
+  conversationTitle?: string;
+  /** Required to build the letter's subject line; ignored for "sections". */
+  generatedAt?: string;
   /** When set, shows only the first N statements total (across sections)
    * — used for the Übersicht "Kurzfassung" preview so it stays a short
    * summary instead of duplicating the entire Dokumentation tab. */
@@ -40,6 +60,31 @@ export function DocumentContent({
       return { ...section, statements: kept };
     })
     .filter((section): section is DocumentSection => section !== null);
+
+  if (layout === "letter") {
+    const subject =
+      conversationTitle && generatedAt
+        ? `Betreff: ${conversationTitle} vom ${new Date(generatedAt).toLocaleDateString("de-DE")}`
+        : null;
+    return (
+      <div className={styles.letter}>
+        {subject && <p className={styles.letterSubject}>{subject}</p>}
+        <p>{LETTER_SALUTATION}</p>
+        {visibleSections.map((section) => (
+          <section key={section.category} className={styles.letterSection}>
+            <h3 className={styles.sectionTitle}>{section.title}</h3>
+            {section.statements.map((statement, index) => (
+              <p key={index} className={styles.letterParagraph}>
+                {statement.text}
+              </p>
+            ))}
+          </section>
+        ))}
+        {truncated && <p className={styles.truncated}>…</p>}
+        <p className={styles.letterClosing}>{LETTER_CLOSING}</p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.content}>

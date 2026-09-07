@@ -125,6 +125,12 @@ class DocumentRevision(Base):
     template_version_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("template_versions.id", ondelete="SET NULL"), nullable=True
     )
+    # Denormalized copy of the resolved TemplateVersion.document_layout at
+    # compose time (see app.documents.service.compose_document) -- same
+    # "snapshot, never recomputed later" discipline as template_version_id
+    # itself, and lets every renderer (frontend, DOCX/PDF export) branch on
+    # this revision's own layout without a second lookup.
+    document_layout: Mapped[str] = mapped_column(String(32), nullable=False, default="sections")
 
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

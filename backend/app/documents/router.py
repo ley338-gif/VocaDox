@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json as _json
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
@@ -41,6 +42,21 @@ from app.platform.db.session import get_session
 from app.review.models import ReviewIssue, ReviewIssueResolution
 
 router = APIRouter(prefix="/conversations", tags=["documents"])
+
+# post-GA: static chrome for a `document_layout="letter"` export (see
+# app.templates.seed's "medical_consultation" template) — never
+# fact-derived, so it deliberately stays outside `structured_content`
+# (every statement there must trace back to real fact_ids; a salutation/
+# closing line never could). Mirrored in the frontend's DocumentContent.tsx.
+_LETTER_SALUTATION = "Sehr geehrte Kolleginnen und Kollegen,"
+_LETTER_CLOSING = "Mit freundlichen kollegialen Grüßen"
+
+
+def _letter_chrome(
+    *, conversation_title: str, generated_at: datetime
+) -> tuple[list[str], list[str]]:
+    subject = f"Betreff: {conversation_title} vom {generated_at.strftime('%d.%m.%Y')}"
+    return [subject, "", _LETTER_SALUTATION], [_LETTER_CLOSING]
 
 
 async def _get_document_or_404(db: AsyncSession, conversation_id: uuid.UUID) -> Document:
@@ -187,6 +203,7 @@ async def export_document_endpoint(
     revision_content = revision.structured_content
     revision_text = revision.rendered_text
     revision_created_at = revision.created_at
+    revision_document_layout = revision.document_layout
     document_id = document.id
     # Same "capture primitives before commit" rule as the revision fields
     # above — `conversation` (returned by authorize_conversation_access)
@@ -231,11 +248,31 @@ async def export_document_endpoint(
             for s in revision_content
         ]
         filename = f"document-{document_id}-r{revision_number}.{format}"
+        is_letter = revision_document_layout == "letter"
+        export_title = "Arztbrief" if is_letter else "Dokumentation"
+        intro_lines, closing_lines = (
+            _letter_chrome(conversation_title=conversation_title, generated_at=revision_created_at)
+            if is_letter
+            else (None, None)
+        )
         if format == "docx":
-            content = render_docx(title="Dokumentation", meta_lines=meta_lines, sections=sections)
+            content = render_docx(
+                title=export_title,
+                meta_lines=meta_lines,
+                sections=sections,
+                intro_lines=intro_lines,
+                closing_lines=closing_lines,
+                bullet=not is_letter,
+            )
             media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         else:
-            content = render_pdf(title="Dokumentation", meta_lines=meta_lines, sections=sections)
+            content = render_pdf(
+                title=export_title,
+                meta_lines=meta_lines,
+                sections=sections,
+                intro_lines=intro_lines,
+                closing_lines=closing_lines,
+            )
             media_type = "application/pdf"
         return Response(
             content=content,

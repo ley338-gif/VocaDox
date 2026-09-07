@@ -38,3 +38,31 @@
   color: var(--text-muted);
   margin: 0;
 }
+
+.letter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.letterSubject {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.letterSection {
+  margin: 0;
+}
+
+.letterParagraph {
+  color: var(--text-secondary);
+  font-size: var(--font-body-base-size);
+  line-height: var(--font-body-lg-line);
+  margin: 0 0 var(--space-2);
+}
+
+.letterClosing {
+  color: var(--text-primary);
+  margin: var(--space-2) 0 0;
+}

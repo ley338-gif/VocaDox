@@ -41,6 +41,12 @@ export interface DocumentSection {
   statements: DocumentStatement[];
 }
 
+// "sections" (default) is the original flat-section layout; "letter"
+// renders the same sections as a formal letter (subject line,
+// salutation, prose paragraphs, closing) — see DocumentContent.tsx's
+// `layout` prop and backend app.documents.service.compose_document.
+export type DocumentLayout = "sections" | "letter";
+
 export interface DocumentRevision {
   id: string;
   document_id: string;
@@ -52,6 +58,7 @@ export interface DocumentRevision {
   created_by_user_id: string | null;
   approved_by_user_id: string | null;
   approved_at: string | null;
+  document_layout: DocumentLayout;
   created_at: string;
   updated_at: string;
 }
