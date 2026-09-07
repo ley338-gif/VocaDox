@@ -21,7 +21,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import ColumnElement, delete, or_, select, text
+from sqlalchemy import ColumnElement, delete, literal_column, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -131,9 +131,17 @@ async def search_entries(
         )
 
     if _dialect_name(session) == "postgresql":
+        # `literal_column`, not `text` -- a `TextClause` has no inherent
+        # result type/name for SQLAlchemy to alias, so `.label()` on one
+        # raises `NotImplementedError` (only ever exercised against real
+        # Postgres; the SQLite fallback below never hits this code path,
+        # which is exactly how this went uncaught by the test suite until
+        # a live deployment surfaced it via Ask VocaDox).
         match_clause = text("search_entries.tsv @@ plainto_tsquery('german', :q)")
-        rank_expr = text("ts_rank(search_entries.tsv, plainto_tsquery('german', :q))")
-        snippet_expr = text(
+        rank_expr: ColumnElement[Any] = literal_column(
+            "ts_rank(search_entries.tsv, plainto_tsquery('german', :q))"
+        )
+        snippet_expr: ColumnElement[Any] = literal_column(
             "ts_headline('german', search_entries.content, "
             "plainto_tsquery('german', :q), "
             "'StartSel=✦,StopSel=✦,MaxWords=35,MinWords=15,MaxFragments=1')"
