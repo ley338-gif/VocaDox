@@ -8,7 +8,7 @@ import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { TextInput } from "../design-system/FormControls";
-import { EmptyState, ErrorState } from "../design-system/States";
+import { EmptyState, ErrorState, Spinner } from "../design-system/States";
 import styles from "./AskVocaDoxPage.module.css";
 
 /**
@@ -62,7 +62,7 @@ export function AskVocaDoxPage() {
           type="submit"
           disabled={askMutation.isPending || !question.trim()}
         >
-          {askMutation.isPending ? "Fragt…" : "Fragen"}
+          {askMutation.isPending ? <Spinner size={16} /> : null} {askMutation.isPending ? "Fragt…" : "Fragen"}
         </Button>
       </form>
 
