@@ -66,3 +66,10 @@
   font-size: var(--font-caption-size);
   color: var(--text-muted);
 }
+
+
+.padded { padding: 22px; }
+.cardHeader { padding: 20px 22px 0; }
+.statCard { padding: 20px; align-items: center; }
+.statIcon { width: 44px; height: 44px; }
+.statValue { font-variant-numeric: tabular-nums; }

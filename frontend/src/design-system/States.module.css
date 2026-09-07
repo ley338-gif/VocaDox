@@ -126,3 +126,8 @@
   font-weight: 600;
   color: var(--text-primary);
 }
+
+
+.empty { padding: 56px 24px; }
+.emptyIcon { width: 60px; height: 60px; background: var(--accent-subtle); color: var(--accent); border-radius: 18px; }
+.emptyDescription { line-height: 1.7; max-width: 26rem; }

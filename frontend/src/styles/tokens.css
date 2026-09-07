@@ -32,17 +32,17 @@
   --color-teal: #0d9488;
 
   /* -- Theme-mapped tokens (light, default) -- */
-  --surface-page: var(--color-gray-100);
+  --surface-page: #f5f8fc;
   --surface-raised: var(--color-white);
-  --surface-sunken: var(--color-gray-200);
-  --border-default: var(--color-gray-300);
+  --surface-sunken: #eef3f9;
+  --border-default: #dfe7f1;
   --text-primary: var(--color-gray-900);
   --text-secondary: var(--color-gray-700);
-  --text-muted: var(--color-gray-500);
+  --text-muted: #64748b;
   --text-on-primary: var(--color-white);
   --accent: var(--color-primary-600);
   --accent-hover: var(--color-primary-500);
-  --accent-subtle: var(--color-primary-100);
+  --accent-subtle: #eaf2ff;
 
   /* -- Typography -- */
   --font-family-base: "Inter", system-ui, -apple-system, sans-serif;
@@ -104,7 +104,7 @@
     --border-default: var(--color-gray-700);
     --text-primary: var(--color-gray-100);
     --text-secondary: var(--color-gray-300);
-    --text-muted: var(--color-gray-500);
+    --text-muted: #94a3b8;
     --text-on-primary: var(--color-white);
     --accent: var(--color-primary-500);
     --accent-hover: var(--color-primary-400);
@@ -120,7 +120,7 @@
   --border-default: var(--color-gray-700);
   --text-primary: var(--color-gray-100);
   --text-secondary: var(--color-gray-300);
-  --text-muted: var(--color-gray-500);
+  --text-muted: #94a3b8;
   --text-on-primary: var(--color-white);
   --accent: var(--color-primary-500);
   --accent-hover: var(--color-primary-400);

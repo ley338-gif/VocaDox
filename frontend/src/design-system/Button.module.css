@@ -49,3 +49,8 @@
 .destructive:hover:not(:disabled) {
   filter: brightness(0.92);
 }
+
+
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; line-height: 1.4; }
+.primary { box-shadow: 0 2px 4px color-mix(in srgb, var(--accent) 18%, transparent); }
+.secondary { background: var(--surface-raised); border-color: color-mix(in srgb, var(--accent) 28%, var(--border-default)); }

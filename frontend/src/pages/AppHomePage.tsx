@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Inbox, MessagesSquare, Mic, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Inbox, Lightbulb, MessagesSquare, Mic, Sparkles, Upload } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import type { Conversation } from "../api/conversations";
@@ -153,6 +153,13 @@ export function AppHomePage() {
 
         <OpenTasksCard limit={6} />
       </div>
+      <section className={styles.guidance} aria-labelledby="workflow-help">
+        <Lightbulb size={24} aria-hidden="true" />
+        <div>
+          <h2 id="workflow-help">Vom Gespräch zur Dokumentation</h2>
+          <p>Nehmen Sie ein Gespräch auf oder laden Sie eine Datei hoch. Öffnen Sie anschließend das Gespräch, um Transkript, Sprecherzuordnung und Dokumentation zu prüfen.</p>
+        </div>
+      </section>
     </div>
   );
 }

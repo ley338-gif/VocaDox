@@ -151,3 +151,9 @@
   font-style: italic;
   margin-top: var(--space-1);
 }
+
+.toolbar { padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.segmentList { background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 8px; }
+.segment { padding: 16px 12px; border-bottom: 1px solid var(--border-default); line-height: 1.65; }
+.segment:last-child { border-bottom: 0; }
+.segmentMeta { flex-wrap: wrap; }

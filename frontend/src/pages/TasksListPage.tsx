@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Search, ArrowRight, ListChecks } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { listTasks, type FollowUpStatus, type FollowUpTask } from "../api/longitudinal";
+import { PageHeader } from "../design-system/PageHeader";
+import { Card } from "../design-system/Card";
+import styles from "./TasksListPage.module.css";
 import { Badge } from "../design-system/Badge";
-import { Select } from "../design-system/FormControls";
+import { TextInput, Select } from "../design-system/FormControls";
 import { EmptyState, ErrorState } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { DataTable, type DataTableColumn } from "../design-system/Table";
@@ -14,7 +17,7 @@ const COLUMNS: DataTableColumn<FollowUpTask>[] = [
   {
     key: "description",
     header: "Aufgabe",
-    render: (row) => row.description,
+    render: (row) => <span className={styles.taskTitle}><ClipboardList size={18} aria-hidden="true" />{row.description}</span>,
     sortable: true,
     sortValue: (row) => row.description,
   },
@@ -41,6 +44,7 @@ const COLUMNS: DataTableColumn<FollowUpTask>[] = [
  */
 export function TasksListPage() {
   const navigate = useNavigate();
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FollowUpStatus | "">("open");
 
   const { data, isLoading, isError } = useQuery({
@@ -50,36 +54,53 @@ export function TasksListPage() {
 
   return (
     <div>
-      <h1 style={{ fontSize: "var(--font-h1-size)", marginBottom: "var(--space-4)" }}>Aufgaben</h1>
-
-      <div style={{ marginBottom: "var(--space-4)" }}>
-        <Select
-          aria-label="Nach Status filtern"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value as FollowUpStatus | "")}
-        >
-          <option value="open">Offen</option>
-          <option value="done">Erledigt</option>
-          <option value="dismissed">Verworfen</option>
-          <option value="">Alle</option>
-        </Select>
-      </div>
-
-      <DataTable
-        columns={COLUMNS}
-        rows={data ?? []}
-        keyExtractor={(row) => row.id}
-        loading={isLoading}
-        error={isError ? <ErrorState message="Aufgaben konnten nicht geladen werden." /> : undefined}
-        onRowClick={(row) => navigate(`/app/conversations/${row.conversation_id}`)}
-        empty={
-          <EmptyState
-            icon={<ClipboardList size={20} aria-hidden="true" />}
-            title="Keine Aufgaben"
-            description="Aus Gesprächen automatisch extrahierte oder manuell erstellte Aufgaben erscheinen hier."
-          />
-        }
+      <PageHeader
+        breadcrumb={[{ label: "VocaDox", to: "/app" }, { label: "Aufgaben" }]}
+        title="Aufgaben"
+        meta="Behalten Sie offene Prüfungen und nächste Schritte aus Ihren Gesprächen im Blick."
       />
+      <div className={styles.layout}>
+        <section aria-label="Aufgabenübersicht" className={styles.main}>
+          <div className={styles.filters}>
+            <label className={styles.search}>
+              <Search size={18} aria-hidden="true" />
+              <TextInput aria-label="Aufgaben suchen" placeholder="Aufgaben suchen …" value={search} onChange={(event) => setSearch(event.target.value)} />
+            </label>
+            <Select
+              aria-label="Nach Status filtern"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as FollowUpStatus | "")}
+            >
+              <option value="open">Offen</option>
+              <option value="done">Erledigt</option>
+              <option value="dismissed">Verworfen</option>
+              <option value="">Alle</option>
+            </Select>
+          </div>
+
+          <DataTable
+            columns={COLUMNS}
+            rows={(data ?? []).filter((task) => `${task.description} ${task.assignee ?? ""}`.toLocaleLowerCase("de-DE").includes(search.toLocaleLowerCase("de-DE")))}
+            keyExtractor={(row) => row.id}
+            loading={isLoading}
+            error={isError ? <ErrorState message="Aufgaben konnten nicht geladen werden." /> : undefined}
+            onRowClick={(row) => navigate(`/app/conversations/${row.conversation_id}`, { state: { tab: "tasks" } })}
+            empty={
+              <EmptyState
+                icon={<ClipboardList size={20} aria-hidden="true" />}
+                title={search ? "Keine passenden Aufgaben" : "Keine Aufgaben"}
+                description={search ? "Ändern Sie den Suchbegriff oder den Statusfilter." : "Aus Gesprächen automatisch extrahierte oder manuell erstellte Aufgaben erscheinen hier."}
+              />
+            }
+          />
+        </section>
+        <aside className={styles.aside}>
+          <Card title={<span className={styles.cardTitle}><ListChecks size={20} aria-hidden="true" /> Aufgaben bearbeiten</span>}>
+            <p>Öffnen Sie eine Aufgabe, um direkt zum zugehörigen Gespräch zu gelangen. Dort können Sie den Status ändern und weitere Aufgaben erstellen.</p>
+            <div className={styles.hint}><ArrowRight size={16} aria-hidden="true" /> Gespräch → Aufgaben</div>
+          </Card>
+        </aside>
+      </div>
     </div>
   );
 }
