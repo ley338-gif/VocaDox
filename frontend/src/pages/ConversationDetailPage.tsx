@@ -15,9 +15,10 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
+import { recordRecentConversation } from "../lib/recentConversations";
 import {
   addMarker,
   addNote,
@@ -132,6 +133,11 @@ export function ConversationDetailPage() {
     queryFn: () => getConversation(conversationId),
     enabled: Boolean(conversationId),
   });
+
+  useEffect(() => {
+    if (conversationQuery.data) recordRecentConversation(conversationQuery.data.id);
+  }, [conversationQuery.data]);
+
   const mediaQuery = useQuery({
     queryKey: ["conversation-media", conversationId],
     queryFn: () => listMedia(conversationId),

@@ -99,7 +99,12 @@ async def list_conversations(
             or_(Conversation.group_id.is_(None), Conversation.group_id.in_(group_ids))
         )
     if status_filter:
-        stmt = stmt.where(Conversation.status == status_filter)
+        # Comma-separated multi-value support (post-GA redesign: the
+        # Gespräche list's "In Bearbeitung" tab groups several real
+        # statuses into one filter) -- a single value with no comma
+        # behaves identically to the old exact-match filter.
+        statuses = [s for s in status_filter.split(",") if s]
+        stmt = stmt.where(Conversation.status.in_(statuses))
     if type_filter:
         stmt = stmt.where(Conversation.conversation_type == type_filter)
     if search:

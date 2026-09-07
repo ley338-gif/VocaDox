@@ -86,5 +86,7 @@ def build_prompt_from_instruction(instruction: str, transcript_text: str) -> str
         "Transcript (each line is one segment, tagged with its segment number):\n"
         f"{transcript_text}\n\n"
         "Return only facts genuinely present above. Respond with JSON matching the given "
-        "schema."
+        "schema. Reminder: every text value in your JSON output MUST be written in the same "
+        "language as the transcript above — copy the transcript's own wording/language, never "
+        "translate it to English."
     )

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Mic, Upload } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { ApiError } from "../api/client";
 import type { ConversationType, PrivacyMode } from "../api/conversations";
@@ -31,7 +31,11 @@ function formatEventTime(date: Date): string {
 export function NewConversationPage() {
   const navigate = useNavigate();
   const { csrfToken, user } = useAuth();
-  const [mode, setMode] = useState<Mode | null>(null);
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get("mode");
+  const [mode, setMode] = useState<Mode | null>(
+    initialMode === "record" || initialMode === "upload" ? initialMode : null
+  );
   const [title, setTitle] = useState("");
   const [conversationType, setConversationType] = useState<ConversationType>("general");
   const [organizationId, setOrganizationId] = useState("");

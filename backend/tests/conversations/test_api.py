@@ -118,6 +118,39 @@ async def test_list_conversations_only_shows_own_organization(
     assert "Alice's conv" not in bob_titles
 
 
+async def test_list_conversations_status_filter_accepts_comma_separated_values(
+    client: AsyncClient, seeded: dict, app_env
+) -> None:
+    """Post-GA redesign: the Gespräche list's "In Bearbeitung" tab groups
+    several real statuses into one request (`?status=recording,uploaded`)
+    instead of one exact-match value -- a single value with no comma must
+    keep behaving exactly like the old filter (asserted below too)."""
+    app, sessionmaker = app_env
+    headers = await login(client, "alice", "a very strong password 123")
+    await _create_conversation(client, headers, seeded["org_a"], title="Created conv")
+    recording = await _create_conversation(client, headers, seeded["org_a"], title="Recording conv")
+    ready = await _create_conversation(client, headers, seeded["org_a"], title="Ready conv")
+
+    import uuid
+
+    from app.conversations.models import Conversation
+
+    async with sessionmaker() as session:
+        row = await session.get(Conversation, uuid.UUID(recording["id"]))
+        row.status = "recording"
+        row2 = await session.get(Conversation, uuid.UUID(ready["id"]))
+        row2.status = "ready"
+        await session.commit()
+
+    multi = await client.get("/api/v1/conversations?status=created,recording", headers=headers)
+    titles = {c["title"] for c in multi.json()["items"]}
+    assert titles == {"Created conv", "Recording conv"}
+
+    single = await client.get("/api/v1/conversations?status=ready", headers=headers)
+    single_titles = {c["title"] for c in single.json()["items"]}
+    assert single_titles == {"Ready conv"}
+
+
 async def test_update_conversation(client: AsyncClient, seeded: dict) -> None:
     headers = await login(client, "alice", "a very strong password 123")
     conv = await _create_conversation(client, headers, seeded["org_a"])

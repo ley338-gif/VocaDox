@@ -35,7 +35,7 @@ import { ApiError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
-import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
+import { EmptyState, ErrorState, Skeleton, Spinner } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { DocumentContent } from "./DocumentContent";
 import panelStyles from "./FactsPanel.module.css";
@@ -102,8 +102,8 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
               disabled={composeMutation.isPending}
               onClick={() => composeMutation.mutate()}
             >
-              <RefreshCw size={16} aria-hidden="true" />{" "}
-              {revision ? "Neu zusammenstellen" : composeMutation.isPending ? "Wird erstellt…" : "Dokument erstellen"}
+              {composeMutation.isPending ? <Spinner size={16} /> : <RefreshCw size={16} aria-hidden="true" />}{" "}
+              {composeMutation.isPending ? "Wird erstellt…" : revision ? "Neu zusammenstellen" : "Dokument erstellen"}
             </Button>
           )}
           {revision && (
@@ -173,7 +173,7 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
                 disabled={revision.status !== "ready_for_approval" || approveMutation.isPending}
                 onClick={() => approveMutation.mutate()}
               >
-                <CheckCircle2 size={16} aria-hidden="true" />{" "}
+                {approveMutation.isPending ? <Spinner size={16} /> : <CheckCircle2 size={16} aria-hidden="true" />}{" "}
                 {approveMutation.isPending ? "Wird freigegeben…" : "Dokument freigeben"}
               </Button>
               {revision.status !== "ready_for_approval" && (
