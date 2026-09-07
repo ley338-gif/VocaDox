@@ -15,7 +15,7 @@
   text-align: left;
   font-size: var(--font-caption-size);
   font-weight: 600;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.03em;
   color: var(--text-muted);
   padding: var(--space-3) var(--space-4);
@@ -84,3 +84,9 @@
 .statusCell {
   padding: var(--space-8) var(--space-4);
 }
+
+
+.table th { background: var(--surface-page); letter-spacing: 0; font-size: 12px; padding: 14px 18px; }
+.table td { padding: 17px 18px; line-height: 1.6; }
+.table tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--surface-raised)); }
+.wrapper { box-shadow: var(--shadow-sm); }

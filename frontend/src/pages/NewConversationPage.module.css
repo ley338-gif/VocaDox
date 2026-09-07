@@ -78,3 +78,8 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-subtle);
 }
+
+.choiceCard { box-shadow: var(--shadow-sm); color: var(--text-primary); }
+.form { padding: 24px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-raised); max-width: 640px; }
+.dropzone { background: var(--surface-page); line-height: 1.7; }
+@media (max-width: 600px) { .choiceRow { flex-direction: column; } .form { padding: 16px; } }

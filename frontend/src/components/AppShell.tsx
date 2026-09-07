@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, LogOut, RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { AudioLines, ChevronLeft, ChevronRight, LogOut, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
@@ -71,7 +71,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     enabled: hasPermission("system:admin"),
     refetchInterval: 30000,
   });
-  const allHealthy = dashboardQuery.data?.components.every((component) => component.healthy) ?? null;
+  const components = dashboardQuery.data?.components;
+  const allHealthy = !dashboardQuery.isError && components?.length ? components.every((component) => component.healthy) : null;
 
   useEffect(() => {
     try {
@@ -102,7 +103,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className={styles.content}>
           <header className={styles.topbar}>
             <Link to="/" className={styles.brand}>
-              VocaDox
+              <AudioLines size={28} aria-hidden="true" /> VocaDox
             </Link>
             <div className={styles.topbarSpacer} />
             <Link to="/design-system" className={styles.publicNavLink}>
@@ -126,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className={styles.sidebarHeader}>
           {!effectiveCollapsed && (
             <Link to="/app" className={styles.brand}>
-              VocaDox
+              <AudioLines size={28} aria-hidden="true" /> VocaDox
             </Link>
           )}
           <button
@@ -148,12 +149,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {section.title && !effectiveCollapsed && <div className={styles.navSectionTitle}>{section.title}</div>}
                 <ul className={styles.navList}>
                   {visibleItems.map((item) => {
-                    const active = location.pathname === item.to;
+                    const active = location.pathname === item.to || (item.to !== "/app" && item.to !== "/admin" && location.pathname.startsWith(`${item.to}/`));
                     const Icon = item.icon;
                     return (
                       <li key={item.to}>
                         <Link
                           to={item.to}
+                          aria-current={active ? "page" : undefined}
                           className={`${styles.navLink} ${active ? styles.navLinkActive : ""}`}
                           title={effectiveCollapsed ? item.label : undefined}
                         >
@@ -178,9 +180,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <ShieldCheck
                     size={14}
                     aria-hidden="true"
-                    style={{ color: allHealthy === false ? "var(--color-danger)" : "var(--color-success)" }}
+                    style={{ color: allHealthy === null ? "var(--text-muted)" : allHealthy ? "var(--color-success)" : "var(--color-danger)" }}
                   />
-                  <span>{allHealthy === false ? "Systemstörung" : "Alle Systeme betriebsbereit"}</span>
+                  <span>{allHealthy === null ? "Systemstatus nicht verfügbar" : allHealthy ? "Alle Systeme betriebsbereit" : "Systemstörung"}</span>
                 </div>
               )}
             </>
@@ -190,9 +192,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-hidden="true"
               style={{
                 color:
-                  hasPermission("system:admin") && allHealthy === false
-                    ? "var(--color-danger)"
-                    : "var(--color-success)",
+                  allHealthy === null ? "var(--text-muted)" : allHealthy ? "var(--color-success)" : "var(--color-danger)",
               }}
             />
           )}
@@ -233,7 +233,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           )}
           <div className={styles.topbarRight} ref={userMenuRef}>
-            <button type="button" className={styles.userButton} onClick={() => setUserMenuOpen((open) => !open)}>
+            <button type="button" className={styles.userButton} aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((open) => !open)}>
               <span className={styles.avatar}>{(user?.displayName ?? "?").slice(0, 1).toUpperCase()}</span>
               {user?.displayName}
             </button>

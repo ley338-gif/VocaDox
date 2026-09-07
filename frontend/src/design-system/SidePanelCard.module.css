@@ -21,3 +21,6 @@
   font-weight: 700;
   color: var(--text-primary);
 }
+
+.icon { width: 34px; height: 34px; border-radius: 9px; }
+.header { gap: 12px; }

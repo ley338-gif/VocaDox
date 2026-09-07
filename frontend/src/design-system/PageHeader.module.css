@@ -127,3 +127,10 @@
     width: 100%;
   }
 }
+
+
+.wrapper { margin-bottom: 26px; }
+.breadcrumb { margin-bottom: 16px; gap: 8px; }
+.meta { line-height: 1.7; font-size: 14px; }
+.title { overflow-wrap: anywhere; }
+.actions { flex-wrap: wrap; }

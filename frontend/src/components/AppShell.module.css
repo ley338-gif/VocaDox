@@ -285,3 +285,21 @@
   padding: var(--space-6);
   overflow-y: auto;
 }
+
+
+.sidebar { position: sticky; top: 0; height: 100dvh; }
+.sidebarHeader { min-height: 80px; border-bottom: 0; }
+.brand { font-size: 23px; letter-spacing: -0.045em; gap: 10px; }
+.brand svg { flex-shrink: 0; }
+.navList { gap: 6px; }
+.navLink { min-height: 44px; padding: 10px; }
+.navLinkActive { box-shadow: inset 3px 0 var(--accent); }
+.navSection + .navSection { border-top: 1px solid var(--border-default); padding-top: 18px; }
+.topbar { min-height: 72px; }
+.searchForm { max-width: 38rem; }
+.searchInput.searchInput { padding: 11px 12px 11px 38px; background: var(--surface-page); }
+.searchIcon { left: 13px; }
+.avatar { width: 36px; height: 36px; font-size: 14px; flex-shrink: 0; }
+.main { padding: 30px; background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 3%, var(--surface-page)), var(--surface-page) 50%); }
+.sidebarFooter { white-space: normal; line-height: 1.7; }
+@media (max-width: 600px) { .main { padding: 16px 12px; } .topbar { flex-wrap: wrap; padding: 12px; } .topbarSpacer { display: none; } .searchForm { flex-basis: 100%; order: 2; } }
