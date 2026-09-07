@@ -93,7 +93,16 @@ const TAB_LABELS: Record<Tab, string> = {
   recap: "Recap",
 };
 
-const PRIMARY_TAB_IDS: Tab[] = ["overview", "transcript", "facts", "document", "review", "recap", "audio"];
+const PRIMARY_TAB_IDS: Tab[] = [
+  "overview",
+  "transcript",
+  "facts",
+  "document",
+  "review",
+  "tasks",
+  "recap",
+  "audio",
+];
 
 type Tab =
   | "overview"
