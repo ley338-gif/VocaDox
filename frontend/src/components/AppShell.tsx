@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, LogOut, Search, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, LogOut, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { getDashboard } from "../api/admin";
 import { useAuth } from "../auth/useAuth";
+import { useOfflineQueueSync } from "../recording/useOfflineQueueSync";
 import styles from "./AppShell.module.css";
 import { ADMIN_SECTIONS, APP_SECTIONS, type NavSection } from "./navigation";
 
@@ -36,7 +37,8 @@ function matchesNarrowViewport(): boolean {
  * route's own RequirePermission in App.tsx.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, hasPermission, logout } = useAuth();
+  const { user, csrfToken, hasPermission, logout } = useAuth();
+  const { pendingCount: pendingOfflineRecordings } = useOfflineQueueSync(csrfToken);
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
@@ -220,6 +222,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             />
           </form>
           <div className={styles.topbarSpacer} />
+          {pendingOfflineRecordings > 0 && (
+            <span
+              className={styles.offlineQueueBadge}
+              role="status"
+              title="Wird automatisch hochgeladen, sobald wieder eine Verbindung besteht"
+            >
+              <RefreshCw size={14} aria-hidden="true" /> {pendingOfflineRecordings}{" "}
+              {pendingOfflineRecordings === 1 ? "Aufnahme wartet" : "Aufnahmen warten"}
+            </span>
+          )}
           <div className={styles.topbarRight} ref={userMenuRef}>
             <button type="button" className={styles.userButton} onClick={() => setUserMenuOpen((open) => !open)}>
               <span className={styles.avatar}>{(user?.displayName ?? "?").slice(0, 1).toUpperCase()}</span>

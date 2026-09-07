@@ -78,6 +78,31 @@ reason:
   captured normally in your browser, and will upload and process
   normally when you stop and click Upload.
 
+## Installing VocaDox on your phone (PWA)
+
+VocaDox is an installable web app. On a supporting mobile browser
+(current Chrome/Edge on Android, Safari on iOS), your browser will offer
+an "Add to Home Screen" / "Install app" option — once installed, it
+opens like a native app (its own icon, no browser address bar) but is
+still the same web app, kept up to date automatically. No app-store
+install is needed or offered.
+
+## Recording while offline (or losing connection mid-recording)
+
+If your device loses connectivity right when you click **Aufnahme
+hochladen** (upload recording), VocaDox saves the finished recording on
+your device (not just in memory — it survives closing the app/browser)
+and shows "Kein Netz — die Aufnahme wurde lokal gespeichert…". You don't
+need to do anything else: the next time your device has a working
+connection, VocaDox uploads it automatically in the background. A small
+indicator ("N Aufnahmen warten") in the top bar shows whether anything
+is still queued.
+
+This only covers a recording that's already **finished** (you clicked
+Stop) at the moment of upload — an in-progress recording still needs an
+active browser tab/app to keep capturing audio; there's no background
+recording while the app is fully closed.
+
 ## If something goes wrong
 
 - **Upload fails** (network issue): you can **Retry** without re-recording
