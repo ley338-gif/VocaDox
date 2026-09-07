@@ -19,17 +19,13 @@ import { getFactEvidence, listFacts, listReviewIssues, type ExtractedFact } from
 import { useAuth } from "../auth/useAuth";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
+import { Card } from "../design-system/Card";
 import { Textarea } from "../design-system/FormControls";
 import { EmptyState, Skeleton } from "../design-system/States";
+import { StatusBadge } from "../design-system/StatusBadge";
 import { factSummary } from "../lib/factSummary";
 import type { AudioPlayerHandle } from "./AudioPlayer";
 import styles from "./FactsPanel.module.css";
-
-function severityTone(severity: string): "neutral" | "warning" | "danger" {
-  if (severity === "critical" || severity === "high") return "danger";
-  if (severity === "medium") return "warning";
-  return "neutral";
-}
 
 function factValueSummary(fact: ExtractedFact | undefined): string {
   if (!fact) return "?";
@@ -103,14 +99,13 @@ export function ReviewWizard({
 
   if (openIssues.length === 0) {
     return (
-      <div>
-        <h4>Review</h4>
+      <Card title="Review">
         <EmptyState
           icon={<CheckCircle2 size={20} aria-hidden="true" />}
           title="Keine offenen Review-Punkte"
           description="Das Dokument kann jetzt zusammengestellt und freigegeben werden."
         />
-      </div>
+      </Card>
     );
   }
 
@@ -118,14 +113,11 @@ export function ReviewWizard({
   const canResolve = hasPermission("review-issue:resolve");
 
   return (
-    <div>
-      <h4>
-        Review — {openIssues.length} found, {index + 1}/{openIssues.length}
-      </h4>
+    <Card title={`Review — ${index + 1}/${openIssues.length} gefunden`}>
       <div className={styles.item}>
         <div className={styles.header}>
-          <AlertTriangle size={14} aria-hidden="true" />
-          <Badge tone={severityTone(currentIssue.severity)}>{currentIssue.severity}</Badge>
+          <AlertTriangle size={16} aria-hidden="true" />
+          <StatusBadge status={currentIssue.severity} />
           <Badge tone="neutral">{currentIssue.issue_type.replace(/_/g, " ")}</Badge>
           {currentIssue.uncertainty_category && (
             <Badge tone="purple">{currentIssue.uncertainty_category.replace(/_/g, " ")}</Badge>
@@ -141,17 +133,9 @@ export function ReviewWizard({
                 key={fid}
                 type="button"
                 onClick={() => setTargetFactId(fid)}
-                style={{
-                  marginRight: "var(--space-2)",
-                  fontWeight: fid === targetFactId ? 700 : 400,
-                  background: "none",
-                  border: "1px solid var(--border-default)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "2px 8px",
-                  cursor: "pointer",
-                }}
+                style={{ marginRight: "var(--space-2)", background: "none", border: "none", padding: 0, cursor: "pointer" }}
               >
-                {factValueSummary(factsById.get(fid))}
+                <Badge tone={fid === targetFactId ? "info" : "neutral"}>{factValueSummary(factsById.get(fid))}</Badge>
               </button>
             ))}
           </div>
@@ -246,6 +230,6 @@ export function ReviewWizard({
           </div>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

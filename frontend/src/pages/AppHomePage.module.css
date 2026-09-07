@@ -1,17 +1,3 @@
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-  flex-wrap: wrap;
-}
-
-.title {
-  font-size: var(--font-h1-size);
-  line-height: var(--font-h1-line);
-}
-
 .actions {
   display: flex;
   gap: var(--space-3);

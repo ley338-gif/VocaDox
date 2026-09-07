@@ -18,6 +18,7 @@ import {
   type TimelineEntry,
 } from "../api/longitudinal";
 import { Badge } from "../design-system/Badge";
+import { Card } from "../design-system/Card";
 import { EmptyState, Skeleton } from "../design-system/States";
 import { DataTable, type DataTableColumn } from "../design-system/Table";
 import styles from "./LongitudinalPanel.module.css";
@@ -92,49 +93,53 @@ export function LongitudinalPanel({
 
   return (
     <div>
-      <h4>Verlauf — Referenz „{externalReference}“</h4>
-      {timelineQuery.isLoading ? (
-        <Skeleton height="4rem" />
-      ) : (
-        <DataTable
-          columns={TIMELINE_COLUMNS(conversationId)}
-          rows={timelineQuery.data?.conversations ?? []}
-          keyExtractor={(row) => row.conversation_id}
-          onRowClick={(row) => navigate(`/app/conversations/${row.conversation_id}`)}
-          empty={<EmptyState title="Keine weiteren Gespräche mit dieser Referenz" />}
-        />
-      )}
+      <Card title={`Verlauf — Referenz „${externalReference}“`}>
+        {timelineQuery.isLoading ? (
+          <Skeleton height="4rem" />
+        ) : (
+          <DataTable
+            columns={TIMELINE_COLUMNS(conversationId)}
+            rows={timelineQuery.data?.conversations ?? []}
+            keyExtractor={(row) => row.conversation_id}
+            onRowClick={(row) => navigate(`/app/conversations/${row.conversation_id}`)}
+            empty={<EmptyState title="Keine weiteren Gespräche mit dieser Referenz" />}
+          />
+        )}
+      </Card>
 
-      <h4 style={{ marginTop: "var(--space-6)" }}>Vergleich</h4>
-      <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
-        Deterministischer, struktureller Vergleich ausschließlich über extrahierte Fakten — nie eine
-        KI-generierte Zusammenfassung von „was sich geändert hat“.
-      </p>
-      {comparisonQuery.isLoading && <Skeleton height="4rem" />}
-      {comparisonQuery.data && comparisonQuery.data.items.length === 0 && (
-        <EmptyState
-          title="Keine Unterschiede festgestellt"
-          description={`Über ${comparisonQuery.data.conversation_count} Gespräch(e) hinweg.`}
-        />
-      )}
-      <ul className={styles.list}>
-        {comparisonQuery.data?.items.map((item, idx) => (
-          <li key={idx} className={styles.comparisonRow}>
-            <div className={styles.comparisonHeader}>
-              <Badge tone={comparisonTone(item.status)}>{item.status.replace("_", " ")}</Badge>
-              <strong>
-                {item.subject} — {item.attribute}
-              </strong>
-              <span style={{ color: "var(--text-muted)" }}>in {item.conversation_title}</span>
-            </div>
-            <div className={styles.comparisonValues}>
-              {item.prior_value !== null && <span>vorher: {item.prior_value}</span>}
-              {item.prior_value !== null && item.current_value !== null && <span> → </span>}
-              {item.current_value !== null && <span>aktuell: {item.current_value}</span>}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div style={{ marginTop: "var(--space-6)" }}>
+        <Card title="Vergleich">
+          <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
+            Deterministischer, struktureller Vergleich ausschließlich über extrahierte Fakten — nie eine
+            KI-generierte Zusammenfassung von „was sich geändert hat“.
+          </p>
+          {comparisonQuery.isLoading && <Skeleton height="4rem" />}
+          {comparisonQuery.data && comparisonQuery.data.items.length === 0 && (
+            <EmptyState
+              title="Keine Unterschiede festgestellt"
+              description={`Über ${comparisonQuery.data.conversation_count} Gespräch(e) hinweg.`}
+            />
+          )}
+          <ul className={styles.list}>
+            {comparisonQuery.data?.items.map((item, idx) => (
+              <li key={idx} className={styles.comparisonRow}>
+                <div className={styles.comparisonHeader}>
+                  <Badge tone={comparisonTone(item.status)}>{item.status.replace("_", " ")}</Badge>
+                  <strong>
+                    {item.subject} — {item.attribute}
+                  </strong>
+                  <span style={{ color: "var(--text-muted)" }}>in {item.conversation_title}</span>
+                </div>
+                <div className={styles.comparisonValues}>
+                  {item.prior_value !== null && <span>vorher: {item.prior_value}</span>}
+                  {item.prior_value !== null && item.current_value !== null && <span> → </span>}
+                  {item.current_value !== null && <span>aktuell: {item.current_value}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
     </div>
   );
 }
