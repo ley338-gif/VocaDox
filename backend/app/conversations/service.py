@@ -27,6 +27,7 @@ from app.conversations.state_machine import transition
 from app.longitudinal.models import FollowUpTask
 from app.media.models import MediaAsset
 from app.providers.storage import StorageProvider
+from app.search.service import delete_search_entries_for_conversation
 
 
 async def create_conversation(
@@ -170,6 +171,11 @@ async def soft_delete_conversation(
     await session.execute(
         delete(FollowUpTask).where(FollowUpTask.conversation_id == conversation.id)
     )
+
+    # Same reasoning as FollowUpTask above -- a deleted conversation's
+    # content must not keep surfacing in cross-conversation search
+    # (post-GA P0-1).
+    await delete_search_entries_for_conversation(session, conversation_id=conversation.id)
 
 
 # -- Participants -------------------------------------------------------

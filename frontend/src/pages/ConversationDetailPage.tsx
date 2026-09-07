@@ -99,11 +99,15 @@ type Tab =
 
 export function ConversationDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation() as { state?: { startRecording?: boolean } };
+  const location = useLocation() as {
+    state?: { startRecording?: boolean; tab?: Tab; focusSegmentId?: string };
+  };
   const navigate = useNavigate();
   const { csrfToken, hasPermission, user } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>(location.state?.startRecording ? "audio" : "overview");
+  const [tab, setTab] = useState<Tab>(
+    location.state?.startRecording ? "audio" : (location.state?.tab ?? "overview")
+  );
   const [showRecorder, setShowRecorder] = useState(Boolean(location.state?.startRecording));
   const audioPlayerRef = useRef<AudioPlayerHandle | null>(null);
   const [activeMs, setActiveMs] = useState(0);
@@ -674,6 +678,7 @@ export function ConversationDetailPage() {
                   conversationId={conversationId}
                   audioPlayerRef={audioPlayerRef}
                   activeMs={activeMs}
+                  focusSegmentId={location.state?.focusSegmentId}
                 />
               </div>
             </div>

@@ -67,5 +67,9 @@ from app.profiles import models as _profiles_models  # noqa: F401,E402
 # same module).
 from app.recap import models as _recap_models  # noqa: F401,E402
 from app.review import models as _review_models  # noqa: F401,E402
+
+# Post-GA (P0-1): search_entries FK-references conversations.id/
+# organizations.id/groups.id -- imported after conversations/organizations.
+from app.search import models as _search_models  # noqa: F401,E402
 from app.templates import models as _templates_models  # noqa: F401,E402
 from app.transcription import models as _transcription_models  # noqa: F401,E402

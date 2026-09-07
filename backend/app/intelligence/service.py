@@ -22,11 +22,14 @@ from app.evidence.models import EvidenceType, FactEvidence
 from app.intelligence.contradictions import FactForContradictionCheck, detect_contradictions
 from app.intelligence.models import Certainty, ExtractedFact, FactCategory, FactStatus
 from app.intelligence.prompts import SYSTEM_PROMPT, build_prompt_from_instruction, render_transcript
+from app.intelligence.rendering import render_fact_statement
 from app.intelligence.schemas import NOT_MENTIONED
 from app.intelligence.uncertainty import classify as classify_uncertainty
 from app.profiles.models import ModelProfile
 from app.providers.llm import LLMProvider
 from app.review.models import ReviewIssue, ReviewIssueStatus, ReviewIssueType
+from app.search.models import SearchSourceType
+from app.search.service import delete_search_entry, upsert_search_entry
 from app.templates.models import TemplateVersion
 from app.templates.schema_builder import ResolvedCategory, resolve_categories
 from app.transcription.models import Transcript, TranscriptSegment
@@ -211,6 +214,9 @@ async def _supersede_previous_facts(session: AsyncSession, *, conversation_id: u
     superseded_ids = {str(f.id) for f in previous_facts}
     for fact in previous_facts:
         fact.status = FactStatus.SUPERSEDED.value
+        await delete_search_entry(
+            session, source_type=SearchSourceType.EXTRACTED_FACT, source_id=fact.id
+        )
 
     open_issues_result = await session.execute(
         select(ReviewIssue).where(
@@ -267,6 +273,11 @@ async def run_extraction(
 
     await _supersede_previous_facts(session, conversation_id=conversation_id)
 
+    from app.conversations.models import Conversation
+
+    conversation = await session.get(Conversation, conversation_id)
+    assert conversation is not None
+
     segments = await _load_segments(session, transcript.id)
     segments_by_sequence = {s.sequence: s for s in segments}
     speaker_ids = {s.speaker_id for s in segments if s.speaker_id is not None}
@@ -307,6 +318,15 @@ async def run_extraction(
                 claimed_sequences=item.get("evidence_segment_sequences", []),
             )
             fact.status = FactStatus.VERIFIED.value if has_evidence else FactStatus.UNVERIFIED.value
+            await upsert_search_entry(
+                session,
+                conversation_id=conversation.id,
+                organization_id=conversation.organization_id,
+                group_id=conversation.group_id,
+                source_type=SearchSourceType.EXTRACTED_FACT,
+                source_id=fact.id,
+                content=render_fact_statement(fact),
+            )
 
             field_values = [
                 v for k, v in item.items() if k not in ("certainty", "evidence_segment_sequences")

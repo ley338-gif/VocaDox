@@ -75,7 +75,10 @@ export function TranscriptTurn({
   onCancelReassignSpeaker: () => void;
 }) {
   return (
-    <li className={`${styles.segment} ${active ? styles.segmentActive : ""}`}>
+    <li
+      id={`transcript-segment-${segment.id}`}
+      className={`${styles.segment} ${active ? styles.segmentActive : ""}`}
+    >
       <button
         type="button"
         className={styles.timestamp}

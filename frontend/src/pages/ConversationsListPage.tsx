@@ -5,14 +5,75 @@ import { useNavigate, useSearchParams } from "react-router";
 
 import type { Conversation } from "../api/conversations";
 import { listConversations } from "../api/conversations";
+import { search as searchContent, type SearchResult } from "../api/search";
 import { Button } from "../design-system/Button";
 import { Select, TextInput } from "../design-system/FormControls";
-import { EmptyState, ErrorState } from "../design-system/States";
+import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { DataTable, type DataTableColumn } from "../design-system/Table";
 import { Pagination } from "../design-system/Pagination";
 import { CONVERSATION_TYPE_LABELS } from "../lib/conversationLabels";
 import styles from "./ConversationsListPage.module.css";
+
+const SEARCH_SOURCE_LABELS: Record<SearchResult["source_type"], string> = {
+  transcript_segment: "Transkript",
+  extracted_fact: "Fakten",
+  document: "Dokumentation",
+};
+
+function highlightedSnippet(snippet: string) {
+  // ts_headline (see app.search.service, ADR-0030) wraps matches in ✦
+  // pairs — the SQLite test/dev fallback never emits these, so plain
+  // snippets render unchanged.
+  const parts = snippet.split("✦");
+  return parts.map((part, i) => (i % 2 === 1 ? <mark key={i}>{part}</mark> : part));
+}
+
+function SearchResultsPanel({ query }: { query: string }) {
+  const navigate = useNavigate();
+  const { data, isLoading } = useQuery({
+    queryKey: ["content-search", query],
+    queryFn: () => searchContent({ q: query }),
+  });
+
+  if (isLoading) return <Skeleton height="4rem" />;
+  if (!data || data.items.length === 0) {
+    return <EmptyState title="Keine Treffer" description="Keine Inhalte gefunden." />;
+  }
+
+  return (
+    <div className={styles.searchResults}>
+      {data.items.map((item) => (
+        <a
+          key={`${item.source_type}-${item.source_id}`}
+          className={styles.searchResult}
+          href={`/app/conversations/${item.conversation_id}`}
+          onClick={(event) => {
+            event.preventDefault();
+            const tab =
+              item.source_type === "transcript_segment"
+                ? "transcript"
+                : item.source_type === "extracted_fact"
+                  ? "facts"
+                  : "document";
+            navigate(`/app/conversations/${item.conversation_id}`, {
+              state: {
+                tab,
+                focusSegmentId: item.source_type === "transcript_segment" ? item.source_id : undefined,
+              },
+            });
+          }}
+        >
+          <div className={styles.searchResultHeader}>
+            <span className={styles.searchResultTitle}>{item.conversation_title}</span>
+            <StatusBadge status={item.source_type} label={SEARCH_SOURCE_LABELS[item.source_type]} />
+          </div>
+          <p className={styles.searchResultSnippet}>{highlightedSnippet(item.snippet)}</p>
+        </a>
+      ))}
+    </div>
+  );
+}
 
 const PAGE_SIZE = 20;
 
@@ -46,6 +107,9 @@ export function ConversationsListPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [offset, setOffset] = useState(0);
+  // Full-text/cross-conversation content search (post-GA P0-1) — distinct
+  // from `search` above, which only ever filters the title column.
+  const [contentQuery, setContentQuery] = useState("");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["conversations", { search, statusFilter, typeFilter, offset }],
@@ -66,6 +130,16 @@ export function ConversationsListPage() {
         <Button variant="primary" type="button" onClick={() => navigate("/app/conversations/new")}>
           <Plus size={16} aria-hidden="true" /> Neues Gespräch
         </Button>
+      </div>
+
+      <div className={styles.searchSection}>
+        <TextInput
+          placeholder="Inhalte durchsuchen (Transkript, Fakten, Dokumentation)…"
+          aria-label="Inhalte durchsuchen"
+          value={contentQuery}
+          onChange={(event) => setContentQuery(event.target.value)}
+        />
+        {contentQuery.trim() && <SearchResultsPanel query={contentQuery.trim()} />}
       </div>
 
       <div className={styles.filters}>
