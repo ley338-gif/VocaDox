@@ -7,6 +7,7 @@ import {
   transitionModelLifecycle,
 } from "../api/analytics";
 import {
+  createProcessingProfile,
   createProcessingProfileVersion,
   listModelProfiles,
   listProcessingProfileVersions,
@@ -45,6 +46,7 @@ export function AdminProfilesPage() {
   const queryClient = useQueryClient();
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
   const [showNewVersion, setShowNewVersion] = useState<string | null>(null);
+  const [showNewProfile, setShowNewProfile] = useState(false);
 
   const processingProfilesQuery = useQuery({
     queryKey: ["admin", "processing-profiles"],
@@ -108,16 +110,38 @@ export function AdminProfilesPage() {
 
   return (
     <AdminLayout>
-      <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
-        Verarbeitungsprofile
-      </h1>
-      <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)", marginBottom: "var(--space-6)" }}>
-        Verarbeitungsprofile bündeln eine Vorlage, ein Extraktionsmodell, Sprache, Aufbewahrungsrichtlinie
-        und Sprach-/Diarisierungs-Hinweise zu dem benannten Preset, das beim Starten eines Gesprächs
-        ausgewählt wird.
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: "var(--font-h1-size)", lineHeight: "var(--font-h1-line)" }}>
+            Verarbeitungsprofile
+          </h1>
+          <p style={{ color: "var(--text-secondary)", marginTop: "var(--space-2)" }}>
+            Verarbeitungsprofile bündeln eine Vorlage, ein Extraktionsmodell, Sprache,
+            Aufbewahrungsrichtlinie und Sprach-/Diarisierungs-Hinweise zu dem benannten Preset,
+            das beim Starten eines Gesprächs ausgewählt wird.
+          </p>
+        </div>
+        {canWrite && (
+          <Button variant="primary" onClick={() => setShowNewProfile((s) => !s)}>
+            {showNewProfile ? "Abbrechen" : "Neues Profil erstellen"}
+          </Button>
+        )}
+      </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      {showNewProfile && (
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <NewProfileForm
+            templates={templatesQuery.data ?? []}
+            modelProfiles={modelProfilesQuery.data ?? []}
+            onCreated={() => {
+              setShowNewProfile(false);
+              void queryClient.invalidateQueries({ queryKey: ["admin", "processing-profiles"] });
+            }}
+          />
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-6)" }}>
         {processingProfilesQuery.data?.map((profile) => (
           <Card key={profile.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -363,7 +387,7 @@ function NewVersionForm({
   onCreated,
 }: {
   processingProfileId: string;
-  templates: { id: string; key: string; current_published_version_id: string | null }[];
+  templates: { id: string; key: string; name: string; current_published_version_id: string | null }[];
   modelProfiles: { id: string; name: string; purpose: string }[];
   onCreated: () => void;
 }) {
@@ -427,7 +451,7 @@ function NewVersionForm({
               .filter((t) => t.current_published_version_id)
               .map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.key}
+                  {t.name}
                 </option>
               ))}
           </Select>
@@ -473,6 +497,159 @@ function NewVersionForm({
         {error && <ErrorState message={error} />}
         <Button variant="primary" onClick={() => void handleSubmit()}>
           Entwurfsversion erstellen
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function NewProfileForm({
+  templates,
+  modelProfiles,
+  onCreated,
+}: {
+  templates: { id: string; key: string; name: string; current_published_version_id: string | null }[];
+  modelProfiles: { id: string; name: string; purpose: string }[];
+  onCreated: () => void;
+}) {
+  const { csrfToken } = useAuth();
+  const [key, setKey] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [isSystemDefault, setIsSystemDefault] = useState(false);
+  const [templateId, setTemplateId] = useState("");
+  const [extractionModelProfileId, setExtractionModelProfileId] = useState("");
+  const [language, setLanguage] = useState("auto");
+  const [speechConfigText, setSpeechConfigText] = useState("{}");
+  const [diarizationConfigText, setDiarizationConfigText] = useState("{}");
+  const [error, setError] = useState<string | null>(null);
+
+  const templateVersionsQuery = useQuery({
+    queryKey: ["admin", "template-versions-for-profile", templateId],
+    queryFn: () => listTemplateVersions(templateId),
+    enabled: templateId !== "",
+  });
+  const publishedVersion = templateVersionsQuery.data?.find((v) => v.status === "published");
+
+  async function handleSubmit() {
+    if (!csrfToken || !key.trim() || !name.trim() || !templateId || !publishedVersion) {
+      setError("Schlüssel, Name und eine Vorlage mit veröffentlichter Version sind erforderlich.");
+      return;
+    }
+    let speechConfig: Record<string, unknown> | null = null;
+    let diarizationConfig: Record<string, unknown> | null = null;
+    try {
+      speechConfig = speechConfigText.trim() ? JSON.parse(speechConfigText) : null;
+      diarizationConfig = diarizationConfigText.trim() ? JSON.parse(diarizationConfigText) : null;
+    } catch {
+      setError("Sprach-/Diarisierungs-Konfiguration muss gültiges JSON sein.");
+      return;
+    }
+    setError(null);
+    try {
+      await createProcessingProfile(
+        {
+          key: key.trim(),
+          name: name.trim(),
+          description: description.trim() || null,
+          is_system_default: isSystemDefault,
+          template_id: templateId,
+          template_version_id: publishedVersion.id,
+          extraction_model_profile_id: extractionModelProfileId || null,
+          language,
+          speech_provider_config: speechConfig,
+          diarization_provider_config: diarizationConfig,
+        },
+        csrfToken
+      );
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Profil konnte nicht erstellt werden.");
+    }
+  }
+
+  return (
+    <Card title="Neues Profil">
+      <div style={{ display: "grid", gap: "var(--space-3)", maxWidth: "480px" }}>
+        <label>
+          Schlüssel (eindeutig, z. B. "medical_consultation")
+          <TextInput value={key} onChange={(e) => setKey(e.target.value)} />
+        </label>
+        <label>
+          Name (Anzeigename)
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label>
+          Beschreibung (optional)
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            style={{ width: "100%" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <input
+            type="checkbox"
+            checked={isSystemDefault}
+            onChange={(e) => setIsSystemDefault(e.target.checked)}
+          />
+          Als Systemstandard setzen
+        </label>
+        <label>
+          Vorlage
+          <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            <option value="">Vorlage wählen…</option>
+            {templates
+              .filter((t) => t.current_published_version_id)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+          </Select>
+        </label>
+        <label>
+          Extraktionsmodell
+          <Select
+            value={extractionModelProfileId}
+            onChange={(e) => setExtractionModelProfileId(e.target.value)}
+          >
+            <option value="">(geerbt)</option>
+            {modelProfiles
+              .filter((m) => m.purpose === "extraction")
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+          </Select>
+        </label>
+        <label>
+          Sprache
+          <TextInput value={language} onChange={(e) => setLanguage(e.target.value)} />
+        </label>
+        <label>
+          Sprach-Anbieter-Konfiguration (JSON)
+          <Textarea
+            value={speechConfigText}
+            onChange={(e) => setSpeechConfigText(e.target.value)}
+            rows={3}
+            style={{ width: "100%", fontFamily: "monospace" }}
+          />
+        </label>
+        <label>
+          Diarisierungs-Anbieter-Konfiguration (JSON)
+          <Textarea
+            value={diarizationConfigText}
+            onChange={(e) => setDiarizationConfigText(e.target.value)}
+            rows={3}
+            style={{ width: "100%", fontFamily: "monospace" }}
+          />
+        </label>
+        {error && <ErrorState message={error} />}
+        <Button variant="primary" onClick={() => void handleSubmit()}>
+          Profil erstellen
         </Button>
       </div>
     </Card>

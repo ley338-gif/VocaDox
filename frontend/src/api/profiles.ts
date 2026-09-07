@@ -80,6 +80,24 @@ export interface ProcessingProfileVersionCreatePayload {
   retention_policy_id?: string | null;
 }
 
+export interface ProcessingProfileCreatePayload extends ProcessingProfileVersionCreatePayload {
+  key: string;
+  name: string;
+  description?: string | null;
+  is_system_default?: boolean;
+}
+
+export function createProcessingProfile(
+  payload: ProcessingProfileCreatePayload,
+  csrfToken: string
+): Promise<ProcessingProfile> {
+  return request("/processing-profiles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function createProcessingProfileVersion(
   processingProfileId: string,
   payload: ProcessingProfileVersionCreatePayload,
