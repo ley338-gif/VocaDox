@@ -101,6 +101,7 @@ async def create_template_endpoint(
         extraction_categories=payload.extraction_categories,
         presentation=payload.presentation,
         review_rules=payload.review_rules,
+        document_layout=payload.document_layout,
         created_by=user,
     )
     await db.commit()
@@ -151,6 +152,7 @@ async def create_template_version_endpoint(
         extraction_categories=payload.extraction_categories,
         presentation=payload.presentation,
         review_rules=payload.review_rules,
+        document_layout=payload.document_layout,
         created_by=user,
     )
     await db.commit()

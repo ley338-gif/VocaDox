@@ -128,6 +128,15 @@ class TemplateVersion(Base):
     extraction_categories: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
     presentation: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
     review_rules: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Post-GA: which shape app.documents.service.compose_document renders
+    # this template's facts into. "sections" (default) is the original
+    # flat category-section layout, unchanged. "letter" renders the same
+    # `presentation`-driven sections as a formal letter (salutation,
+    # subject line, prose paragraphs instead of bullets, closing) -- see
+    # app.documents.export_formats and frontend DocumentContent.tsx's
+    # `layout` branch. A plain string, not a StrEnum, so a future layout
+    # doesn't need a migration to add -- only renderer support.
+    document_layout: Mapped[str] = mapped_column(String(32), nullable=False, default="sections")
 
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -158,6 +167,7 @@ def _forbid_mutating_published_template_version(
             content_history.extraction_categories.history.has_changes()
             or content_history.presentation.history.has_changes()
             or content_history.review_rules.history.has_changes()
+            or content_history.document_layout.history.has_changes()
         )
         if content_changed:
             raise ImmutablePublishedVersionError(

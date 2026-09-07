@@ -16,9 +16,11 @@ async def test_general_and_meeting_seeded_and_published(client, seeded) -> None:
     assert set(by_key) == {"general", "meeting", "medical_consultation", "psychotherapy"}
     assert by_key["general"]["current_published_version_id"] is not None
     assert by_key["meeting"]["current_published_version_id"] is not None
-    # Foundation-only templates (spec: "prepared as foundation only") are
-    # deliberately NOT published/selectable yet.
-    assert by_key["medical_consultation"]["current_published_version_id"] is None
+    # post-GA: medical_consultation is now a real, selectable, published
+    # "letter" layout (see app.templates.seed's module docstring).
+    # psychotherapy remains a foundation-only template (spec: "prepared as
+    # foundation only") -- deliberately NOT published/selectable yet.
+    assert by_key["medical_consultation"]["current_published_version_id"] is not None
     assert by_key["psychotherapy"]["current_published_version_id"] is None
 
 

@@ -516,7 +516,15 @@ export function ConversationDetailPage() {
                     description="Automatisch erstellt, sobald ein Dokument zusammengestellt wurde."
                   />
                 )}
-                {documentSections && <DocumentContent sections={documentSections} maxStatements={6} />}
+                {documentSections && (
+                  <DocumentContent
+                    sections={documentSections}
+                    layout={documentQuery.data?.current_revision?.document_layout}
+                    conversationTitle={conversation.title}
+                    generatedAt={documentQuery.data?.current_revision?.created_at}
+                    maxStatements={6}
+                  />
+                )}
               </div>
 
               {conversation.description && (
@@ -755,7 +763,7 @@ export function ConversationDetailPage() {
 
           {tab === "document" && (
             <div>
-              <DocumentPanel conversationId={conversationId} />
+              <DocumentPanel conversationId={conversationId} conversationTitle={conversation.title} />
             </div>
           )}
 

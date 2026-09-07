@@ -3210,6 +3210,11 @@ export interface components {
             /** Template Version Id */
             template_version_id?: string | null;
             /**
+             * Document Layout
+             * @default sections
+             */
+            document_layout: string;
+            /**
              * Created At
              * Format: date-time
              */
@@ -5160,6 +5165,11 @@ export interface components {
             review_rules?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Document Layout
+             * @default sections
+             */
+            document_layout: string;
         };
         /** TemplateResponse */
         TemplateResponse: {
@@ -5201,6 +5211,11 @@ export interface components {
             review_rules?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Document Layout
+             * @default sections
+             */
+            document_layout: string;
         };
         /** TemplateVersionResponse */
         TemplateVersionResponse: {
@@ -5230,6 +5245,8 @@ export interface components {
             review_rules: {
                 [key: string]: unknown;
             } | null;
+            /** Document Layout */
+            document_layout: string;
             /** Created By User Id */
             created_by_user_id: string | null;
             /**

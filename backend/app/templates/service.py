@@ -88,6 +88,7 @@ async def create_template(
     presentation: list[dict[str, Any]],
     review_rules: dict[str, Any] | None,
     created_by: User,
+    document_layout: str = "sections",
 ) -> Template:
     template = Template(key=key, name=name, description=description)
     session.add(template)
@@ -99,6 +100,7 @@ async def create_template(
         extraction_categories=extraction_categories,
         presentation=presentation,
         review_rules=review_rules,
+        document_layout=document_layout,
         created_by_user_id=created_by.id if created_by else None,
     )
     session.add(version)
@@ -114,6 +116,7 @@ async def create_draft_version(
     presentation: list[dict[str, Any]],
     review_rules: dict[str, Any] | None,
     created_by: User,
+    document_layout: str = "sections",
 ) -> TemplateVersion:
     """Never mutates an existing version — always a brand new DRAFT row,
     numbered one past the highest version_number this template has ever
@@ -128,6 +131,7 @@ async def create_draft_version(
         extraction_categories=extraction_categories,
         presentation=presentation,
         review_rules=review_rules,
+        document_layout=document_layout,
         created_by_user_id=created_by.id if created_by else None,
     )
     session.add(version)

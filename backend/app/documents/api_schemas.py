@@ -26,6 +26,7 @@ class DocumentRevisionResponse(BaseModel):
     approved_by_user_id: uuid.UUID | None
     approved_at: datetime | None
     template_version_id: uuid.UUID | None = None
+    document_layout: str = "sections"
     created_at: datetime
     updated_at: datetime
 

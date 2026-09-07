@@ -238,6 +238,9 @@ async def compose_document(
         blocking_issue_ids=[str(i.id) for i in blocking],
         created_by_user_id=requested_by.id,
         template_version_id=template_version.id if template_version is not None else None,
+        document_layout=(
+            template_version.document_layout if template_version is not None else "sections"
+        ),
     )
     session.add(revision)
     await session.flush()
