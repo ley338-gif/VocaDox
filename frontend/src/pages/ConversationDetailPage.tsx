@@ -5,6 +5,7 @@ import {
   CheckSquare,
   Clock,
   FileText,
+  Gauge,
   History,
   Link2,
   RefreshCw,
@@ -35,6 +36,7 @@ import {
   updateParticipant,
   uploadMedia,
 } from "../api/conversations";
+import { getCompleteness } from "../api/completeness";
 import { getDocument } from "../api/documents";
 import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
 import { createKnownSpeaker, listKnownSpeakers } from "../api/people";
@@ -49,6 +51,7 @@ import {
 } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
+import { CompletenessPanel } from "../components/CompletenessPanel";
 import { DocumentContent } from "../components/DocumentContent";
 import { DocumentPanel } from "../components/DocumentPanel";
 import { FactsPanel } from "../components/FactsPanel";
@@ -189,6 +192,11 @@ export function ConversationDetailPage() {
     queryKey: ["conversation-tasks", conversationId],
     queryFn: () => listConversationTasks(conversationId),
     enabled: Boolean(conversationId) && hasPermission("task:read"),
+  });
+  const completenessQuery = useQuery({
+    queryKey: ["completeness", conversationId],
+    queryFn: () => getCompleteness(conversationId),
+    enabled: Boolean(conversationId) && hasPermission("fact:read"),
   });
   const externalReference = conversationQuery.data?.external_reference;
   const organizationId = conversationQuery.data?.organization_id;
@@ -1037,6 +1045,15 @@ export function ConversationDetailPage() {
               </>
             )}
           </SidePanelCard>
+
+          {hasPermission("fact:read") && (
+            <SidePanelCard icon={<Gauge size={14} aria-hidden="true" />} title="Vollständigkeit">
+              <CompletenessPanel
+                completeness={completenessQuery.data}
+                isLoading={completenessQuery.isLoading}
+              />
+            </SidePanelCard>
+          )}
 
           {hasPermission("task:read") && (
             <SidePanelCard

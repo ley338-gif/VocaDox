@@ -4,11 +4,9 @@
 
 When diarization runs, VocaDox's speech-detection system identifies
 distinct voices in the recording and labels them generically —
-`SPEAKER_00`, `SPEAKER_01`, and so on. **This is not identity
-recognition.** VocaDox never attempts to recognize *who* a voice belongs
-to (no voice biometrics, no matching against any database of known
-people) — it only distinguishes "this is a different voice than that
-one."
+`SPEAKER_00`, `SPEAKER_01`, and so on. It only distinguishes "this is a
+different voice than that one" — it never determines *who* a voice
+belongs to by itself.
 
 ## Assigning a name
 
@@ -22,8 +20,18 @@ speaker list:
   conversation (Participants tab), you can associate a detected speaker
   with one of them.
 
-This is always a manual, human decision — the system never guesses or
-auto-assigns a real identity to a detected speaker.
+This is always a manual, human decision — the system never silently
+assigns a real identity to a detected speaker.
+
+## Recurring-speaker suggestions (voiceprints)
+
+If your organization has enrolled a person's voiceprint (Admin → Bekannte
+Personen, or directly from a conversation's speaker list — see
+`docs/admin/voiceprints.md`), a later conversation may show a
+confidence-scored **suggestion**: "Vorschlag: {Name} (NN% Übereinstimmung)."
+This is still not automatic identification — it is a hint you must
+explicitly accept ("Übernehmen") before it becomes a real assignment.
+Ignoring it has no effect at all.
 
 ## Multiple recordings, multiple speaker sets
 
