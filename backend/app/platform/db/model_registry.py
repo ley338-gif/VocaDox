@@ -7,9 +7,13 @@ to know every domain's models module exists.
 
 from __future__ import annotations
 
+from app.analytics import models as _analytics_models  # noqa: F401
+
 # Phase 8: model_profile_lifecycle_events FK-references model_profiles.id;
 # evaluation_runs has no FKs into other domains' tables.
-from app.analytics import models as _analytics_models  # noqa: F401
+# Post-GA (P1-1): ask_queries FK-references organizations.id/users.id/
+# conversations.id -- imported early since it has no dependents.
+from app.ask import models as _ask_models  # noqa: F401
 from app.audit import models as _audit_models  # noqa: F401
 
 # conversations imports media (Conversation.media_assets uses a string

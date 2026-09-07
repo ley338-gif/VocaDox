@@ -155,6 +155,10 @@ PERMISSIONS: dict[str, str] = {
         "Create, edit, and delete an organization's custom transcription vocabulary, "
         "organization-wide or per template."
     ),
+    "ask:query": (
+        "Ask a natural-language question answered only from already-extracted, "
+        "evidence-linked facts (Ask VocaDox) -- never a raw-transcript summary."
+    ),
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -192,6 +196,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "processing:read",
             "processing:retry",
             "fact:read",
+            "ask:query",
             "fact:extract",
             "evidence:read",
             "review-issue:read",
@@ -251,6 +256,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "speaker:read",
             "processing:read",
             "fact:read",
+            "ask:query",
             "evidence:read",
             "review-issue:read",
             "review-issue:resolve",
@@ -289,6 +295,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "processing:read",
             "processing:retry",
             "fact:read",
+            "ask:query",
             "fact:extract",
             "evidence:read",
             "review-issue:read",
@@ -317,6 +324,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "speaker:read",
             "processing:read",
             "fact:read",
+            "ask:query",
             "evidence:read",
             "review-issue:read",
             "document:read",
