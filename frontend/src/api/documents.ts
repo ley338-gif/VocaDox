@@ -91,7 +91,7 @@ export function approveDocument(conversationId: string, csrfToken: string): Prom
 
 export function documentExportUrl(
   conversationId: string,
-  format: "text" | "json" | "docx" | "pdf"
+  format: "text" | "json" | "docx" | "pdf" | "fhir"
 ): string {
   return `${API_PREFIX}/conversations/${conversationId}/document/export?format=${format}`;
 }

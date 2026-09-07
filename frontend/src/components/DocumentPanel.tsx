@@ -120,6 +120,13 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
               <a className={panelStyles.exportLink} href={documentExportUrl(conversationId, "pdf")}>
                 <Download size={16} aria-hidden="true" /> .pdf
               </a>
+              <a
+                className={panelStyles.exportLink}
+                href={documentExportUrl(conversationId, "fhir")}
+                title="FHIR R4 DocumentReference — für den Import in ein Praxisverwaltungs-/Klinikinformationssystem"
+              >
+                <Download size={16} aria-hidden="true" /> FHIR
+              </a>
             </>
           )}
         </div>

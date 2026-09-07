@@ -92,6 +92,78 @@ async def test_export_docx_and_pdf(client, seeded, processing_env) -> None:  # n
     assert resp.content[:4] == b"%PDF"
 
 
+async def test_export_fhir_document_reference(client, seeded, processing_env) -> None:  # noqa: ANN001
+    """Post-GA P3-1: a real FHIR R4 DocumentReference export."""
+    import base64
+
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id = await make_ready_conversation_with_transcript(
+        client, headers, seeded["org_a"], processing_env
+    )
+    _, sessionmaker, _queue, _storage = processing_env
+    async with sessionmaker() as session:
+        await seed_facts_with_contradiction_and_clean_fact(
+            session, conversation_id=uuid.UUID(conversation_id)
+        )
+    await client.patch(
+        f"/api/v1/conversations/{conversation_id}",
+        json={"external_reference": "PVS-4711", "external_reference_type": "patient-number"},
+        headers=headers,
+    )
+    await client.post(
+        f"/api/v1/conversations/{conversation_id}/participants",
+        json={"display_name": "Herr M.", "participant_type": "patient"},
+        headers=headers,
+    )
+    await client.post(
+        f"/api/v1/conversations/{conversation_id}/document/compose", json={}, headers=headers
+    )
+
+    resp = await client.get(
+        f"/api/v1/conversations/{conversation_id}/document/export?format=fhir", headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("application/fhir+json")
+    assert "attachment" in resp.headers["content-disposition"]
+
+    resource = resp.json()
+    assert resource["resourceType"] == "DocumentReference"
+    assert resource["status"] == "current"
+    assert resource["docStatus"] in ("preliminary", "final")
+    assert resource["description"] == "Processing test"
+    assert resource["subject"] == {"display": "Herr M."}
+    assert resource["identifier"] == [{"type": {"text": "patient-number"}, "value": "PVS-4711"}]
+    attachment = resource["content"][0]["attachment"]
+    assert attachment["contentType"] == "text/plain; charset=utf-8"
+    decoded = base64.b64decode(attachment["data"]).decode("utf-8")
+    assert "Ramipril" in decoded
+
+
+async def test_export_fhir_without_patient_participant_omits_subject(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id = await make_ready_conversation_with_transcript(
+        client, headers, seeded["org_a"], processing_env
+    )
+    _, sessionmaker, _queue, _storage = processing_env
+    async with sessionmaker() as session:
+        await seed_facts_with_contradiction_and_clean_fact(
+            session, conversation_id=uuid.UUID(conversation_id)
+        )
+    await client.post(
+        f"/api/v1/conversations/{conversation_id}/document/compose", json={}, headers=headers
+    )
+
+    resp = await client.get(
+        f"/api/v1/conversations/{conversation_id}/document/export?format=fhir", headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    resource = resp.json()
+    assert "subject" not in resource
+    assert "identifier" not in resource
+
+
 async def test_export_without_composed_document_is_409(client, seeded, processing_env) -> None:  # noqa: ANN001
     headers = await login(client, "alice", "a very strong password 123")
     conversation_id = await make_ready_conversation_with_transcript(

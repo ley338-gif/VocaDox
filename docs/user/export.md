@@ -10,6 +10,15 @@ can download it as:
   per statement, with the approval status and revision number shown at
   the top.
 - **.pdf** — the same content as a PDF.
+- **FHIR** — a FHIR R4 `DocumentReference` resource (`.json`), for
+  importing this document into a Praxisverwaltungssystem/Klinik­
+  informationssystem that accepts FHIR files. No patient identity is
+  claimed: the resource's subject is a free-text display name (from a
+  participant marked "Patient", if you've added one), never a real
+  patient-record reference. Nothing is sent anywhere automatically —
+  this is a downloadable file, exactly like the other formats; you (or
+  your practice's system administrator) import it into your target
+  system yourself.
 
 ## Recap
 
