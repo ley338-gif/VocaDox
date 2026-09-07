@@ -47,6 +47,10 @@ class PromptComparisonRequest(BaseModel):
     model_profile_id: uuid.UUID
 
 
+class VocabularyComparisonRequest(BaseModel):
+    conversation_id: uuid.UUID
+
+
 class EvaluationRunResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

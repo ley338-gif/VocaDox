@@ -1661,6 +1661,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/evaluation/vocabulary-comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Vocabulary Comparison Endpoint
+         * @description Post-GA P0-3: real speech-to-text on the given conversation's own
+         *     audio, with vs without its resolved custom vocabulary, measured by
+         *     Word Error Rate against the conversation's own reviewed transcript.
+         *     Requires the conversation to already have both an active, ready
+         *     transcript AND a configured vocabulary for its organization/template
+         *     — otherwise there is nothing meaningful to compare.
+         */
+        post: operations["run_vocabulary_comparison_endpoint_api_v1_admin_evaluation_vocabulary_comparison_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/model-profiles/{model_profile_id}/lifecycle": {
         parameters: {
             query?: never;
@@ -2316,6 +2341,42 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vocabulary Endpoint */
+        get: operations["list_vocabulary_endpoint_api_v1_vocabulary_get"];
+        put?: never;
+        /** Create Vocabulary Endpoint */
+        post: operations["create_vocabulary_endpoint_api_v1_vocabulary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/vocabulary/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Vocabulary Endpoint */
+        delete: operations["delete_vocabulary_endpoint_api_v1_vocabulary__entry_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Vocabulary Endpoint */
+        patch: operations["update_vocabulary_endpoint_api_v1_vocabulary__entry_id__patch"];
         trace?: never;
     };
 }
@@ -4880,6 +4941,65 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VocabularyComparisonRequest */
+        VocabularyComparisonRequest: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+        };
+        /** VocabularyCreateRequest */
+        VocabularyCreateRequest: {
+            /** Template Id */
+            template_id?: string | null;
+            /** Name */
+            name: string;
+            /** Terms */
+            terms?: string[];
+            /** Initial Prompt */
+            initial_prompt?: string | null;
+        };
+        /** VocabularyResponse */
+        VocabularyResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Template Id */
+            template_id: string | null;
+            /** Name */
+            name: string;
+            /** Terms */
+            terms: string[];
+            /** Initial Prompt */
+            initial_prompt: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** VocabularyUpdateRequest */
+        VocabularyUpdateRequest: {
+            /** Name */
+            name?: string | null;
+            /** Terms */
+            terms?: string[] | null;
+            /** Initial Prompt */
+            initial_prompt?: string | null;
         };
         /** WebhookCreateRequest */
         WebhookCreateRequest: {
@@ -8523,6 +8643,39 @@ export interface operations {
             };
         };
     };
+    run_vocabulary_comparison_endpoint_api_v1_admin_evaluation_vocabulary_comparison_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VocabularyComparisonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_model_lifecycle_endpoint_api_v1_admin_model_profiles__model_profile_id__lifecycle_get: {
         parameters: {
             query?: never;
@@ -9849,6 +10002,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vocabulary_endpoint_api_v1_vocabulary_get: {
+        parameters: {
+            query: {
+                organization_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VocabularyResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_vocabulary_endpoint_api_v1_vocabulary_post: {
+        parameters: {
+            query: {
+                organization_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VocabularyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VocabularyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_vocabulary_endpoint_api_v1_vocabulary__entry_id__delete: {
+        parameters: {
+            query: {
+                organization_id: string;
+            };
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_vocabulary_endpoint_api_v1_vocabulary__entry_id__patch: {
+        parameters: {
+            query: {
+                organization_id: string;
+            };
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VocabularyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VocabularyResponse"];
                 };
             };
             /** @description Validation Error */

@@ -65,6 +65,7 @@ export const ADMIN_SECTIONS: NavSection[] = [
       { to: "/admin/diarization", label: "Diarisierung", icon: Cpu, permission: "provider:read" },
       { to: "/admin/profiles", label: "Verarbeitungsprofile", icon: Cpu, permission: "processing-profile:read" },
       { to: "/admin/prompts", label: "Prompts", icon: Cpu, permission: "template:read" },
+      { to: "/admin/vocabulary", label: "Fachwortschatz", icon: Cpu, permission: "vocabulary:read" },
     ],
   },
   {

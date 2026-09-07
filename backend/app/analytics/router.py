@@ -22,10 +22,12 @@ from app.analytics.schemas import (
     PromptComparisonRequest,
     QualityMetricsResponse,
     TechnicalAnalyticsResponse,
+    VocabularyComparisonRequest,
 )
 from app.analytics.service import (
     IncompleteChecklistError,
     InvalidLifecycleTransitionError,
+    VocabularyComparisonNotPossibleError,
     correction_metrics,
     get_evaluation_run,
     list_evaluation_runs,
@@ -34,14 +36,19 @@ from app.analytics.service import (
     quality_metrics,
     run_model_comparison,
     run_prompt_comparison,
+    run_vocabulary_comparison,
     technical_analytics,
     transition_model_lifecycle,
 )
 from app.audit.service import record_event
+from app.core.ai_providers import get_speech_provider
+from app.core.storage import get_storage_provider
 from app.identity.deps import require_csrf, require_permission
 from app.identity.models import User
 from app.platform.db.session import get_session
 from app.profiles.models import ModelProfile
+from app.providers.speech_to_text import SpeechToTextProvider
+from app.providers.storage import StorageProvider
 from app.templates.models import PromptVersion
 
 router = APIRouter(prefix="/admin", tags=["analytics"])
@@ -208,6 +215,51 @@ async def run_prompt_comparison_endpoint(
         event_metadata={
             "evaluation_run_id": str(run.id),
             "run_type": EvaluationRunType.PROMPT_COMPARISON.value,
+            "status": run.status,
+        },
+    )
+    await db.commit()
+    await db.refresh(run)
+    return EvaluationRunResponse.model_validate(run)
+
+
+@router.post(
+    "/evaluation/vocabulary-comparison",
+    response_model=EvaluationRunResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def run_vocabulary_comparison_endpoint(
+    payload: VocabularyComparisonRequest,
+    actor: User = Depends(_require_evaluation_run),
+    db: AsyncSession = Depends(get_session),
+    storage: StorageProvider = Depends(get_storage_provider),
+    speech_provider: SpeechToTextProvider = Depends(get_speech_provider),
+    _csrf: None = Depends(require_csrf),
+) -> EvaluationRunResponse:
+    """Post-GA P0-3: real speech-to-text on the given conversation's own
+    audio, with vs without its resolved custom vocabulary, measured by
+    Word Error Rate against the conversation's own reviewed transcript.
+    Requires the conversation to already have both an active, ready
+    transcript AND a configured vocabulary for its organization/template
+    — otherwise there is nothing meaningful to compare."""
+    try:
+        run = await run_vocabulary_comparison(
+            db,
+            storage,
+            speech_provider,
+            conversation_id=payload.conversation_id,
+            actor_user_id=actor.id,
+        )
+    except VocabularyComparisonNotPossibleError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await record_event(
+        db,
+        event_type="evaluation_run.completed",
+        user_id=actor.id,
+        username=actor.username,
+        event_metadata={
+            "evaluation_run_id": str(run.id),
+            "run_type": EvaluationRunType.VOCABULARY_COMPARISON.value,
             "status": run.status,
         },
     )

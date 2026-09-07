@@ -618,6 +618,68 @@ async def test_worker_lease_expiry_reclaims_stale_running_job(seeded, processing
         assert reclaimed[0].error_code == "WORKER_LEASE_EXPIRED"
 
 
+async def test_custom_vocabulary_is_passed_to_speech_provider(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """Post-GA P0-3: an organization-wide vocabulary entry's terms/prompt
+    reach `SpeechToTextProvider.transcribe()` as hotwords/initial_prompt
+    -- FakeSpeechProvider stays deterministic (ignores them), so this
+    only proves the wiring, not any real ASR effect."""
+    import uuid as _uuid
+
+    from app.processing.models import ProcessingJob as _ProcessingJob
+    from app.processing.orchestrator import execute_transcribe
+    from app.providers.speech_to_text import FakeSpeechProvider, TranscriptionResult
+
+    class _CapturingSpeechProvider(FakeSpeechProvider):
+        def __init__(self) -> None:
+            self.calls: list[dict] = []
+
+        async def transcribe(
+            self, media_path, *, language_hint=None, hotwords=None, initial_prompt=None  # noqa: ANN001
+        ) -> TranscriptionResult:
+            self.calls.append({"hotwords": hotwords, "initial_prompt": initial_prompt})
+            return await super().transcribe(
+                media_path,
+                language_hint=language_hint,
+                hotwords=hotwords,
+                initial_prompt=initial_prompt,
+            )
+
+    headers = await login(client, "carol", "yet another strong pw 789")
+    _, sessionmaker, queue, storage = processing_env
+    conversation_id, media_id = await create_conversation_with_source_audio(
+        client, headers, organization_id=seeded["org_a"]
+    )
+    await client.post(
+        f"/api/v1/vocabulary?organization_id={seeded['org_a']}",
+        json={
+            "name": "Org-weit",
+            "terms": ["Ramipril", "Metoprolol"],
+            "initial_prompt": "Arztgespräch.",
+        },
+        headers=headers,
+    )
+
+    await _process_and_wait(client, headers, conversation_id)
+    await run_all_jobs(sessionmaker, queue, storage)
+
+    capturing = _CapturingSpeechProvider()
+    async with sessionmaker() as session:
+        job = _ProcessingJob(
+            conversation_id=_uuid.UUID(conversation_id),
+            source_media_id=_uuid.UUID(media_id),
+            job_type="transcribe",
+            job_metadata={},
+        )
+        await execute_transcribe(session, storage, capturing, job)
+        await session.commit()
+
+    assert len(capturing.calls) == 1
+    assert capturing.calls[0]["hotwords"] == "Ramipril Metoprolol"
+    assert capturing.calls[0]["initial_prompt"] == "Arztgespräch."
+
+
 async def test_transcript_export_srt_and_vtt(client, seeded, processing_env) -> None:  # noqa: ANN001
     """Post-GA P0-2: SRT/VTT export from the same alignment timestamps
     already used for JSON/markdown/text export."""

@@ -35,16 +35,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.analytics.eval_engine import EvalSubject, run_eval_subject
 from app.analytics.fixtures import FIXTURE_KEY
 from app.analytics.models import EvaluationRun, EvaluationRunType, ModelProfileLifecycleEvent
+from app.analytics.wer import word_error_rate
+from app.conversations.models import Conversation
 from app.core.ai_providers import get_llm_provider_for_model_identifier
 from app.intelligence.models import ExtractedFact, FactCorrection, FactReviewStatus
 from app.intelligence.prompts import SYSTEM_PROMPT, get_builtin_category_instruction
 from app.intelligence.schemas import EXTRACTION_CATEGORIES
+from app.media.models import MediaAsset, MediaKind
 from app.processing.models import JobType, ProcessingJob, ProcessingStatus
 from app.profiles.models import ModelLifecycleStatus, ModelProfile
+from app.profiles.resolver import NoSystemDefaultProfileError, resolve_effective_config
 from app.providers.llm import LLMProvider
+from app.providers.speech_to_text import SpeechToTextProvider
+from app.providers.storage import StorageProvider
 from app.review.models import ReviewIssue
 from app.templates.models import PromptVersion
 from app.transcription.models import TranscriptSegment, TranscriptSegmentCorrection
+from app.transcription.service import get_active_ready_transcript, list_segments
+from app.vocabulary.service import resolve_vocabulary, vocabulary_to_hotwords
 
 
 def _builtin_category_instructions() -> dict[str, str]:
@@ -371,6 +379,122 @@ async def run_prompt_comparison(
         run.result_b = result_b.as_public_dict()
         run.status = "completed"
     except Exception as exc:  # noqa: BLE001
+        run.status = "failed"
+        run.error_message_safe = f"{type(exc).__name__}: {exc}"[:1000]
+    run.created_by_user_id = actor_user_id
+    run.completed_at = datetime.now(UTC)
+    await db.flush()
+    return run
+
+
+class VocabularyComparisonNotPossibleError(ValueError):
+    """Raised when the given conversation has no active, ready transcript
+    to use as ground truth for a vocabulary comparison."""
+
+
+async def run_vocabulary_comparison(
+    db: AsyncSession,
+    storage: StorageProvider,
+    speech_provider: SpeechToTextProvider,
+    *,
+    conversation_id: uuid.UUID,
+    actor_user_id: uuid.UUID | None,
+) -> EvaluationRun:
+    """Runs the SAME real audio through the SAME speech provider twice --
+    once with no vocabulary, once with this conversation's org/template-
+    resolved vocabulary applied (app.vocabulary.service.resolve_vocabulary)
+    -- and measures Word Error Rate (app.analytics.wer) against the
+    conversation's own already-reviewed transcript as ground truth. This
+    is the one Evaluation Lab comparison type that exercises a real
+    provider on real audio rather than the synthetic text fixture every
+    other comparison type uses -- vocabulary/hotwords only affect ASR
+    decoding, not text-based fact extraction, so there is no meaningful
+    way to measure its effect without doing exactly this."""
+    conversation = await db.get(Conversation, conversation_id)
+    if conversation is None:
+        raise VocabularyComparisonNotPossibleError("conversation not found")
+
+    source_media_result = await db.execute(
+        select(MediaAsset)
+        .where(
+            MediaAsset.conversation_id == conversation_id,
+            MediaAsset.kind == MediaKind.SOURCE_AUDIO.value,
+            MediaAsset.deleted_at.is_(None),
+        )
+        .order_by(MediaAsset.created_at.desc())
+    )
+    source_media = source_media_result.scalars().first()
+    if source_media is None:
+        raise VocabularyComparisonNotPossibleError("no source audio for this conversation")
+
+    transcript = await get_active_ready_transcript(db, source_media_id=source_media.id)
+    if transcript is None:
+        raise VocabularyComparisonNotPossibleError(
+            "no active, ready transcript for this conversation"
+        )
+    segments = await list_segments(db, transcript_id=transcript.id)
+    ground_truth = " ".join(s.corrected_text or s.original_text for s in segments)
+    if not ground_truth.strip():
+        raise VocabularyComparisonNotPossibleError("transcript has no content to compare against")
+
+    normalized_result = await db.execute(
+        select(MediaAsset)
+        .where(
+            MediaAsset.conversation_id == conversation_id,
+            MediaAsset.kind == MediaKind.NORMALIZED_AUDIO.value,
+            MediaAsset.deleted_at.is_(None),
+        )
+        .order_by(MediaAsset.created_at.desc())
+    )
+    normalized_media = normalized_result.scalars().first()
+    if normalized_media is None:
+        raise VocabularyComparisonNotPossibleError("no normalized audio for this conversation")
+    path = await storage.open_path(normalized_media.storage_key)
+
+    vocabulary_entry = None
+    try:
+        effective = await resolve_effective_config(db, conversation)
+        vocabulary_entry = await resolve_vocabulary(
+            db, organization_id=conversation.organization_id, template_id=effective.template_id
+        )
+    except NoSystemDefaultProfileError:
+        pass
+    if vocabulary_entry is None:
+        raise VocabularyComparisonNotPossibleError(
+            "no custom vocabulary configured for this conversation's organization/template"
+        )
+
+    run = EvaluationRun(
+        run_type=EvaluationRunType.VOCABULARY_COMPARISON.value,
+        fixture_key=f"conversation:{conversation_id}",
+        subject_a={"kind": "vocabulary", "label": "ohne Glossar", "vocabulary_entry_id": None},
+        subject_b={
+            "kind": "vocabulary",
+            "label": "mit Glossar",
+            **vocabulary_entry.as_snapshot(),
+        },
+    )
+    db.add(run)
+    await db.flush()
+
+    try:
+        without = await speech_provider.transcribe(str(path), language_hint=transcript.language)
+        hypothesis_without = " ".join(seg.text for seg in without.segments)
+
+        with_vocab = await speech_provider.transcribe(
+            str(path),
+            language_hint=transcript.language,
+            hotwords=vocabulary_to_hotwords(vocabulary_entry),
+            initial_prompt=vocabulary_entry.initial_prompt,
+        )
+        hypothesis_with = " ".join(seg.text for seg in with_vocab.segments)
+
+        wer_without = round(word_error_rate(ground_truth, hypothesis_without), 4)
+        wer_with = round(word_error_rate(ground_truth, hypothesis_with), 4)
+        run.result_a = {"word_error_rate": wer_without}
+        run.result_b = {"word_error_rate": wer_with}
+        run.status = "completed"
+    except Exception as exc:  # noqa: BLE001 - a failed comparison must be visible, not raised
         run.status = "failed"
         run.error_message_safe = f"{type(exc).__name__}: {exc}"[:1000]
     run.created_by_user_id = actor_user_id

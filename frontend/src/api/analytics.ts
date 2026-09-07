@@ -102,15 +102,19 @@ export interface EvalResult {
   error: string | null;
 }
 
+export interface VocabularyEvalResult {
+  word_error_rate: number;
+}
+
 export interface EvaluationRun {
   id: string;
-  run_type: "model_comparison" | "prompt_comparison";
+  run_type: "model_comparison" | "prompt_comparison" | "vocabulary_comparison";
   status: "running" | "completed" | "failed";
   fixture_key: string;
   subject_a: Record<string, unknown>;
   subject_b: Record<string, unknown>;
-  result_a: EvalResult | null;
-  result_b: EvalResult | null;
+  result_a: EvalResult | VocabularyEvalResult | null;
+  result_b: EvalResult | VocabularyEvalResult | null;
   error_message_safe: string | null;
   created_at: string;
   completed_at: string | null;
@@ -152,6 +156,16 @@ export function runPromptComparison(
       },
       csrfToken
     )
+  );
+}
+
+export function runVocabularyComparison(
+  conversationId: string,
+  csrfToken: string
+): Promise<EvaluationRun> {
+  return request(
+    "/admin/evaluation/vocabulary-comparison",
+    jsonInit("POST", { conversation_id: conversationId }, csrfToken)
   );
 }
 

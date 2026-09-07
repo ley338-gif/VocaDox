@@ -150,6 +150,11 @@ PERMISSIONS: dict[str, str] = {
     "recap:read": "View the shareable participant-facing recap for a conversation.",
     "recap:generate": "Generate or regenerate the AI-drafted shareable recap for a conversation.",
     "recap:approve": "Approve a shareable recap as ready to share.",
+    "vocabulary:read": "View an organization's custom transcription vocabulary (hotwords/prompt).",
+    "vocabulary:manage": (
+        "Create, edit, and delete an organization's custom transcription vocabulary, "
+        "organization-wide or per template."
+    ),
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -211,6 +216,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "recap:read",
             "recap:generate",
             "recap:approve",
+            "vocabulary:read",
+            "vocabulary:manage",
         ],
     ),
     "Template Manager": (
@@ -228,6 +235,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "conversation:read",
             "analytics:read",
             "evaluation:run",
+            "vocabulary:read",
+            "vocabulary:manage",
         ],
     ),
     "Reviewer": (

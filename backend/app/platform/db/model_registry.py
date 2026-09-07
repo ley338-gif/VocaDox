@@ -73,3 +73,7 @@ from app.review import models as _review_models  # noqa: F401,E402
 from app.search import models as _search_models  # noqa: F401,E402
 from app.templates import models as _templates_models  # noqa: F401,E402
 from app.transcription import models as _transcription_models  # noqa: F401,E402
+
+# Post-GA (P0-3): vocabulary_entries FK-references organizations.id/
+# templates.id/users.id -- imported after those.
+from app.vocabulary import models as _vocabulary_models  # noqa: F401,E402

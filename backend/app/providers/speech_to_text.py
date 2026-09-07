@@ -82,8 +82,17 @@ class SpeechToTextProvider(ABC):
 
     @abstractmethod
     async def transcribe(
-        self, media_path: str, *, language_hint: str | None = None
+        self,
+        media_path: str,
+        *,
+        language_hint: str | None = None,
+        hotwords: str | None = None,
+        initial_prompt: str | None = None,
     ) -> TranscriptionResult:
+        """`hotwords`/`initial_prompt` (post-GA P0-3) carry an org/
+        template-resolved custom vocabulary (app.vocabulary.service
+        .resolve_vocabulary) straight through to the underlying model,
+        unmodified -- never reinterpreted or scored here."""
         raise NotImplementedError
 
     @abstractmethod
@@ -92,10 +101,17 @@ class SpeechToTextProvider(ABC):
 
 
 class FakeSpeechProvider(SpeechToTextProvider):
-    """Deterministic synthetic transcription for tests and local dev."""
+    """Deterministic synthetic transcription for tests and local dev --
+    accepts `hotwords`/`initial_prompt` (so pipeline wiring can be tested)
+    but never lets them change the output, staying fully deterministic."""
 
     async def transcribe(
-        self, media_path: str, *, language_hint: str | None = None
+        self,
+        media_path: str,
+        *,
+        language_hint: str | None = None,
+        hotwords: str | None = None,
+        initial_prompt: str | None = None,
     ) -> TranscriptionResult:
         return TranscriptionResult(
             segments=[
@@ -213,7 +229,12 @@ class FasterWhisperSpeechProvider(SpeechToTextProvider):
         return self._model
 
     async def transcribe(
-        self, media_path: str, *, language_hint: str | None = None
+        self,
+        media_path: str,
+        *,
+        language_hint: str | None = None,
+        hotwords: str | None = None,
+        initial_prompt: str | None = None,
     ) -> TranscriptionResult:
         import asyncio
 
@@ -225,6 +246,8 @@ class FasterWhisperSpeechProvider(SpeechToTextProvider):
                 beam_size=self._config.beam_size,
                 vad_filter=self._config.vad_filter,
                 word_timestamps=True,
+                hotwords=hotwords,
+                initial_prompt=initial_prompt,
             )
             segments: list[TranscriptSegment] = []
             for i, seg in enumerate(segments_iter):
