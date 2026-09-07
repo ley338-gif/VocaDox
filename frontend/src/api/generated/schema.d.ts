@@ -668,6 +668,55 @@ export interface paths {
         patch: operations["assign_speaker_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/speakers/{speaker_id}/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enroll Speaker Voiceprint Endpoint
+         * @description Explicit human action: "this detected speaker's voice really is
+         *     this known person" — folds the speaker's embedding into that
+         *     KnownSpeaker's running-average voiceprint (app.people.service.
+         *     enroll_voiceprint). Requires both speaker:assign (conversation-scoped)
+         *     and known-speaker:manage (this mutates an org-wide KnownSpeaker),
+         *     mirroring the same two-permission gate the frontend already applies
+         *     to "remember as known person".
+         */
+        post: operations["enroll_speaker_voiceprint_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__enroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/speakers/{speaker_id}/accept-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Speaker Suggestion Endpoint
+         * @description Turns a pending confidence-scored suggestion into a real assignment
+         *     — same permission as any other manual assignment, since that's what
+         *     this ultimately is; the suggestion only pre-fills *which* KnownSpeaker,
+         *     never assigns anything by itself.
+         */
+        post: operations["accept_speaker_suggestion_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__accept_suggestion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/process/extract": {
         parameters: {
             query?: never;
@@ -2831,6 +2880,12 @@ export interface components {
             assigned_by_user_id: string | null;
             /** Assigned At */
             assigned_at: string | null;
+            /** Has Voiceprint */
+            has_voiceprint: boolean;
+            /** Suggested Known Speaker Id */
+            suggested_known_speaker_id: string | null;
+            /** Suggested Confidence */
+            suggested_confidence: number | null;
             /**
              * Created At
              * Format: date-time
@@ -3246,6 +3301,10 @@ export interface components {
             display_name: string;
             /** Notes */
             notes: string | null;
+            /** Has Voiceprint */
+            has_voiceprint: boolean;
+            /** Voiceprint Sample Count */
+            voiceprint_sample_count: number;
             /**
              * Created At
              * Format: date-time
@@ -4671,6 +4730,14 @@ export interface components {
             participant_id?: string | null;
             /** Display Label */
             display_label?: string | null;
+        };
+        /** SpeakerEnrollRequest */
+        SpeakerEnrollRequest: {
+            /**
+             * Known Speaker Id
+             * Format: uuid
+             */
+            known_speaker_id: string;
         };
         /** SpeechProviderStatusResponse */
         SpeechProviderStatusResponse: {
@@ -6807,6 +6874,74 @@ export interface operations {
                 "application/json": components["schemas"]["SpeakerAssignmentRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectedSpeakerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enroll_speaker_voiceprint_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__enroll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                speaker_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeakerEnrollRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectedSpeakerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_speaker_suggestion_endpoint_api_v1_conversations__conversation_id__speakers__speaker_id__accept_suggestion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                speaker_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

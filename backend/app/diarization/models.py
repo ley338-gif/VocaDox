@@ -8,6 +8,17 @@ a real identified person. Mapping a DetectedSpeaker to a real
 explicit human action recorded here — never automatic, never voice
 biometric identification.
 
+Post-GA P1-2 adds `embedding` (the diarization provider's raw per-speaker
+voice embedding, when available) plus `suggested_known_speaker_id`/
+`suggested_confidence` — a *candidate* match against an organization's
+enrolled `KnownSpeaker` voiceprints (app.diarization.service.
+suggest_known_speakers), always confidence-scored and always requiring an
+explicit human accept (app.diarization.service.accept_suggestion) before
+it becomes a real `participant_id` assignment. The suggestion fields are
+themselves never voice-biometric identification of a person — they are
+computer-generated hints a human must confirm, same as every other
+assignment on this model.
+
 `DiarizationSegment` rows are the raw normalized diarization-provider
 output (see app.providers.diarization.DiarizationResult) persisted for
 provenance/replay; `TranscriptSegment.speaker_id` (set by alignment) is
@@ -20,7 +31,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, String, Uuid, func
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.db.session import Base
@@ -50,12 +61,22 @@ class DetectedSpeaker(Base):
     )
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    embedding: Mapped[list[float] | None] = mapped_column(JSON, nullable=True)
+    suggested_known_speaker_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("known_speakers.id", ondelete="SET NULL"), nullable=True
+    )
+    suggested_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+    @property
+    def has_voiceprint(self) -> bool:
+        return self.embedding is not None
 
 
 class DiarizationSegment(Base):
