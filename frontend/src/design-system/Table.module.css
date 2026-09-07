@@ -90,3 +90,9 @@
 .table td { padding: 17px 18px; line-height: 1.6; }
 .table tbody tr:hover td { background: color-mix(in srgb, var(--accent) 4%, var(--surface-raised)); }
 .wrapper { box-shadow: var(--shadow-sm); }
+
+/* Empty/error messages remain readable without horizontal scrolling on phones. */
+@media (max-width: 600px) {
+  .table:has(.statusCell) { table-layout: fixed; }
+  .table:has(.statusCell) thead { display: none; }
+}
