@@ -1,10 +1,11 @@
 /**
  * React hook wiring real browser recording APIs (`getUserMedia`,
- * `MediaRecorder`, Web Audio `AnalyserNode` for the level meter) onto the
- * pure `recordingMachine` state transitions. Feature-detects before doing
- * anything — see `isRecordingSupported()` — and never auto-starts a
- * recording; `requestPermission()`/`start()` are both explicit user
- * actions wired to button clicks in RecordingWorkspace.
+ * `getDisplayMedia`, `MediaRecorder`, Web Audio `AnalyserNode` for the
+ * level meter) onto the pure `recordingMachine` state transitions.
+ * Feature-detects before doing anything — see `isRecordingSupported()` —
+ * and never auto-starts a recording; `requestPermission()`/`start()` are
+ * both explicit user actions wired to button clicks in
+ * RecordingWorkspace.
  *
  * Browser compatibility (documented, not just implemented): tested against
  * current Chrome/Edge (Chromium) and Firefox, which both record
@@ -12,6 +13,17 @@
  * support is inconsistent across versions — `isRecordingSupported()`
  * returns false there today rather than silently producing an
  * unplayable/mislabeled file; see docs/user/recording.md.
+ *
+ * Post-GA P2-2: `source: "system-audio"` captures a shared tab/screen's
+ * audio (`getDisplayMedia`) instead of the microphone — e.g. a video
+ * call already running in the browser, entirely client-side. VocaDox
+ * remains deliberately bot-free: this never joins a meeting on the
+ * user's behalf, it only captures audio from a source the user
+ * explicitly picks in the browser's own share-picker UI, same as
+ * microphone capture requires an explicit permission grant. Chromium
+ * requires `video: true` alongside `audio: true` for the share-audio
+ * checkbox to reliably appear at all — the video track is stopped
+ * immediately and never recorded (see `start()`).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -23,11 +35,18 @@ export interface Marker {
   label?: string;
 }
 
+export type AudioSource = "microphone" | "system-audio";
+
 export function isRecordingSupported(): boolean {
   if (typeof navigator === "undefined" || typeof window === "undefined") return false;
   const hasGetUserMedia = Boolean(navigator.mediaDevices?.getUserMedia);
   const hasMediaRecorder = typeof window.MediaRecorder !== "undefined";
   return hasGetUserMedia && hasMediaRecorder;
+}
+
+export function isSystemAudioCaptureSupported(): boolean {
+  if (!isRecordingSupported()) return false;
+  return Boolean(navigator.mediaDevices?.getDisplayMedia);
 }
 
 export function preferredMimeType(): string | undefined {
@@ -83,23 +102,52 @@ export function useRecorder() {
     rafRef.current = requestAnimationFrame(tick);
   }, []);
 
-  const requestPermission = useCallback(async () => {
-    if (!isRecordingSupported()) {
-      dispatch({ type: "UNSUPPORTED" });
-      return;
-    }
-    dispatch({ type: "REQUEST_PERMISSION" });
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      stream.getAudioTracks().forEach((track) => {
-        track.addEventListener("ended", () => dispatch({ type: "DEVICE_DISCONNECTED" }));
-      });
-      dispatch({ type: "PERMISSION_GRANTED" });
-    } catch {
-      dispatch({ type: "PERMISSION_DENIED" });
-    }
-  }, [dispatch]);
+  const requestPermission = useCallback(
+    async (source: AudioSource = "microphone") => {
+      if (!isRecordingSupported()) {
+        dispatch({ type: "UNSUPPORTED" });
+        return;
+      }
+      if (source === "system-audio" && !isSystemAudioCaptureSupported()) {
+        dispatch({ type: "UNSUPPORTED" });
+        return;
+      }
+      dispatch({ type: "REQUEST_PERMISSION" });
+      try {
+        let rawStream: MediaStream;
+        if (source === "system-audio") {
+          // Chromium reliably shows the "share tab audio" checkbox only
+          // when video is also requested — the video track is discarded
+          // immediately below, never recorded or displayed.
+          rawStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          rawStream.getVideoTracks().forEach((track) => track.stop());
+          if (rawStream.getAudioTracks().length === 0) {
+            rawStream.getTracks().forEach((track) => track.stop());
+            setErrorMessage(
+              "Es wurde kein Audio freigegeben. Aktivieren Sie im Freigabedialog des Browsers " +
+                '"Tab-Audio freigeben" (oder das Äquivalent Ihres Systems) und wählen Sie den ' +
+                "Tab bzw. Bildschirm mit dem gewünschten Ton."
+            );
+            dispatch({ type: "PERMISSION_DENIED" });
+            return;
+          }
+          // Recorded/analyzed stream is audio-only from here on — the
+          // (already-stopped) video track must never reach MediaRecorder.
+          rawStream = new MediaStream(rawStream.getAudioTracks());
+        } else {
+          rawStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+        streamRef.current = rawStream;
+        rawStream.getAudioTracks().forEach((track) => {
+          track.addEventListener("ended", () => dispatch({ type: "DEVICE_DISCONNECTED" }));
+        });
+        dispatch({ type: "PERMISSION_GRANTED" });
+      } catch {
+        dispatch({ type: "PERMISSION_DENIED" });
+      }
+    },
+    [dispatch]
+  );
 
   const start = useCallback(() => {
     const stream = streamRef.current;
@@ -116,7 +164,7 @@ export function useRecorder() {
       if (event.data.size > 0) chunksRef.current.push(event.data);
     };
     recorder.onerror = () => {
-      setErrorMessage("Recording device error — the recording has been stopped.");
+      setErrorMessage("Fehler am Aufnahmegerät — die Aufnahme wurde gestoppt.");
       dispatch({ type: "RECORDER_ERROR" });
     };
     recorder.onstop = () => {

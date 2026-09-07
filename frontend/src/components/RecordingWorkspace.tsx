@@ -5,7 +5,12 @@ import { ApiError } from "../api/client";
 import { addMarker, finalizeRecording } from "../api/conversations";
 import { Button } from "../design-system/Button";
 import { useLiveTranscript } from "../recording/useLiveTranscript";
-import { isRecordingSupported, useRecorder } from "../recording/useRecorder";
+import {
+  type AudioSource,
+  isRecordingSupported,
+  isSystemAudioCaptureSupported,
+  useRecorder,
+} from "../recording/useRecorder";
 import styles from "./RecordingWorkspace.module.css";
 
 // Mirrors the backend's default `recording_consent_notice` setting
@@ -13,7 +18,7 @@ import styles from "./RecordingWorkspace.module.css";
 // from an admin-configurable endpoint — see docs/admin/recording-policy.md
 // for the deferred "make this editable in the UI" follow-up.
 const CONSENT_NOTICE =
-  "Confirm that required consent/authorization for this recording has been obtained.";
+  "Bestätigen Sie, dass die erforderliche Einwilligung/Genehmigung für diese Aufnahme eingeholt wurde.";
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -32,6 +37,7 @@ export function RecordingWorkspace({
   onFinalized: () => void;
 }) {
   const [consentGiven, setConsentGiven] = useState(false);
+  const [audioSource, setAudioSource] = useState<AudioSource>("microphone");
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const recorder = useRecorder();
   const live = useLiveTranscript(
@@ -45,9 +51,9 @@ export function RecordingWorkspace({
     return (
       <div className={styles.workspace} role="alert">
         <div className={styles.errorBanner}>
-          <AlertTriangle size={16} aria-hidden="true" /> Recording isn&apos;t supported in this
-          browser. Try a recent Chrome, Edge, or Firefox — or use &quot;Upload audio&quot;
-          instead.
+          <AlertTriangle size={16} aria-hidden="true" /> Aufnahme wird in diesem Browser nicht
+          unterstützt. Verwenden Sie einen aktuellen Chrome, Edge oder Firefox — oder nutzen Sie
+          stattdessen &quot;Audio hochladen&quot;.
         </div>
       </div>
     );
@@ -59,22 +65,47 @@ export function RecordingWorkspace({
         <div className={styles.consentBox}>
           <p>{CONSENT_NOTICE}</p>
           <p className={styles.consentDisclaimer}>
-            This confirmation does not by itself make the recording legally compliant. Consent
-            and other legal obligations remain the responsibility of your organization/operator.
+            Diese Bestätigung allein macht die Aufnahme noch nicht rechtskonform. Einwilligung und
+            weitere rechtliche Pflichten liegen weiterhin in der Verantwortung Ihrer Organisation.
           </p>
+          {isSystemAudioCaptureSupported() && (
+            <fieldset className={styles.sourcePicker}>
+              <legend>Audioquelle</legend>
+              <label>
+                <input
+                  type="radio"
+                  name="audio-source"
+                  checked={audioSource === "microphone"}
+                  onChange={() => setAudioSource("microphone")}
+                />{" "}
+                Mikrofon
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="audio-source"
+                  checked={audioSource === "system-audio"}
+                  onChange={() => setAudioSource("system-audio")}
+                />{" "}
+                Ton von Tab/Bildschirm (z. B. ein bereits laufendes Video-Meeting im Browser) —
+                VocaDox tritt niemals selbst einem Meeting bei; Sie wählen im Freigabedialog Ihres
+                Browsers selbst, welcher Tab/Bildschirm erfasst wird.
+              </label>
+            </fieldset>
+          )}
           <div className={styles.controls}>
             <Button variant="secondary" type="button" onClick={() => onFinalized()}>
-              Cancel
+              Abbrechen
             </Button>
             <Button
               variant="primary"
               type="button"
               onClick={() => {
                 setConsentGiven(true);
-                void recorder.requestPermission();
+                void recorder.requestPermission(audioSource);
               }}
             >
-              Start recording
+              Aufnahme starten
             </Button>
           </div>
         </div>
@@ -103,7 +134,7 @@ export function RecordingWorkspace({
       live.reset();
       onFinalized();
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : "Upload failed.";
+      const message = error instanceof ApiError ? error.message : "Hochladen fehlgeschlagen.";
       recorder.uploadFailed(message);
     }
   }
@@ -112,17 +143,24 @@ export function RecordingWorkspace({
     <div className={styles.workspace}>
       {recorder.state === "permission-denied" && (
         <div className={styles.errorBanner} role="alert">
-          <AlertTriangle size={16} aria-hidden="true" /> Microphone access was denied. Allow
-          microphone access in your browser settings, then try again.
+          <AlertTriangle size={16} aria-hidden="true" />{" "}
+          {recorder.errorMessage ??
+            (audioSource === "system-audio"
+              ? "Freigabe von Tab/Bildschirm wurde verweigert oder abgebrochen. Versuchen Sie es erneut und wählen Sie einen Tab/Bildschirm zur Freigabe."
+              : "Mikrofonzugriff wurde verweigert. Erlauben Sie den Mikrofonzugriff in Ihren Browser-Einstellungen und versuchen Sie es erneut.")}
           <div style={{ marginTop: "var(--space-2)" }}>
-            <Button variant="secondary" type="button" onClick={() => void recorder.requestPermission()}>
-              Try again
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => void recorder.requestPermission(audioSource)}
+            >
+              Erneut versuchen
             </Button>
           </div>
         </div>
       )}
 
-      {recorder.errorMessage && (
+      {recorder.errorMessage && recorder.state !== "permission-denied" && (
         <div className={styles.errorBanner} role="alert">
           <AlertTriangle size={16} aria-hidden="true" /> {recorder.errorMessage}
         </div>
@@ -137,7 +175,8 @@ export function RecordingWorkspace({
             fill={recorder.state === "recording" ? "var(--color-danger)" : "none"}
           />
           <span aria-live="polite">
-            {recorder.state === "recording" ? "Recording" : "Paused"} — {formatElapsed(recorder.elapsedMs)}
+            {recorder.state === "recording" ? "Aufnahme läuft" : "Pausiert"} —{" "}
+            {formatElapsed(recorder.elapsedMs)}
           </span>
           <div className={styles.levelMeterTrack} aria-hidden="true">
             <div
@@ -151,34 +190,54 @@ export function RecordingWorkspace({
       <div className={styles.controls}>
         {recorder.state === "ready" && (
           <Button variant="primary" type="button" onClick={recorder.start}>
-            <Circle size={16} aria-hidden="true" /> Record
+            <Circle size={16} aria-hidden="true" /> Aufnehmen
           </Button>
         )}
         {recorder.state === "recording" && (
           <>
-            <Button variant="secondary" type="button" onClick={recorder.pause} aria-label="Pause recording">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={recorder.pause}
+              aria-label="Aufnahme pausieren"
+            >
               <Pause size={16} aria-hidden="true" /> Pause
             </Button>
             <Button
               variant="secondary"
               type="button"
               onClick={() => recorder.addMarker()}
-              aria-label="Add marker"
+              aria-label="Marker hinzufügen"
             >
               <Bookmark size={16} aria-hidden="true" /> Marker
             </Button>
-            <Button variant="destructive" type="button" onClick={recorder.stop} aria-label="Stop recording">
-              <Square size={16} aria-hidden="true" /> Stop
+            <Button
+              variant="destructive"
+              type="button"
+              onClick={recorder.stop}
+              aria-label="Aufnahme stoppen"
+            >
+              <Square size={16} aria-hidden="true" /> Stopp
             </Button>
           </>
         )}
         {recorder.state === "paused" && (
           <>
-            <Button variant="secondary" type="button" onClick={recorder.resume} aria-label="Resume recording">
-              <Play size={16} aria-hidden="true" /> Resume
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={recorder.resume}
+              aria-label="Aufnahme fortsetzen"
+            >
+              <Play size={16} aria-hidden="true" /> Fortsetzen
             </Button>
-            <Button variant="destructive" type="button" onClick={recorder.stop} aria-label="Stop recording">
-              <Square size={16} aria-hidden="true" /> Stop
+            <Button
+              variant="destructive"
+              type="button"
+              onClick={recorder.stop}
+              aria-label="Aufnahme stoppen"
+            >
+              <Square size={16} aria-hidden="true" /> Stopp
             </Button>
           </>
         )}
@@ -191,28 +250,35 @@ export function RecordingWorkspace({
                 live.reset();
                 recorder.discard();
               }}
-              aria-label="Discard recording"
+              aria-label="Aufnahme verwerfen"
             >
-              <Trash2 size={16} aria-hidden="true" /> Discard
+              <Trash2 size={16} aria-hidden="true" /> Verwerfen
             </Button>
             <Button variant="primary" type="button" onClick={() => void handleFinalize()}>
-              <Upload size={16} aria-hidden="true" /> Upload recording
+              <Upload size={16} aria-hidden="true" /> Aufnahme hochladen
             </Button>
           </>
         )}
-        {recorder.state === "uploading" && <span aria-live="polite">Uploading…</span>}
+        {recorder.state === "uploading" && <span aria-live="polite">Wird hochgeladen…</span>}
         {recorder.state === "upload-failed" && (
           <>
-            <span role="alert">Upload failed: {recorder.errorMessage}</span>
-            <Button variant="secondary" type="button" onClick={() => { recorder.retryUpload(); void handleFinalize(); }}>
-              Retry upload
+            <span role="alert">Hochladen fehlgeschlagen: {recorder.errorMessage}</span>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => {
+                recorder.retryUpload();
+                void handleFinalize();
+              }}
+            >
+              Hochladen wiederholen
             </Button>
             <Button variant="tertiary" type="button" onClick={recorder.discard}>
-              Discard
+              Verwerfen
             </Button>
           </>
         )}
-        {recorder.state === "uploaded" && <span>Recording uploaded.</span>}
+        {recorder.state === "uploaded" && <span>Aufnahme hochgeladen.</span>}
       </div>
 
       {(recorder.state === "recording" || recorder.state === "paused") && live.transcriptText && (
@@ -232,7 +298,7 @@ export function RecordingWorkspace({
       )}
 
       {recorder.markers.length > 0 && (
-        <ul className={styles.markerList} aria-label="Markers">
+        <ul className={styles.markerList} aria-label="Marker">
           {recorder.markers.map((marker, index) => (
             <li key={index} className={styles.markerItem}>
               {formatElapsed(marker.timestampMs)}

@@ -18,9 +18,10 @@ isn't supported in this browser" message with a suggestion to use
    itself make the recording legally compliant — see
    `docs/security/recording-privacy.md`. You must have actually obtained
    whatever consent your organization/jurisdiction requires before
-   proceeding.
-3. Your browser will ask for microphone permission. If you deny it, you
-   can retry from the same screen.
+   proceeding. In a supporting browser, you also pick an **Audioquelle**
+   (audio source) here — see below.
+3. Your browser will ask for microphone (or tab/screen-sharing)
+   permission. If you deny it, you can retry from the same screen.
 4. **Record** starts capture. You'll see elapsed time and a live level
    meter. Use **Pause**/**Resume** as needed, and **Marker** to bookmark a
    moment (e.g. "medication discussion starts here") — markers are
@@ -29,6 +30,32 @@ isn't supported in this browser" message with a suggestion to use
    or **Upload** it to finalize.
 6. Once uploaded, the conversation's Audio tab shows a full player with
    your markers overlaid on the seek bar.
+
+## Recording tab/screen audio (e.g. a video call)
+
+On the consent step, if your browser supports it, you'll see an
+**Audioquelle** (audio source) choice:
+
+- **Mikrofon** (default) — your microphone, as before.
+- **Ton von Tab/Bildschirm** — captures audio from a tab, window, or your
+  whole screen instead, using the browser's own share-picker. This is
+  how you can record a video call (Zoom/Teams/Meet/...) that's already
+  running in another browser tab, **without any bot joining the call and
+  without VocaDox connecting to the meeting service at all** — VocaDox
+  only ever receives the audio your browser is already sharing, the
+  exact same mechanism screen-recording tools use.
+
+When the browser's share dialog appears, make sure to enable **"Share
+tab audio"** (Chrome/Edge) or your browser's equivalent — picking a tab
+without that checked shares no sound, and VocaDox will show a clear
+error rather than silently recording nothing. Chrome's share dialog also
+requires picking a tab/screen even though only its audio is used —
+VocaDox never records or stores any video, the video track is discarded
+immediately.
+
+This choice is available only in browsers whose `getDisplayMedia` API
+supports it (current Chrome/Edge; Firefox's tab-audio support varies by
+version) — where it isn't, only **Mikrofon** is offered.
 
 ## Live transcript & live draft (preview only)
 
