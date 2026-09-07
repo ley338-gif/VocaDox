@@ -15,6 +15,7 @@ import {
 } from "../api/admin";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
+import { RevealSecretBanner } from "../components/RevealSecretBanner";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
@@ -144,36 +145,11 @@ export function AdminWebhooksPage() {
       </p>
 
       {revealedSecret && (
-        <div
-          style={{
-            border: "1px solid var(--color-warning)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--space-4)",
-            marginBottom: "var(--space-4)",
-            background: "color-mix(in srgb, var(--color-warning) 10%, var(--surface-raised))",
-          }}
-        >
-          <strong>Signaturschlüssel für "{revealedSecret.name}" — jetzt kopieren, er wird nicht erneut angezeigt:</strong>
-          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
-            <code
-              style={{
-                flex: 1,
-                padding: "var(--space-2)",
-                background: "var(--surface-sunken)",
-                borderRadius: "var(--radius-sm)",
-                overflowWrap: "anywhere",
-              }}
-            >
-              {revealedSecret.secret}
-            </code>
-            <Button variant="secondary" onClick={() => navigator.clipboard.writeText(revealedSecret.secret)}>
-              Kopieren
-            </Button>
-            <Button variant="secondary" onClick={() => setRevealedSecret(null)}>
-              Schließen
-            </Button>
-          </div>
-        </div>
+        <RevealSecretBanner
+          label={`Signaturschlüssel für "${revealedSecret.name}"`}
+          value={revealedSecret.secret}
+          onClose={() => setRevealedSecret(null)}
+        />
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
