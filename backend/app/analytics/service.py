@@ -50,7 +50,7 @@ from app.providers.speech_to_text import SpeechToTextProvider
 from app.providers.storage import StorageProvider
 from app.review.models import ReviewIssue
 from app.templates.models import PromptVersion
-from app.transcription.models import TranscriptSegment, TranscriptSegmentCorrection
+from app.transcription.models import Transcript, TranscriptSegment, TranscriptSegmentCorrection
 from app.transcription.service import get_active_ready_transcript, list_segments
 from app.vocabulary.service import resolve_vocabulary, vocabulary_to_hotwords
 
@@ -147,7 +147,9 @@ async def technical_analytics(db: AsyncSession, *, days: int = 30) -> dict[str, 
 # -- Quality metrics ------------------------------------------------------
 
 
-async def quality_metrics(db: AsyncSession) -> dict[str, Any]:
+async def quality_metrics(
+    db: AsyncSession, *, conversation_ids: list[uuid.UUID] | None = None
+) -> dict[str, Any]:
     """Honest, precisely-defined descriptive statistics over real
     correction/review data (Phase 3/4/5) — never a fabricated "accuracy"
     figure without a defined methodology.
@@ -166,24 +168,50 @@ async def quality_metrics(db: AsyncSession) -> dict[str, Any]:
     - `review_issue_resolution_counts`: counts of `review_issues.status`
       and, among resolved ones, `resolved_status` (confirmed/corrected/
       removed) — how review-flagged issues actually get resolved.
+
+    `conversation_ids=None` (default) computes organization-wide totals,
+    unchanged from this function's original behavior. Passing a list —
+    including an empty one — scopes every count to exactly those
+    conversations instead; post-GA P1-4's quality report uses this so its
+    numbers describe only the sample it explicitly names, never silently
+    widened to unrelated data (see app.analytics.quality_report).
     """
-    total_segments = (
-        await db.execute(select(func.count()).select_from(TranscriptSegment))
-    ).scalar_one()
-    corrected_segments = (
-        await db.execute(
-            select(func.count(func.distinct(TranscriptSegmentCorrection.segment_id)))
+    segment_query = select(func.count()).select_from(TranscriptSegment)
+    corrected_query = select(func.count(func.distinct(TranscriptSegmentCorrection.segment_id)))
+    fact_query = select(ExtractedFact.review_status, func.count()).group_by(
+        ExtractedFact.review_status
+    )
+    issue_status_query = select(ReviewIssue.status, func.count()).group_by(ReviewIssue.status)
+    resolved_status_query = (
+        select(ReviewIssue.resolved_status, func.count())
+        .where(ReviewIssue.resolved_status.is_not(None))
+        .group_by(ReviewIssue.resolved_status)
+    )
+    if conversation_ids is not None:
+        segment_query = segment_query.join(
+            Transcript, Transcript.id == TranscriptSegment.transcript_id
+        ).where(Transcript.conversation_id.in_(conversation_ids))
+        corrected_query = corrected_query.join(
+            TranscriptSegment,
+            TranscriptSegment.id == TranscriptSegmentCorrection.segment_id,
+        ).join(Transcript, Transcript.id == TranscriptSegment.transcript_id).where(
+            Transcript.conversation_id.in_(conversation_ids)
         )
-    ).scalar_one()
+        fact_query = fact_query.where(ExtractedFact.conversation_id.in_(conversation_ids))
+        issue_status_query = issue_status_query.where(
+            ReviewIssue.conversation_id.in_(conversation_ids)
+        )
+        resolved_status_query = resolved_status_query.where(
+            ReviewIssue.conversation_id.in_(conversation_ids)
+        )
+
+    total_segments = (await db.execute(segment_query)).scalar_one()
+    corrected_segments = (await db.execute(corrected_query)).scalar_one()
     transcript_correction_rate = (
         (corrected_segments / total_segments) if total_segments else None
     )
 
-    fact_rows = (
-        await db.execute(select(ExtractedFact.review_status, func.count()).group_by(
-            ExtractedFact.review_status
-        ))
-    ).all()
+    fact_rows = (await db.execute(fact_query)).all()
     fact_review_status_counts = {status: count for status, count in fact_rows}
     total_facts = sum(fact_review_status_counts.values())
     corrected_or_removed = fact_review_status_counts.get(
@@ -191,16 +219,8 @@ async def quality_metrics(db: AsyncSession) -> dict[str, Any]:
     ) + fact_review_status_counts.get(FactReviewStatus.REMOVED.value, 0)
     fact_corrected_or_removed_rate = (corrected_or_removed / total_facts) if total_facts else None
 
-    issue_status_rows = (
-        await db.execute(select(ReviewIssue.status, func.count()).group_by(ReviewIssue.status))
-    ).all()
-    resolved_status_rows = (
-        await db.execute(
-            select(ReviewIssue.resolved_status, func.count())
-            .where(ReviewIssue.resolved_status.is_not(None))
-            .group_by(ReviewIssue.resolved_status)
-        )
-    ).all()
+    issue_status_rows = (await db.execute(issue_status_query)).all()
+    resolved_status_rows = (await db.execute(resolved_status_query)).all()
 
     return {
         "transcript_segments_total": total_segments,

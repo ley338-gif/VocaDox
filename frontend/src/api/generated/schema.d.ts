@@ -1752,6 +1752,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/evaluation/quality-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Quality Report Endpoint
+         * @description Post-GA P1-4: real Word Error Rate + extraction-quality metrics
+         *     over an explicitly-named sample of already-reviewed conversations —
+         *     the Evaluation Lab's customer-facing quality report (procurement/DPO/
+         *     EU AI Act documentation). Computed fresh on every call, never
+         *     persisted as an EvaluationRun (see app.analytics.quality_report's
+         *     module docstring for why "reproducible" doesn't require storage
+         *     here). `format=json` (default) returns the structured report;
+         *     `docx`/`pdf` return a downloadable file.
+         */
+        post: operations["generate_quality_report_endpoint_api_v1_admin_evaluation_quality_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/model-profiles/{model_profile_id}/lifecycle": {
         parameters: {
             query?: never;
@@ -4315,6 +4342,11 @@ export interface components {
             review_issue_resolution_counts: {
                 [key: string]: number;
             };
+        };
+        /** QualityReportRequest */
+        QualityReportRequest: {
+            /** Conversation Ids */
+            conversation_ids: string[];
         };
         /** QueueCounts */
         QueueCounts: {
@@ -9004,6 +9036,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvaluationRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_quality_report_endpoint_api_v1_admin_evaluation_quality_report_post: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QualityReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

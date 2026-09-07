@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analytics.models import EvaluationRunType
+from app.analytics.quality_report import generate_quality_report
 from app.analytics.schemas import (
+    ConversationWerResultResponse,
     CorrectionMetricsResponse,
     EvaluationRunListResponse,
     EvaluationRunResponse,
@@ -21,6 +23,9 @@ from app.analytics.schemas import (
     ModelLifecycleResponse,
     PromptComparisonRequest,
     QualityMetricsResponse,
+    QualityReportRequest,
+    QualityReportResponse,
+    SkippedConversationResponse,
     TechnicalAnalyticsResponse,
     VocabularyComparisonRequest,
 )
@@ -43,6 +48,7 @@ from app.analytics.service import (
 from app.audit.service import record_event
 from app.core.ai_providers import get_speech_provider
 from app.core.storage import get_storage_provider
+from app.documents.export_formats import ExportSection, render_docx, render_pdf
 from app.identity.deps import require_csrf, require_permission
 from app.identity.models import User
 from app.platform.db.session import get_session
@@ -266,6 +272,124 @@ async def run_vocabulary_comparison_endpoint(
     await db.commit()
     await db.refresh(run)
     return EvaluationRunResponse.model_validate(run)
+
+
+@router.post("/evaluation/quality-report")
+async def generate_quality_report_endpoint(
+    payload: QualityReportRequest,
+    format: str = "json",  # noqa: A002 - matches the query param name intentionally
+    actor: User = Depends(_require_evaluation_run),
+    db: AsyncSession = Depends(get_session),
+    storage: StorageProvider = Depends(get_storage_provider),
+    speech_provider: SpeechToTextProvider = Depends(get_speech_provider),
+    _csrf: None = Depends(require_csrf),
+) -> Response:
+    """Post-GA P1-4: real Word Error Rate + extraction-quality metrics
+    over an explicitly-named sample of already-reviewed conversations —
+    the Evaluation Lab's customer-facing quality report (procurement/DPO/
+    EU AI Act documentation). Computed fresh on every call, never
+    persisted as an EvaluationRun (see app.analytics.quality_report's
+    module docstring for why "reproducible" doesn't require storage
+    here). `format=json` (default) returns the structured report;
+    `docx`/`pdf` return a downloadable file."""
+    report = await generate_quality_report(
+        db, storage, speech_provider, conversation_ids=payload.conversation_ids
+    )
+    await record_event(
+        db,
+        event_type="evaluation_run.quality_report_generated",
+        user_id=actor.id,
+        username=actor.username,
+        event_metadata={
+            "conversation_count": len(payload.conversation_ids),
+            "included_count": len(report.conversation_results),
+            "skipped_count": len(report.skipped),
+            "format": format,
+        },
+    )
+    await db.commit()
+
+    response = QualityReportResponse(
+        generated_at=report.generated_at,
+        speech_provider=report.speech_provider,
+        speech_model=report.speech_model,
+        speech_model_revision=report.speech_model_revision,
+        conversation_results=[
+            ConversationWerResultResponse(
+                conversation_id=r.conversation_id,
+                word_error_rate=r.word_error_rate,
+                reference_word_count=r.reference_word_count,
+            )
+            for r in report.conversation_results
+        ],
+        skipped=[
+            SkippedConversationResponse(conversation_id=s.conversation_id, reason=s.reason)
+            for s in report.skipped
+        ],
+        mean_word_error_rate=report.mean_word_error_rate,
+        quality_metrics=QualityMetricsResponse.model_validate(report.quality_metrics),
+    )
+
+    if format == "json":
+        return Response(
+            content=response.model_dump_json(indent=2), media_type="application/json"
+        )
+
+    meta_lines = [
+        f"Erstellt: {report.generated_at.isoformat()}",
+        f"Spracherkennung: {report.speech_provider} / {report.speech_model}"
+        + (f" (Revision {report.speech_model_revision})" if report.speech_model_revision else ""),
+        f"Stichprobe: {len(report.conversation_results)} Gespräche ausgewertet, "
+        f"{len(report.skipped)} übersprungen",
+        (
+            f"Mittlere Wortfehlerrate: {report.mean_word_error_rate * 100:.1f}%"
+            if report.mean_word_error_rate is not None
+            else "Mittlere Wortfehlerrate: keine auswertbaren Gespräche"
+        ),
+    ]
+    sections = [
+        ExportSection(
+            heading="Wortfehlerrate je Gespräch",
+            lines=[
+                f"{r.conversation_id}: {r.word_error_rate * 100:.1f}% "
+                f"({r.reference_word_count} Referenzwörter)"
+                for r in report.conversation_results
+            ]
+            or ["Keine auswertbaren Gespräche in dieser Stichprobe."],
+        ),
+        ExportSection(
+            heading="Übersprungene Gespräche",
+            lines=[f"{s.conversation_id}: {s.reason}" for s in report.skipped] or ["Keine."],
+        ),
+        ExportSection(
+            heading="Extraktionsgüte (Korrektur-/Review-Kennzahlen der Stichprobe)",
+            lines=[
+                f"Transkript-Segmente korrigiert: "
+                f"{report.quality_metrics.get('transcript_segments_corrected')} von "
+                f"{report.quality_metrics.get('transcript_segments_total')}",
+                f"Fakten korrigiert/entfernt: "
+                f"{report.quality_metrics.get('fact_corrected_or_removed_rate')}",
+            ],
+        ),
+    ]
+    filename = f"quality-report-{report.generated_at.date().isoformat()}.{format}"
+    if format == "docx":
+        content = render_docx(
+            title="VocaDox Qualitätsbericht", meta_lines=meta_lines, sections=sections
+        )
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif format == "pdf":
+        content = render_pdf(
+            title="VocaDox Qualitätsbericht", meta_lines=meta_lines, sections=sections
+        )
+        media_type = "application/pdf"
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unsupported format")
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # -- Model Lifecycle ------------------------------------------------------

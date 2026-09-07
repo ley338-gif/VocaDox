@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TechnicalAnalyticsResponse(BaseModel):
@@ -34,6 +34,35 @@ class CorrectionMetricsResponse(BaseModel):
     fact_corrections_by_category: dict[str, int]
     most_corrected_subjects: list[dict[str, Any]]
     transcript_segment_corrections_total: int
+
+
+# -- Quality report (post-GA P1-4) -----------------------------------------
+
+
+class QualityReportRequest(BaseModel):
+    conversation_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
+
+
+class ConversationWerResultResponse(BaseModel):
+    conversation_id: uuid.UUID
+    word_error_rate: float
+    reference_word_count: int
+
+
+class SkippedConversationResponse(BaseModel):
+    conversation_id: uuid.UUID
+    reason: str
+
+
+class QualityReportResponse(BaseModel):
+    generated_at: datetime
+    speech_provider: str
+    speech_model: str
+    speech_model_revision: str | None
+    conversation_results: list[ConversationWerResultResponse]
+    skipped: list[SkippedConversationResponse]
+    mean_word_error_rate: float | None
+    quality_metrics: QualityMetricsResponse
 
 
 class ModelComparisonRequest(BaseModel):
