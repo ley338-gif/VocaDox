@@ -261,6 +261,10 @@ export function useRecorder() {
     setErrorMessage(message);
     dispatch({ type: "UPLOAD_FAILURE" });
   }, [dispatch]);
+  const uploadQueuedOffline = useCallback((message: string) => {
+    setErrorMessage(message);
+    dispatch({ type: "UPLOAD_QUEUED_OFFLINE" });
+  }, [dispatch]);
   const retryUpload = useCallback(() => dispatch({ type: "RETRY_UPLOAD" }), [dispatch]);
 
   // Navigation-away protection while there's unsaved recorded audio.
@@ -302,6 +306,7 @@ export function useRecorder() {
     beginUpload,
     uploadSucceeded,
     uploadFailed,
+    uploadQueuedOffline,
     retryUpload,
   };
 }

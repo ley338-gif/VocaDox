@@ -25,6 +25,7 @@ export type RecordingState =
   | "uploading"
   | "uploaded"
   | "upload-failed"
+  | "queued-offline"
   | "discarded";
 
 export type RecordingEvent =
@@ -43,6 +44,7 @@ export type RecordingEvent =
   | { type: "UPLOAD_START" }
   | { type: "UPLOAD_SUCCESS" }
   | { type: "UPLOAD_FAILURE" }
+  | { type: "UPLOAD_QUEUED_OFFLINE" }
   | { type: "RETRY_UPLOAD" };
 
 const TRANSITIONS: Record<RecordingState, Partial<Record<RecordingEvent["type"], RecordingState>>> = {
@@ -68,9 +70,14 @@ const TRANSITIONS: Record<RecordingState, Partial<Record<RecordingEvent["type"],
     DEVICE_DISCONNECTED: "stopped",
   },
   stopped: { DISCARD: "discarded", UPLOAD_START: "uploading" },
-  uploading: { UPLOAD_SUCCESS: "uploaded", UPLOAD_FAILURE: "upload-failed" },
+  uploading: {
+    UPLOAD_SUCCESS: "uploaded",
+    UPLOAD_FAILURE: "upload-failed",
+    UPLOAD_QUEUED_OFFLINE: "queued-offline",
+  },
   "upload-failed": { RETRY_UPLOAD: "uploading", DISCARD: "discarded" },
   uploaded: {},
+  "queued-offline": {},
   discarded: {},
 };
 

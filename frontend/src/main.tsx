@@ -10,6 +10,9 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router";
 
 import { App } from "./App";
+import { registerServiceWorker } from "./registerServiceWorker";
+
+registerServiceWorker();
 
 const queryClient = new QueryClient();
 

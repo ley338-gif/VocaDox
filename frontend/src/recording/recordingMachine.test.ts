@@ -91,4 +91,11 @@ describe("recordingMachine", () => {
     expect(state).toBe("unsupported");
     expect(reduceRecordingState(state, { type: "REQUEST_PERMISSION" })).toBe("unsupported");
   });
+
+  it("post-GA P2-3: an offline upload is queued, not treated as a failure needing manual retry", () => {
+    const state = reduceRecordingState("uploading", { type: "UPLOAD_QUEUED_OFFLINE" });
+    expect(state).toBe("queued-offline");
+    expect(canTransition("queued-offline", "RETRY_UPLOAD")).toBe(false);
+    expect(hasUnsavedRecording("queued-offline")).toBe(false);
+  });
 });

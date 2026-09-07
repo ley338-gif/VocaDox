@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ApiError } from "../api/client";
 import { addMarker, finalizeRecording } from "../api/conversations";
 import { Button } from "../design-system/Button";
+import { enqueueRecording, isOfflineQueueSupported } from "../recording/offlineQueue";
 import { useLiveTranscript } from "../recording/useLiveTranscript";
 import {
   type AudioSource,
@@ -134,6 +135,30 @@ export function RecordingWorkspace({
       live.reset();
       onFinalized();
     } catch (error) {
+      // A network-level failure (offline, request never reached the
+      // server) never surfaces as an ApiError — fetch itself throws
+      // before there's a response to build one from. That's exactly the
+      // case worth queuing for automatic retry rather than making the
+      // user remember to manually retry once back online.
+      if (!(error instanceof ApiError) && isOfflineQueueSupported()) {
+        try {
+          await enqueueRecording({
+            conversationId,
+            idempotencyKey,
+            blob: recorder.blob,
+            markers: recorder.markers,
+          });
+          live.reset();
+          recorder.uploadQueuedOffline(
+            "Kein Netz — die Aufnahme wurde lokal gespeichert und wird automatisch " +
+              "hochgeladen, sobald wieder eine Verbindung besteht."
+          );
+          return;
+        } catch {
+          // IndexedDB itself failed (private browsing, quota, ...) — fall
+          // through to the normal upload-failed/manual-retry path below.
+        }
+      }
       const message = error instanceof ApiError ? error.message : "Hochladen fehlgeschlagen.";
       recorder.uploadFailed(message);
     }
@@ -279,6 +304,9 @@ export function RecordingWorkspace({
           </>
         )}
         {recorder.state === "uploaded" && <span>Aufnahme hochgeladen.</span>}
+        {recorder.state === "queued-offline" && (
+          <span role="status">{recorder.errorMessage}</span>
+        )}
       </div>
 
       {(recorder.state === "recording" || recorder.state === "paused") && live.transcriptText && (
