@@ -194,3 +194,35 @@ class TranscriptSegmentCorrection(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class TranscriptSegmentSpeakerCorrection(Base):
+    """Audit trail for a per-segment speaker reassignment — mirrors
+    `TranscriptSegmentCorrection` exactly (one immutable row per
+    correction event). Distinct from `app.diarization.models
+    .DetectedSpeaker.display_label` (which relabels an entire detected
+    speaker CLUSTER at once): this corrects a single mis-clustered
+    segment onto a different, already-detected speaker without touching
+    any other segment in either cluster -- diarization clusters by voice
+    embedding, not by any human-obvious trait like pitch, so a handful of
+    segments can land in the wrong cluster even when a person can hear
+    the mistake immediately."""
+
+    __tablename__ = "transcript_segment_speaker_corrections"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    segment_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("transcript_segments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    corrected_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    previous_speaker_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("detected_speakers.id", ondelete="SET NULL"), nullable=True
+    )
+    new_speaker_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("detected_speakers.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

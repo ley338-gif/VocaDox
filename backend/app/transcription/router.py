@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import record_event
 from app.conversations.authz import authorize_conversation_access
 from app.core.ai_providers import get_queue_backend, get_speech_provider
+from app.diarization.service import get_speaker
 from app.identity.deps import get_current_user, require_csrf
 from app.identity.models import User
 from app.media.models import MediaAsset, MediaKind
@@ -36,10 +37,16 @@ from app.transcription.schemas import (
     ProcessingStatusResponse,
     ProcessRequest,
     SegmentCorrectionRequest,
+    SegmentSpeakerReassignRequest,
     TranscriptResponse,
     TranscriptSegmentResponse,
 )
-from app.transcription.service import correct_segment, list_segments, set_review_status
+from app.transcription.service import (
+    correct_segment,
+    list_segments,
+    reassign_segment_speaker,
+    set_review_status,
+)
 
 router = APIRouter(prefix="/conversations", tags=["transcription"])
 
@@ -307,6 +314,72 @@ async def correct_segment_endpoint(
     await db.commit()
     await db.refresh(segment)
     return TranscriptSegmentResponse.model_validate(segment)
+
+
+@router.patch(
+    "/{conversation_id}/transcript/segments/{segment_id}/speaker",
+    response_model=list[TranscriptSegmentResponse],
+)
+async def reassign_segment_speaker_endpoint(
+    conversation_id: uuid.UUID,
+    segment_id: uuid.UUID,
+    body: SegmentSpeakerReassignRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> list[TranscriptSegmentResponse]:
+    """Corrects a single mis-clustered segment (or, with `through_segment_id`,
+    every segment from it through that one, inclusive) onto a different,
+    already-detected speaker -- see app.transcription.models
+    .TranscriptSegmentSpeakerCorrection's docstring for why this is
+    distinct from relabeling a whole DetectedSpeaker cluster. Does NOT
+    retroactively rewrite any fact already extracted using the old
+    label -- re-run extraction (or correct the fact via the Review
+    Wizard) afterward if this conversation was already processed."""
+    await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="speaker:assign"
+    )
+    segment = await _get_segment_or_404(db, conversation_id, segment_id)
+    speaker = await get_speaker(db, conversation_id=conversation_id, speaker_id=body.speaker_id)
+    if speaker is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="speaker not found")
+
+    targets = [segment]
+    if body.through_segment_id is not None:
+        through_segment = await _get_segment_or_404(db, conversation_id, body.through_segment_id)
+        if through_segment.sequence < segment.sequence:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="through_segment_id must not come before segment_id",
+            )
+        result = await db.execute(
+            select(TranscriptSegment)
+            .where(
+                TranscriptSegment.transcript_id == segment.transcript_id,
+                TranscriptSegment.sequence >= segment.sequence,
+                TranscriptSegment.sequence <= through_segment.sequence,
+            )
+            .order_by(TranscriptSegment.sequence)
+        )
+        targets = list(result.scalars().all())
+
+    for target in targets:
+        await reassign_segment_speaker(db, target, speaker_id=speaker.id, user_id=user.id)
+
+    await record_event(
+        db,
+        event_type="transcript.segment_speaker_reassigned",
+        user_id=user.id,
+        event_metadata={
+            "segment_ids": [str(t.id) for t in targets],
+            "speaker_id": str(speaker.id),
+        },
+    )
+
+    await db.commit()
+    for target in targets:
+        await db.refresh(target)
+    return [TranscriptSegmentResponse.model_validate(t) for t in targets]
 
 
 @router.get("/{conversation_id}/transcript/export")

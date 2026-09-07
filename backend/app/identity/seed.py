@@ -53,7 +53,10 @@ PERMISSIONS: dict[str, str] = {
     "transcript:process": "Trigger speech-to-text/diarization processing for a conversation.",
     "transcript:correct": "Correct transcript segment text / set segment review status.",
     "speaker:read": "View detected speakers for a conversation.",
-    "speaker:assign": "Assign/unassign a detected speaker to a participant or display label.",
+    "speaker:assign": (
+        "Assign/unassign a detected speaker to a participant or display label, or reassign a "
+        "single mis-clustered transcript segment onto a different detected speaker."
+    ),
     "processing:read": "View processing job/run status for a conversation.",
     "processing:retry": "Retry a failed processing job; cancel a queued one.",
     "provider:read": "View admin speech/diarization provider status.",

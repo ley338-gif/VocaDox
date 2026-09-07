@@ -19,6 +19,7 @@ import {
   listSpeakers,
   listTranscriptSegments,
   processTranscript,
+  reassignSegmentSpeaker,
   retryProcessing,
   transcriptExportUrl,
   type DetectedSpeaker,
@@ -58,6 +59,11 @@ export function TranscriptPanel({
   const queryClient = useQueryClient();
   const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  // Per-segment speaker correction (distinct from editingSegmentId's text
+  // correction) — see TranscriptTurn's props docstring.
+  const [reassigningSegmentId, setReassigningSegmentId] = useState<string | null>(null);
+  const [reassignSpeakerId, setReassignSpeakerId] = useState("");
+  const [reassignThroughId, setReassignThroughId] = useState("");
   const [search, setSearch] = useState("");
   const [speakerFilter, setSpeakerFilter] = useState<string | null>(null);
   // Optional hint for the diarization model — real testing showed
@@ -125,6 +131,21 @@ export function TranscriptPanel({
     onSuccess: () => {
       setEditingSegmentId(null);
       void queryClient.invalidateQueries({ queryKey: ["transcript-segments", conversationId] });
+    },
+  });
+
+  const reassignSpeakerMutation = useMutation({
+    mutationFn: (vars: { segmentId: string; speakerId: string; throughSegmentId?: string }) =>
+      reassignSegmentSpeaker(
+        conversationId,
+        vars.segmentId,
+        { speaker_id: vars.speakerId, through_segment_id: vars.throughSegmentId },
+        csrfToken ?? ""
+      ),
+    onSuccess: () => {
+      setReassigningSegmentId(null);
+      void queryClient.invalidateQueries({ queryKey: ["transcript-segments", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["speakers", conversationId] });
     },
   });
 
@@ -256,6 +277,27 @@ export function TranscriptPanel({
             onEditValueChange={setEditValue}
             onSaveEdit={() => correctMutation.mutate({ segmentId: segment.id, text: editValue })}
             onCancelEdit={() => setEditingSegmentId(null)}
+            canReassignSpeaker={hasPermission("speaker:assign")}
+            speakers={speakers}
+            laterSegments={allSegments.filter((s) => s.sequence > segment.sequence)}
+            reassigningSpeaker={reassigningSegmentId === segment.id}
+            reassignSpeakerId={reassignSpeakerId}
+            reassignThroughId={reassignThroughId}
+            onStartReassignSpeaker={() => {
+              setReassigningSegmentId(segment.id);
+              setReassignSpeakerId(segment.speaker_id ?? "");
+              setReassignThroughId("");
+            }}
+            onReassignSpeakerIdChange={setReassignSpeakerId}
+            onReassignThroughIdChange={setReassignThroughId}
+            onSaveReassignSpeaker={() =>
+              reassignSpeakerMutation.mutate({
+                segmentId: segment.id,
+                speakerId: reassignSpeakerId,
+                throughSegmentId: reassignThroughId || undefined,
+              })
+            }
+            onCancelReassignSpeaker={() => setReassigningSegmentId(null)}
           />
         ))}
         {segments.length === 0 && speakerFilter && (

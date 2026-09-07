@@ -1,8 +1,8 @@
 import { AlertTriangle } from "lucide-react";
 
 import { Button } from "../design-system/Button";
-import { TextInput } from "../design-system/FormControls";
-import type { TranscriptSegment } from "../api/transcription";
+import { Select, TextInput } from "../design-system/FormControls";
+import type { DetectedSpeaker, TranscriptSegment } from "../api/transcription";
 import { SpeakerBadge } from "./SpeakerBadge";
 import styles from "./TranscriptPanel.module.css";
 
@@ -12,6 +12,8 @@ function formatTs(ms: number): string {
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
+
+const NO_THROUGH_SEGMENT = "";
 
 /** One transcript turn — extracted from TranscriptPanel so the segment
  * row markup (timestamp/speaker/confidence/review-flag/correction) is a
@@ -31,6 +33,17 @@ export function TranscriptTurn({
   onEditValueChange,
   onSaveEdit,
   onCancelEdit,
+  canReassignSpeaker,
+  speakers,
+  laterSegments,
+  reassigningSpeaker,
+  reassignSpeakerId,
+  reassignThroughId,
+  onStartReassignSpeaker,
+  onReassignSpeakerIdChange,
+  onReassignThroughIdChange,
+  onSaveReassignSpeaker,
+  onCancelReassignSpeaker,
 }: {
   segment: TranscriptSegment;
   speakerColorKey: string;
@@ -44,6 +57,22 @@ export function TranscriptTurn({
   onEditValueChange: (value: string) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
+  /** Per-segment speaker correction — distinct from the whole-cluster
+   * reassignment in the "Sprecher verwalten" modal (SpeakerAssignRow):
+   * this moves just this segment (optionally through a later one) onto a
+   * different already-detected speaker, for when diarization clustered a
+   * handful of segments into the wrong voice. */
+  canReassignSpeaker: boolean;
+  speakers: DetectedSpeaker[];
+  laterSegments: TranscriptSegment[];
+  reassigningSpeaker: boolean;
+  reassignSpeakerId: string;
+  reassignThroughId: string;
+  onStartReassignSpeaker: () => void;
+  onReassignSpeakerIdChange: (value: string) => void;
+  onReassignThroughIdChange: (value: string) => void;
+  onSaveReassignSpeaker: () => void;
+  onCancelReassignSpeaker: () => void;
 }) {
   return (
     <li className={`${styles.segment} ${active ? styles.segmentActive : ""}`}>
@@ -57,7 +86,11 @@ export function TranscriptTurn({
       </button>
       <div className={styles.segmentBody}>
         <div className={styles.segmentMeta}>
-          <SpeakerBadge colorKey={speakerColorKey} label={speakerName} />
+          <SpeakerBadge
+            colorKey={speakerColorKey}
+            label={speakerName}
+            onClick={canReassignSpeaker ? onStartReassignSpeaker : undefined}
+          />
           {segment.confidence !== null && (
             <span className={styles.muted}>{Math.round(segment.confidence * 100)}%</span>
           )}
@@ -71,6 +104,39 @@ export function TranscriptTurn({
             </span>
           )}
         </div>
+        {reassigningSpeaker && (
+          <div className={styles.editRow}>
+            <Select
+              aria-label="Richtiger Sprecher"
+              value={reassignSpeakerId}
+              onChange={(event) => onReassignSpeakerIdChange(event.target.value)}
+            >
+              {speakers.map((speaker) => (
+                <option key={speaker.id} value={speaker.id}>
+                  {speaker.display_label ?? speaker.internal_label}
+                </option>
+              ))}
+            </Select>
+            <Select
+              aria-label="Bis Segment (optional)"
+              value={reassignThroughId}
+              onChange={(event) => onReassignThroughIdChange(event.target.value)}
+            >
+              <option value={NO_THROUGH_SEGMENT}>Nur dieses Segment</option>
+              {laterSegments.map((later) => (
+                <option key={later.id} value={later.id}>
+                  bis {formatTs(later.start_ms)} — {(later.corrected_text ?? later.original_text).slice(0, 40)}
+                </option>
+              ))}
+            </Select>
+            <Button variant="primary" type="button" onClick={onSaveReassignSpeaker}>
+              Anwenden
+            </Button>
+            <Button variant="tertiary" type="button" onClick={onCancelReassignSpeaker}>
+              Abbrechen
+            </Button>
+          </div>
+        )}
         {editing ? (
           <div className={styles.editRow}>
             <TextInput

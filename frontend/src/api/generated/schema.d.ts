@@ -585,6 +585,33 @@ export interface paths {
         patch: operations["correct_segment_endpoint_api_v1_conversations__conversation_id__transcript_segments__segment_id__patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/transcript/segments/{segment_id}/speaker": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reassign Segment Speaker Endpoint
+         * @description Corrects a single mis-clustered segment (or, with `through_segment_id`,
+         *     every segment from it through that one, inclusive) onto a different,
+         *     already-detected speaker -- see app.transcription.models
+         *     .TranscriptSegmentSpeakerCorrection's docstring for why this is
+         *     distinct from relabeling a whole DetectedSpeaker cluster. Does NOT
+         *     retroactively rewrite any fact already extracted using the old
+         *     label -- re-run extraction (or correct the fact via the Review
+         *     Wizard) afterward if this conversation was already processed.
+         */
+        patch: operations["reassign_segment_speaker_endpoint_api_v1_conversations__conversation_id__transcript_segments__segment_id__speaker_patch"];
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/transcript/export": {
         parameters: {
             query?: never;
@@ -4328,6 +4355,16 @@ export interface components {
          * @enum {string}
          */
         SegmentReviewStatus: "unreviewed" | "confirmed" | "corrected" | "flagged";
+        /** SegmentSpeakerReassignRequest */
+        SegmentSpeakerReassignRequest: {
+            /**
+             * Speaker Id
+             * Format: uuid
+             */
+            speaker_id: string;
+            /** Through Segment Id */
+            through_segment_id?: string | null;
+        };
         /** ServiceAccountCreateRequest */
         ServiceAccountCreateRequest: {
             /** Name */
@@ -6383,6 +6420,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranscriptSegmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reassign_segment_speaker_endpoint_api_v1_conversations__conversation_id__transcript_segments__segment_id__speaker_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                segment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentSpeakerReassignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptSegmentResponse"][];
                 };
             };
             /** @description Validation Error */
