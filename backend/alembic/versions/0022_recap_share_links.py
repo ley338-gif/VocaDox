@@ -47,7 +47,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("token"),
     )
-    op.create_index("ix_recap_share_links_conversation_id", "recap_share_links", ["conversation_id"])
+    op.create_index(
+        "ix_recap_share_links_conversation_id", "recap_share_links", ["conversation_id"]
+    )
     op.create_index("ix_recap_share_links_token", "recap_share_links", ["token"], unique=True)
     op.create_index("ix_recap_share_links_created_at", "recap_share_links", ["created_at"])
 

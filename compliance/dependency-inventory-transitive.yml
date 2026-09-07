@@ -3080,7 +3080,7 @@ dependencies:
   approval_status: approved
 - name: optuna
   ecosystem: pypi
-  version: 4.9.0
+  version: 5.0.0
   scope: worker
   direct: false
   license: MIT
