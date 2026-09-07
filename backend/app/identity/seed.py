@@ -63,6 +63,10 @@ PERMISSIONS: dict[str, str] = {
     "provider:test": "Trigger an admin-initiated provider health check.",
     "fact:read": "View extracted facts for a conversation.",
     "fact:extract": "Trigger LLM fact extraction for a conversation's transcript.",
+    "fact:redact": (
+        "Redact/un-redact a fact's content in shared outputs (Document, search, Ask "
+        "VocaDox) while preserving its evidence chain."
+    ),
     "evidence:read": "View the evidence (transcript segments) linked to an extracted fact.",
     "review-issue:read": "View review issues (uncertainty/contradiction flags) for a conversation.",
     "review-issue:resolve": (
@@ -196,6 +200,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "processing:read",
             "processing:retry",
             "fact:read",
+            "fact:redact",
             "ask:query",
             "fact:extract",
             "evidence:read",
@@ -256,6 +261,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "speaker:read",
             "processing:read",
             "fact:read",
+            "fact:redact",
             "ask:query",
             "evidence:read",
             "review-issue:read",

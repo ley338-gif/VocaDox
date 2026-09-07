@@ -48,6 +48,7 @@ export interface ExtractedFact {
   corrected_structured_value: Record<string, unknown> | null;
   reviewed_by_user_id: string | null;
   reviewed_at: string | null;
+  is_redacted: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -99,4 +100,33 @@ export function getFactEvidence(conversationId: string, factId: string): Promise
 
 export function listReviewIssues(conversationId: string): Promise<ReviewIssue[]> {
   return request<ReviewIssue[]>(`/conversations/${conversationId}/review-issues`);
+}
+
+/** Post-GA P3-2: hides the fact's content from Document composition,
+ * search, and Ask VocaDox — the underlying fact and its evidence are
+ * never removed, only its rendered content is suppressed. */
+export function redactFact(
+  conversationId: string,
+  factId: string,
+  reason: string | undefined,
+  csrfToken: string
+): Promise<ExtractedFact> {
+  return request<ExtractedFact>(`/conversations/${conversationId}/facts/${factId}/redact`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function unredactFact(
+  conversationId: string,
+  factId: string,
+  reason: string | undefined,
+  csrfToken: string
+): Promise<ExtractedFact> {
+  return request<ExtractedFact>(`/conversations/${conversationId}/facts/${factId}/unredact`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify({ reason }),
+  });
 }

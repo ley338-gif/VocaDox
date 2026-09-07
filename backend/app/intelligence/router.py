@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.service import record_event
 from app.conversations.authz import authorize_conversation_access
 from app.evidence.models import FactEvidence
 from app.identity.deps import get_current_user, require_csrf
@@ -22,9 +23,11 @@ from app.intelligence.api_schemas import (
     ExtractedFactResponse,
     ExtractRequest,
     FactEvidenceResponse,
+    FactRedactionRequest,
     ReviewIssueResponse,
 )
 from app.intelligence.models import ExtractedFact, FactStatus
+from app.intelligence.service import redact_fact, unredact_fact
 from app.media.models import MediaAsset, MediaKind
 from app.platform.config import get_settings
 from app.platform.db.session import get_session
@@ -147,6 +150,59 @@ async def get_fact_endpoint(
         db, user=user, conversation_id=conversation_id, permission_code="fact:read"
     )
     fact = await _get_fact_or_404(db, conversation_id, fact_id)
+    return ExtractedFactResponse.model_validate(fact)
+
+
+@router.post("/{conversation_id}/facts/{fact_id}/redact", response_model=ExtractedFactResponse)
+async def redact_fact_endpoint(
+    conversation_id: uuid.UUID,
+    fact_id: uuid.UUID,
+    body: FactRedactionRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> ExtractedFactResponse:
+    """Post-GA P3-2: hides this fact's content from every shared/rendered
+    output while preserving the fact row, its evidence, and this action
+    in the audit trail (app.intelligence.service.redact_fact)."""
+    await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="fact:redact"
+    )
+    fact = await _get_fact_or_404(db, conversation_id, fact_id)
+    await redact_fact(db, fact, reason=body.reason, actor_user_id=user.id)
+    await record_event(
+        db,
+        event_type="fact.redacted",
+        user_id=user.id,
+        event_metadata={"conversation_id": str(conversation_id), "fact_id": str(fact_id)},
+    )
+    await db.commit()
+    await db.refresh(fact)
+    return ExtractedFactResponse.model_validate(fact)
+
+
+@router.post("/{conversation_id}/facts/{fact_id}/unredact", response_model=ExtractedFactResponse)
+async def unredact_fact_endpoint(
+    conversation_id: uuid.UUID,
+    fact_id: uuid.UUID,
+    body: FactRedactionRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> ExtractedFactResponse:
+    await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="fact:redact"
+    )
+    fact = await _get_fact_or_404(db, conversation_id, fact_id)
+    await unredact_fact(db, fact, reason=body.reason, actor_user_id=user.id)
+    await record_event(
+        db,
+        event_type="fact.unredacted",
+        user_id=user.id,
+        event_metadata={"conversation_id": str(conversation_id), "fact_id": str(fact_id)},
+    )
+    await db.commit()
+    await db.refresh(fact)
     return ExtractedFactResponse.model_validate(fact)
 
 

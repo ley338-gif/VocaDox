@@ -827,6 +827,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/facts/{fact_id}/redact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redact Fact Endpoint
+         * @description Post-GA P3-2: hides this fact's content from every shared/rendered
+         *     output while preserving the fact row, its evidence, and this action
+         *     in the audit trail (app.intelligence.service.redact_fact).
+         */
+        post: operations["redact_fact_endpoint_api_v1_conversations__conversation_id__facts__fact_id__redact_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/facts/{fact_id}/unredact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unredact Fact Endpoint */
+        post: operations["unredact_fact_endpoint_api_v1_conversations__conversation_id__facts__fact_id__unredact_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/facts/{fact_id}/evidence": {
         parameters: {
             query?: never;
@@ -2488,6 +2527,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/recap/share-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Share Links Endpoint */
+        get: operations["list_share_links_endpoint_api_v1_conversations__conversation_id__recap_share_links_get"];
+        put?: never;
+        /**
+         * Create Share Link Endpoint
+         * @description Requires `recap:approve` -- the same trust level already required
+         *     to approve the recap in the first place; sharing it externally is at
+         *     least as consequential as approving it.
+         */
+        post: operations["create_share_link_endpoint_api_v1_conversations__conversation_id__recap_share_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/recap/share-links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Share Link Endpoint */
+        delete: operations["revoke_share_link_endpoint_api_v1_conversations__conversation_id__recap_share_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/recap/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Public Recap Endpoint
+         * @description 404 for "doesn't exist", "expired", and "revoked" alike -- never
+         *     distinguishes them, so a guessed/expired token can't be used to learn
+         *     anything about whether it was ever real (same posture
+         *     authorize_conversation_access already uses for org/team boundaries).
+         *     Also 404s if the recap is somehow no longer approved (e.g. a new
+         *     DRAFT revision superseded the one that was shared) -- the link never
+         *     serves stale or unapproved content.
+         */
+        get: operations["get_public_recap_endpoint_api_v1_public_recap__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -2933,6 +3038,14 @@ export interface components {
             /** Transcript Segment Corrections Total */
             transcript_segment_corrections_total: number;
         };
+        /** CreateShareLinkRequest */
+        CreateShareLinkRequest: {
+            /**
+             * Ttl Hours
+             * @default 168
+             */
+            ttl_hours: number;
+        };
         /** CreateTaskRequest */
         CreateTaskRequest: {
             /** Description */
@@ -3201,6 +3314,11 @@ export interface components {
             /** Reviewed At */
             reviewed_at?: string | null;
             /**
+             * Is Redacted
+             * @default false
+             */
+            is_redacted: boolean;
+            /**
              * Created At
              * Format: date-time
              */
@@ -3243,6 +3361,11 @@ export interface components {
             segment_end_ms?: number | null;
             /** Segment Text */
             segment_text?: string | null;
+        };
+        /** FactRedactionRequest */
+        FactRedactionRequest: {
+            /** Reason */
+            reason?: string | null;
         };
         /**
          * FollowUpStatus
@@ -4369,6 +4492,26 @@ export interface components {
             /** Retired At */
             retired_at: string | null;
         };
+        /**
+         * PublicRecapResponse
+         * @description Deliberately minimal -- only what an unauthenticated recipient
+         *     needs to read the recap. Never the conversation title, participant
+         *     names, or any other metadata beyond what the recap text itself
+         *     already contains.
+         */
+        PublicRecapResponse: {
+            /** Content */
+            content: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Approved At */
+            approved_at: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
         /** QualityMetricsResponse */
         QualityMetricsResponse: {
             /** Transcript Segments Total */
@@ -4881,6 +5024,39 @@ export interface components {
             last_rotated_at: string | null;
             /** Last Used At */
             last_used_at: string | null;
+        };
+        /** ShareLinkResponse */
+        ShareLinkResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Token */
+            token: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Access Count */
+            access_count: number;
+            /** Last Accessed At */
+            last_accessed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** SpeakerAssignmentRequest */
         SpeakerAssignmentRequest: {
@@ -7338,6 +7514,78 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractedFactResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redact_fact_endpoint_api_v1_conversations__conversation_id__facts__fact_id__redact_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactRedactionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractedFactResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unredact_fact_endpoint_api_v1_conversations__conversation_id__facts__fact_id__unredact_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                fact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactRedactionRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -10587,6 +10835,133 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_share_links_endpoint_api_v1_conversations__conversation_id__recap_share_links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareLinkResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_share_link_endpoint_api_v1_conversations__conversation_id__recap_share_links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateShareLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareLinkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_share_link_endpoint_api_v1_conversations__conversation_id__recap_share_links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_recap_endpoint_api_v1_public_recap__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicRecapResponse"];
                 };
             };
             /** @description Validation Error */

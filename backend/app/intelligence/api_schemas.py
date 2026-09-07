@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ExtractRequest(BaseModel):
@@ -31,8 +31,29 @@ class ExtractedFactResponse(BaseModel):
     corrected_structured_value: dict[str, Any] | None = None
     reviewed_by_user_id: uuid.UUID | None = None
     reviewed_at: datetime | None = None
+    # Post-GA P3-2. The real `structured_value`/`corrected_structured_value`
+    # above are deliberately still returned as-is even when redacted —
+    # this is the internal, permission-gated view (a reviewer must be able
+    # to see what's redacted and why); only shared/rendered outputs black
+    # the content out (see app.intelligence.rendering.render_fact_statement).
+    is_redacted: bool = False
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FactRedactionRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class FactRedactionEventResponse(BaseModel):
+    id: uuid.UUID
+    fact_id: uuid.UUID
+    redacted: bool
+    reason: str | None
+    actor_user_id: uuid.UUID | None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 

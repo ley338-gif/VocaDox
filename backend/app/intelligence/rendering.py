@@ -22,6 +22,14 @@ def effective_value(fact: ExtractedFact) -> dict[str, Any]:
     return fact.structured_value
 
 
+# Post-GA P3-2: the one shared placeholder every redacted fact renders
+# as, everywhere render_fact_statement is used (Document composition,
+# search indexing, Ask VocaDox citations) — never the real content, and
+# never a placeholder that varies by category (which would itself leak
+# information about what kind of thing was hidden).
+REDACTED_PLACEHOLDER = "[Geschwärzt]"
+
+
 def render_fact_statement(fact: ExtractedFact) -> str:
     """Byte-identical rendering for the 3 builtin categories (never
     touched, so every pre-Phase-6/Phase-5 rendered document is unchanged).
@@ -29,7 +37,17 @@ def render_fact_statement(fact: ExtractedFact) -> str:
     Meeting's agenda_topic/action_item — falls through to a generic
     "field: value" renderer built from whatever keys the fact actually
     has, proving the composer isn't secretly still hardcoded to 3
-    categories."""
+    categories.
+
+    A redacted fact (`fact.is_redacted`) always renders as
+    `REDACTED_PLACEHOLDER`, regardless of category — this is the one
+    place every "publish/present" consumer (compose_document, search
+    indexing, Ask VocaDox) goes through, so blacking it out here blacks
+    it out everywhere at once, by construction. The raw `GET .../facts`
+    API deliberately never calls this function (see
+    app.intelligence.models.ExtractedFact.is_redacted's docstring)."""
+    if fact.is_redacted:
+        return REDACTED_PLACEHOLDER
     value = effective_value(fact)
     keys = set(value.keys())
     if fact.category == FactCategory.GENERAL_FACT.value and keys <= {

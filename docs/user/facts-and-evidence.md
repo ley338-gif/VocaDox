@@ -64,6 +64,30 @@ This is a minimal, read-only list for Phase 4. A full review workflow
 (marking issues resolved, correcting facts, approval before a document is
 generated) is a later phase.
 
+## Redacting a fact (post-GA P3-2)
+
+If a fact's content is sensitive and must not appear in the composed
+Document, search results, or an Ask VocaDox answer, someone with the
+`fact:redact` permission (Manager/Reviewer by default) can redact it:
+
+```
+POST /api/v1/conversations/{id}/facts/{fact_id}/redact    {"reason": "..."}
+POST /api/v1/conversations/{id}/facts/{fact_id}/unredact  {"reason": "..."}
+```
+
+This is **not** the same as marking a fact REMOVED during review — REMOVED
+means "this fact is wrong," redaction means "this fact is correct but
+must stay hidden." A redacted fact:
+
+- Renders as `[Geschwärzt]` everywhere it would otherwise be shown to
+  someone reading the Document, searching, or asking VocaDox a question.
+- Is still shown with its real content on this Facts page, for anyone
+  with `fact:read` — you can always see what's redacted and why.
+- Keeps its full evidence chain intact — nothing about the fact, its
+  source transcript segment, or its history is ever deleted.
+- Can always be un-redacted later; both actions are recorded (who, when,
+  and an optional reason) in the audit trail.
+
 ## What this is not
 
 - Not a generated report or clinical document — see

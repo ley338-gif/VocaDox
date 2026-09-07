@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class GenerateRecapRequest(BaseModel):
@@ -40,3 +40,36 @@ class RecapResponse(BaseModel):
     current_revision: RecapRevisionResponse | None = None
 
     model_config = {"from_attributes": True}
+
+
+# -- Share links (post-GA P3-2) ------------------------------------------
+
+
+class CreateShareLinkRequest(BaseModel):
+    ttl_hours: int = Field(default=168, ge=1, le=720)  # default 7 days, max 30 days
+
+
+class ShareLinkResponse(BaseModel):
+    id: uuid.UUID
+    conversation_id: uuid.UUID
+    token: str
+    expires_at: datetime
+    revoked_at: datetime | None
+    created_by_user_id: uuid.UUID | None
+    access_count: int
+    last_accessed_at: datetime | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PublicRecapResponse(BaseModel):
+    """Deliberately minimal -- only what an unauthenticated recipient
+    needs to read the recap. Never the conversation title, participant
+    names, or any other metadata beyond what the recap text itself
+    already contains."""
+
+    content: str
+    revision_number: int
+    approved_at: datetime | None
+    expires_at: datetime

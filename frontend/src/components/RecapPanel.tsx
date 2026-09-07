@@ -5,16 +5,131 @@
  * human-approved before export/sharing.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Download, RefreshCw, Sparkles } from "lucide-react";
+import { CheckCircle2, Copy, Download, Link2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { useState } from "react";
 
-import { approveRecap, generateRecap, getRecap, recapExportUrl } from "../api/recap";
+import {
+  approveRecap,
+  createShareLink,
+  generateRecap,
+  getRecap,
+  listShareLinks,
+  recapExportUrl,
+  revokeShareLink,
+} from "../api/recap";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
+import { Select } from "../design-system/FormControls";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import styles from "./RecapPanel.module.css";
+
+const TTL_OPTIONS = [
+  { label: "24 Stunden", hours: 24 },
+  { label: "7 Tage", hours: 24 * 7 },
+  { label: "30 Tage", hours: 24 * 30 },
+];
+
+function formatExpiry(iso: string): string {
+  return new Date(iso).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function ShareLinksSection({ conversationId }: { conversationId: string }) {
+  const { csrfToken, hasPermission } = useAuth();
+  const queryClient = useQueryClient();
+  const [ttlHours, setTtlHours] = useState(TTL_OPTIONS[1].hours);
+
+  const linksQuery = useQuery({
+    queryKey: ["recap-share-links", conversationId],
+    queryFn: () => listShareLinks(conversationId),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () => createShareLink(conversationId, ttlHours, csrfToken ?? ""),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["recap-share-links", conversationId] }),
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (linkId: string) => revokeShareLink(conversationId, linkId, csrfToken ?? ""),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["recap-share-links", conversationId] }),
+  });
+
+  const activeLinks = (linksQuery.data ?? []).filter(
+    (link) => !link.revoked_at && new Date(link.expires_at) > new Date()
+  );
+
+  if (!hasPermission("recap:approve")) return null;
+
+  return (
+    <div className={styles.shareLinks}>
+      <p className={styles.shareLinksHeading}>
+        <Link2 size={14} aria-hidden="true" /> Freigabe-Links (zeitlich begrenzt, kein Login
+        erforderlich)
+      </p>
+      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+        <Select
+          aria-label="Gültigkeitsdauer"
+          value={ttlHours}
+          onChange={(event) => setTtlHours(Number(event.target.value))}
+        >
+          {TTL_OPTIONS.map((option) => (
+            <option key={option.hours} value={option.hours}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+        <Button
+          variant="secondary"
+          type="button"
+          disabled={createMutation.isPending}
+          onClick={() => createMutation.mutate()}
+        >
+          Link erstellen
+        </Button>
+      </div>
+
+      {activeLinks.length > 0 && (
+        <ul className={styles.shareLinkList}>
+          {activeLinks.map((link) => {
+            const url = `${window.location.origin}/share/recap/${link.token}`;
+            return (
+              <li key={link.id} className={styles.shareLinkItem}>
+                <span className={styles.shareLinkUrl}>{url}</span>
+                <span className={styles.shareLinkMeta}>
+                  läuft ab am {formatExpiry(link.expires_at)} · {link.access_count}× abgerufen
+                </span>
+                <button
+                  type="button"
+                  aria-label="Link kopieren"
+                  onClick={() => void navigator.clipboard.writeText(url)}
+                >
+                  <Copy size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Link widerrufen"
+                  onClick={() => revokeMutation.mutate(link.id)}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export function RecapPanel({ conversationId }: { conversationId: string }) {
   const { csrfToken, hasPermission } = useAuth();
@@ -118,6 +233,8 @@ export function RecapPanel({ conversationId }: { conversationId: string }) {
               </>
             )}
           </div>
+
+          {revision.status === "approved" && <ShareLinksSection conversationId={conversationId} />}
         </Card>
       )}
     </div>

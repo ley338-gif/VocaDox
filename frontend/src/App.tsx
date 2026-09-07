@@ -33,6 +33,7 @@ import { AppHomePage } from "./pages/AppHomePage";
 import { ConversationDetailPage } from "./pages/ConversationDetailPage";
 import { ConversationsListPage } from "./pages/ConversationsListPage";
 import { HomePage } from "./pages/HomePage";
+import { PublicRecapPage } from "./pages/PublicRecapPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewConversationPage } from "./pages/NewConversationPage";
 import { TasksListPage } from "./pages/TasksListPage";
@@ -52,6 +53,7 @@ export function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/design-system" element={<DesignSystemPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/share/recap/:token" element={<PublicRecapPage />} />
           <Route
             path="/app"
             element={

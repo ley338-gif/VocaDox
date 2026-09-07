@@ -20,13 +20,22 @@ from app.identity.deps import get_current_user, require_csrf, require_permission
 from app.identity.models import User
 from app.platform.db.session import get_session
 from app.providers.llm import LLMProvider
-from app.recap.api_schemas import RecapResponse, RecapRevisionResponse
-from app.recap.models import Recap, RecapRevision
+from app.recap.api_schemas import (
+    CreateShareLinkRequest,
+    RecapResponse,
+    RecapRevisionResponse,
+    ShareLinkResponse,
+)
+from app.recap.models import Recap, RecapRevision, RecapShareLink
 from app.recap.service import (
     RecapApprovalError,
     RecapNotComposableError,
+    ShareLinkNotAvailableError,
     approve_recap,
+    create_share_link,
     generate_recap,
+    list_share_links,
+    revoke_share_link,
 )
 
 router = APIRouter(prefix="/conversations", tags=["recap"])
@@ -180,3 +189,104 @@ async def export_recap_endpoint(
     # callers/tests assert `content` verbatim) -- the new DOCX/PDF formats
     # are where the status/revision-number visibility requirement lands.
     return Response(content=content, media_type="text/plain")
+
+
+# -- Share links (post-GA P3-2) ------------------------------------------
+
+
+@router.post(
+    "/{conversation_id}/recap/share-links",
+    response_model=ShareLinkResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_share_link_endpoint(
+    conversation_id: uuid.UUID,
+    body: CreateShareLinkRequest,
+    user: User = Depends(_require_approve),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> ShareLinkResponse:
+    """Requires `recap:approve` -- the same trust level already required
+    to approve the recap in the first place; sharing it externally is at
+    least as consequential as approving it."""
+    await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="recap:approve"
+    )
+    recap = await _get_recap_or_404(db, conversation_id)
+    try:
+        link = await create_share_link(
+            db,
+            conversation_id=conversation_id,
+            recap=recap,
+            ttl_hours=body.ttl_hours,
+            created_by_user_id=user.id,
+        )
+    except ShareLinkNotAvailableError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await record_event(
+        db,
+        event_type="recap.share_link_created",
+        user_id=user.id,
+        username=user.username,
+        event_metadata={
+            "conversation_id": str(conversation_id),
+            "recap_id": str(recap.id),
+            "share_link_id": str(link.id),
+            "expires_at": link.expires_at.isoformat(),
+        },
+    )
+    await db.commit()
+    await db.refresh(link)
+    return ShareLinkResponse.model_validate(link)
+
+
+@router.get("/{conversation_id}/recap/share-links", response_model=list[ShareLinkResponse])
+async def list_share_links_endpoint(
+    conversation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+) -> list[ShareLinkResponse]:
+    await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="recap:read"
+    )
+    links = await list_share_links(db, conversation_id=conversation_id)
+    return [ShareLinkResponse.model_validate(link) for link in links]
+
+
+async def _get_share_link_or_404(
+    db: AsyncSession, conversation_id: uuid.UUID, link_id: uuid.UUID
+) -> RecapShareLink:
+    result = await db.execute(
+        select(RecapShareLink).where(
+            RecapShareLink.id == link_id, RecapShareLink.conversation_id == conversation_id
+        )
+    )
+    link = result.scalar_one_or_none()
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="share link not found")
+    return link
+
+
+@router.delete(
+    "/{conversation_id}/recap/share-links/{link_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def revoke_share_link_endpoint(
+    conversation_id: uuid.UUID,
+    link_id: uuid.UUID,
+    user: User = Depends(_require_approve),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> None:
+    await authorize_conversation_access(
+        db, user=user, conversation_id=conversation_id, permission_code="recap:approve"
+    )
+    link = await _get_share_link_or_404(db, conversation_id, link_id)
+    await revoke_share_link(db, link)
+    await record_event(
+        db,
+        event_type="recap.share_link_revoked",
+        user_id=user.id,
+        username=user.username,
+        event_metadata={"conversation_id": str(conversation_id), "share_link_id": str(link_id)},
+    )
+    await db.commit()

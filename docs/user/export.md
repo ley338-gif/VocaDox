@@ -27,6 +27,19 @@ you can download it as **.txt**, **.docx**, or **.pdf** — same
 status/revision visibility as the Document export. Export is only
 available for an *approved* recap (unchanged from before).
 
+### Freigabe-Links (share links, post-GA P3-2)
+
+If you have `recap:approve` permission, an approved recap also shows a
+**Freigabe-Links** section: create a link (valid 24 hours, 7 days, or 30
+days) that lets anyone who has it read the recap **without a VocaDox
+login** — useful for sending to a patient or a referring practice. The
+link always shows the recap's current content; if you generate and
+approve a new revision later, the same link starts showing that instead.
+**Widerrufen** (revoke) immediately invalidates a link, and every link
+expires on its own if you never revoke it. Nothing beyond the recap text
+itself and its expiry date is shown on the public page — no other
+conversation data, no login prompt.
+
 ## Transcript
 
 From the **Transkript** tab you can download the transcript as **.txt**,

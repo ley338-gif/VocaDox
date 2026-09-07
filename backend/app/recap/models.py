@@ -124,3 +124,39 @@ def _forbid_mutating_approved_recap_revision(
             f"recap_revisions.id={target.id} is APPROVED and can never be modified; "
             "create a new revision via generate_recap instead"
         )
+
+
+class RecapShareLink(Base):
+    """Post-GA P3-2: a time-limited, unauthenticated-access token for one
+    conversation's currently-approved recap — e.g. to send to a patient
+    or referring practice without giving them a VocaDox login. `token` is
+    a cryptographically random, unguessable string
+    (`secrets.token_urlsafe`, see app.recap.service.create_share_link) —
+    never derived from or containing any identifying data, same posture
+    as `app.identity.sessions.SessionData`'s own session tokens.
+
+    Access is validated purely by (token exists, not expired, not
+    revoked) at request time — the recap CONTENT served is always the
+    live current-revision content at the moment of access, never a
+    frozen copy, so revoking approval or generating a new revision takes
+    effect on every outstanding link immediately."""
+
+    __tablename__ = "recap_share_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    access_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_accessed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )

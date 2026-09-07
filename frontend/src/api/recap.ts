@@ -80,3 +80,55 @@ export function approveRecap(conversationId: string, csrfToken: string): Promise
 export function recapExportUrl(conversationId: string, format: "text" | "docx" | "pdf" = "text"): string {
   return `${API_PREFIX}/conversations/${conversationId}/recap/export?format=${format}`;
 }
+
+// -- Share links (post-GA P3-2) ------------------------------------------
+
+export interface ShareLink {
+  id: string;
+  conversation_id: string;
+  token: string;
+  expires_at: string;
+  revoked_at: string | null;
+  created_by_user_id: string | null;
+  access_count: number;
+  last_accessed_at: string | null;
+  created_at: string;
+}
+
+export function listShareLinks(conversationId: string): Promise<ShareLink[]> {
+  return request(`/conversations/${conversationId}/recap/share-links`);
+}
+
+export function createShareLink(
+  conversationId: string,
+  ttlHours: number,
+  csrfToken: string
+): Promise<ShareLink> {
+  return request(`/conversations/${conversationId}/recap/share-links`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+    body: JSON.stringify({ ttl_hours: ttlHours }),
+  });
+}
+
+export function revokeShareLink(
+  conversationId: string,
+  linkId: string,
+  csrfToken: string
+): Promise<void> {
+  return request(`/conversations/${conversationId}/recap/share-links/${linkId}`, {
+    method: "DELETE",
+    headers: { "X-CSRF-Token": csrfToken },
+  });
+}
+
+export interface PublicRecap {
+  content: string;
+  revision_number: number;
+  approved_at: string | null;
+  expires_at: string;
+}
+
+export function getPublicRecap(token: string): Promise<PublicRecap> {
+  return request(`/public/recap/${token}`);
+}
