@@ -75,3 +75,34 @@
   border-radius: 8px;
   font-size: var(--font-body-sm-size);
 }
+
+.livePreview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border-radius: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.livePreviewLabel {
+  font-size: var(--font-caption-size);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: var(--space-2) 0 0;
+}
+
+.livePreviewLabel:first-child {
+  margin-top: 0;
+}
+
+.liveTranscriptText,
+.liveDraftText {
+  font-size: var(--font-body-sm-size);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  margin: 0;
+}

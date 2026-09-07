@@ -734,6 +734,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/live/chunks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest Live Chunk Endpoint */
+        post: operations["ingest_live_chunk_endpoint_api_v1_conversations__conversation_id__live_chunks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Live Session Endpoint */
+        get: operations["get_live_session_endpoint_api_v1_conversations__conversation_id__live_get"];
+        put?: never;
+        post?: never;
+        /** Clear Live Session Endpoint */
+        delete: operations["clear_live_session_endpoint_api_v1_conversations__conversation_id__live_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/process/extract": {
         parameters: {
             query?: never;
@@ -2663,6 +2698,11 @@ export interface components {
             /** Completed At */
             completed_at: string | null;
         };
+        /** Body_ingest_live_chunk_endpoint_api_v1_conversations__conversation_id__live_chunks_post */
+        Body_ingest_live_chunk_endpoint_api_v1_conversations__conversation_id__live_chunks_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post */
         Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post: {
             /** File */
@@ -3473,6 +3513,17 @@ export interface components {
             } | null;
             /** Note */
             note?: string | null;
+        };
+        /** LiveSessionResponse */
+        LiveSessionResponse: {
+            /** Transcript Text */
+            transcript_text: string;
+            /** Draft Text */
+            draft_text: string | null;
+            /** Chunk Count */
+            chunk_count: number;
+            /** Updated At */
+            updated_at: string;
         };
         /** LivenessResponse */
         LivenessResponse: {
@@ -7103,6 +7154,101 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CompletenessResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_live_chunk_endpoint_api_v1_conversations__conversation_id__live_chunks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_ingest_live_chunk_endpoint_api_v1_conversations__conversation_id__live_chunks_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_live_session_endpoint_api_v1_conversations__conversation_id__live_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_live_session_endpoint_api_v1_conversations__conversation_id__live_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -47,6 +47,7 @@ export function useRecorder() {
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const mimeTypeRef = useRef<string>("audio/webm");
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -109,6 +110,7 @@ export function useRecorder() {
     setErrorMessage(null);
 
     const mimeType = preferredMimeType();
+    mimeTypeRef.current = mimeType ?? "audio/webm";
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data);
@@ -192,6 +194,19 @@ export function useRecorder() {
     dispatch({ type: "DISCARD" });
   }, [dispatch]);
 
+  /**
+   * Post-GA P2-1: the whole recording-so-far as a Blob, for a periodic
+   * live-preview upload. Deliberately NOT a delta since the last call —
+   * only the very first MediaRecorder timeslice carries the WebM header/
+   * cluster-init segment a decoder needs; later slices are raw
+   * continuation clusters that aren't independently decodable. Returns
+   * `null` before any chunk has been captured yet.
+   */
+  const getLiveChunkBlob = useCallback((): Blob | null => {
+    if (chunksRef.current.length === 0) return null;
+    return new Blob(chunksRef.current, { type: mimeTypeRef.current });
+  }, []);
+
   const beginUpload = useCallback(() => dispatch({ type: "UPLOAD_START" }), [dispatch]);
   const uploadSucceeded = useCallback(() => dispatch({ type: "UPLOAD_SUCCESS" }), [dispatch]);
   const uploadFailed = useCallback((message: string) => {
@@ -235,6 +250,7 @@ export function useRecorder() {
     addMarker,
     stop,
     discard,
+    getLiveChunkBlob,
     beginUpload,
     uploadSucceeded,
     uploadFailed,
