@@ -7,7 +7,7 @@ _note: "Full resolved dependency tree (direct + transitive) for both ecosystems.
   \ it ships in the worker-speech/worker-diarization images only, never in the api/frontend images (see\
   \ backend/worker.Dockerfile)."
 summary:
-  approved: 495
+  approved: 498
   review_required: 3
   blocked: 0
   unknown: 0
@@ -2677,7 +2677,7 @@ dependencies:
 - name: charset-normalizer
   ecosystem: pypi
   version: 3.5.1
-  scope: dev
+  scope: runtime
   direct: false
   license: MIT
   approval_status: approved
@@ -2929,6 +2929,13 @@ dependencies:
   direct: false
   license: Apache-2.0
   approval_status: approved
+- name: lxml
+  ecosystem: pypi
+  version: 6.1.3
+  scope: runtime
+  direct: false
+  license: BSD-3-Clause
+  approval_status: approved
 - name: markdown-it-py
   ecosystem: pypi
   version: 4.2.0
@@ -3111,7 +3118,7 @@ dependencies:
 - name: pillow
   ecosystem: pypi
   version: 12.3.0
-  scope: worker
+  scope: runtime
   direct: false
   license: MIT-CMU
   approval_status: approved
@@ -3288,6 +3295,13 @@ dependencies:
   direct: false
   license: Apache Software License; BSD License
   approval_status: approved
+- name: python-docx
+  ecosystem: pypi
+  version: 1.2.0
+  scope: runtime
+  direct: true
+  license: MIT
+  approval_status: approved
 - name: python-dotenv
   ecosystem: pypi
   version: 1.2.3
@@ -3316,6 +3330,15 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: reportlab
+  ecosystem: pypi
+  version: 5.0.1
+  scope: runtime
+  direct: true
+  license: BSD-3-Clause
+  approval_status: approved
+  note: License disambiguated via manual PyPI/registry verification (see PACKAGE_LICENSE_OVERRIDES in
+    this script).
 - name: requests
   ecosystem: pypi
   version: 2.34.2

@@ -47,6 +47,7 @@ from app.transcription.service import (
     reassign_segment_speaker,
     set_review_status,
 )
+from app.transcription.subtitles import render_srt, render_vtt
 
 router = APIRouter(prefix="/conversations", tags=["transcription"])
 
@@ -421,6 +422,22 @@ async def export_transcript_endpoint(
             f"**[{_fmt_ts(s.start_ms)}]** {s.corrected_text or s.original_text}" for s in segments
         ]
         return Response(content="\n\n".join(lines), media_type="text/markdown")
+
+    if format == "srt":
+        filename = f"transcript-{transcript.id}.srt"
+        return Response(
+            content=render_srt(segments),
+            media_type="application/x-subrip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    if format == "vtt":
+        filename = f"transcript-{transcript.id}.vtt"
+        return Response(
+            content=render_vtt(segments),
+            media_type="text/vtt",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     lines = [f"[{_fmt_ts(s.start_ms)}] {s.corrected_text or s.original_text}" for s in segments]
     return Response(content="\n".join(lines), media_type="text/plain")

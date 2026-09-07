@@ -100,14 +100,22 @@ export function RecapPanel({ conversationId }: { conversationId: string }) {
               </Button>
             )}
             {revision.status === "approved" && (
-              <a
-                className={styles.exportLink}
-                href={recapExportUrl(conversationId)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Download size={16} aria-hidden="true" /> Als Text exportieren
-              </a>
+              <>
+                <a
+                  className={styles.exportLink}
+                  href={recapExportUrl(conversationId, "text")}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Download size={16} aria-hidden="true" /> Als Text exportieren
+                </a>
+                <a className={styles.exportLink} href={recapExportUrl(conversationId, "docx")}>
+                  <Download size={16} aria-hidden="true" /> .docx
+                </a>
+                <a className={styles.exportLink} href={recapExportUrl(conversationId, "pdf")}>
+                  <Download size={16} aria-hidden="true" /> .pdf
+                </a>
+              </>
             )}
           </div>
         </Card>

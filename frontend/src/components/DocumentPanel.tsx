@@ -26,6 +26,7 @@ import { useState } from "react";
 import {
   approveDocument,
   composeDocument,
+  documentExportUrl,
   fetchDocumentExport,
   getDocument,
   listDocumentRevisions,
@@ -113,6 +114,12 @@ export function DocumentPanel({ conversationId }: { conversationId: string }) {
               <Button variant="tertiary" type="button" onClick={() => void handleExport("json")}>
                 <Download size={16} aria-hidden="true" /> .json
               </Button>
+              <a className={panelStyles.exportLink} href={documentExportUrl(conversationId, "docx")}>
+                <Download size={16} aria-hidden="true" /> .docx
+              </a>
+              <a className={panelStyles.exportLink} href={documentExportUrl(conversationId, "pdf")}>
+                <Download size={16} aria-hidden="true" /> .pdf
+              </a>
             </>
           )}
         </div>

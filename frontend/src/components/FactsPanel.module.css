@@ -7,6 +7,22 @@
   gap: var(--space-3);
 }
 
+.exportLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-body-sm-size);
+  font-weight: 600;
+  color: var(--accent);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.exportLink:hover {
+  background: var(--accent-subtle);
+}
+
 .item {
   padding: var(--space-3);
   border-radius: var(--radius-md);

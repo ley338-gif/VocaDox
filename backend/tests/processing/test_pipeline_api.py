@@ -616,3 +616,32 @@ async def test_worker_lease_expiry_reclaims_stale_running_job(seeded, processing
         assert len(reclaimed) == 1
         assert reclaimed[0].status == ProcessingStatus.QUEUED.value
         assert reclaimed[0].error_code == "WORKER_LEASE_EXPIRED"
+
+
+async def test_transcript_export_srt_and_vtt(client, seeded, processing_env) -> None:  # noqa: ANN001
+    """Post-GA P0-2: SRT/VTT export from the same alignment timestamps
+    already used for JSON/markdown/text export."""
+    _, sessionmaker, queue, storage = processing_env
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id, _ = await create_conversation_with_source_audio(
+        client, headers, organization_id=seeded["org_a"]
+    )
+    await _process_and_wait(client, headers, conversation_id)
+    await run_all_jobs(sessionmaker, queue, storage)
+
+    resp = await client.get(
+        f"/api/v1/conversations/{conversation_id}/transcript/export?format=srt", headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("application/x-subrip")
+    assert "attachment" in resp.headers["content-disposition"]
+    assert "1\n00:00:00,000 --> " in resp.text
+    assert "-->" in resp.text
+
+    resp = await client.get(
+        f"/api/v1/conversations/{conversation_id}/transcript/export?format=vtt", headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("text/vtt")
+    assert "attachment" in resp.headers["content-disposition"]
+    assert resp.text.startswith("WEBVTT\n\n00:00:00.000 --> ")
