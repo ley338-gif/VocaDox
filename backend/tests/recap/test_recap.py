@@ -111,6 +111,21 @@ async def test_generate_approve_export_recap(client, seeded, app_env) -> None:  
     assert export_response.status_code == 200
     assert export_response.text == recap["current_revision"]["content"]
 
+    # Post-GA P0-2: DOCX/PDF exports too, with status/revision visible
+    # (the plain-text export above deliberately stays byte-identical to
+    # its pre-P0-2 shape).
+    docx_response = await client.get(
+        f"/api/v1/conversations/{conversation_id}/recap/export?format=docx", headers=headers
+    )
+    assert docx_response.status_code == 200, docx_response.text
+    assert docx_response.content[:2] == b"PK"
+
+    pdf_response = await client.get(
+        f"/api/v1/conversations/{conversation_id}/recap/export?format=pdf", headers=headers
+    )
+    assert pdf_response.status_code == 200, pdf_response.text
+    assert pdf_response.content[:4] == b"%PDF"
+
     # Re-generating adds a NEW revision — never mutates the approved one.
     headers = await login(client, "alice", "a very strong password 123")
     regenerate_response = await client.post(

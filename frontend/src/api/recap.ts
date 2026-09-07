@@ -77,6 +77,6 @@ export function approveRecap(conversationId: string, csrfToken: string): Promise
   return request(`/conversations/${conversationId}/recap/approve`, jsonInit("POST", csrfToken));
 }
 
-export function recapExportUrl(conversationId: string): string {
-  return `${API_PREFIX}/conversations/${conversationId}/recap/export`;
+export function recapExportUrl(conversationId: string, format: "text" | "docx" | "pdf" = "text"): string {
+  return `${API_PREFIX}/conversations/${conversationId}/recap/export?format=${format}`;
 }

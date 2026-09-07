@@ -192,6 +192,9 @@ export function assignSpeaker(
   );
 }
 
-export function transcriptExportUrl(conversationId: string, format: "text" | "json" | "markdown"): string {
+export function transcriptExportUrl(
+  conversationId: string,
+  format: "text" | "json" | "markdown" | "srt" | "vtt"
+): string {
   return `${API_PREFIX}/conversations/${conversationId}/transcript/export?format=${format}`;
 }

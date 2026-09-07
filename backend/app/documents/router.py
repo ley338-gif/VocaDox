@@ -22,6 +22,7 @@ from app.documents.api_schemas import (
     DocumentRevisionResponse,
     ResolveReviewIssueRequest,
 )
+from app.documents.export_formats import ExportSection, render_docx, render_pdf
 from app.documents.models import Document, DocumentRevision
 from app.documents.service import (
     ApprovalBlockedError,
@@ -210,8 +211,28 @@ async def export_document_endpoint(
         }
         return Response(content=_json.dumps(payload, indent=2), media_type="application/json")
 
-    header = f"Status: {revision_status} (revision {revision_number})\n\n"
-    return Response(content=header + revision_text, media_type="text/plain")
+    meta_lines = [f"Status: {revision_status} (revision {revision_number})"]
+
+    if format in ("docx", "pdf"):
+        sections = [
+            ExportSection(heading=s["title"], lines=[st["text"] for st in s["statements"]])
+            for s in revision_content
+        ]
+        filename = f"document-{document_id}-r{revision_number}.{format}"
+        if format == "docx":
+            content = render_docx(title="Dokumentation", meta_lines=meta_lines, sections=sections)
+            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        else:
+            content = render_pdf(title="Dokumentation", meta_lines=meta_lines, sections=sections)
+            media_type = "application/pdf"
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    body = "\n\n".join(meta_lines) + "\n\n" + revision_text
+    return Response(content=body, media_type="text/plain")
 
 
 async def _get_fact_or_404(

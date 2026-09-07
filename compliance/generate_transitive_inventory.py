@@ -138,6 +138,9 @@ PACKAGE_LICENSE_OVERRIDES: dict[tuple[str, str], str] = {
     ("pypi", "soundfile"): "BSD-3-Clause",  # PyPI license field states "BSD 3-Clause License"
     ("pypi", "sympy"): "BSD-3-Clause",
     ("pypi", "threadpoolctl"): "BSD-3-Clause",  # PyPI license field states "BSD-3-Clause"
+    ("pypi", "reportlab"): "BSD-3-Clause",  # Post-GA P0-2: pip-licenses reports bare "BSD"; the
+    # actual LICENSE file in the reportlab 5.0.1 sdist (retain-notice + reproduce-in-binary +
+    # no-endorsement-without-permission, three conditions) is BSD-3-Clause, verified 2026-09-07.
     ("pypi", "torchaudio"): "BSD-2-Clause",  # verified via github.com/pytorch/audio LICENSE — 2-clause, unlike torch's own 3-clause
     ("pypi", "cloudpickle"): "BSD-3-Clause",  # Phase 4: pip-licenses reports bare "BSD" (OSI trove
     # classifier only); PyPI JSON's `info.license` field for cloudpickle 3.1.2 states

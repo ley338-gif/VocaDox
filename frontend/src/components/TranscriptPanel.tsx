@@ -253,6 +253,12 @@ export function TranscriptPanel({
           <a href={transcriptExportUrl(conversationId, "markdown")} target="_blank" rel="noreferrer">
             <Download size={14} aria-hidden="true" /> .md
           </a>
+          <a href={transcriptExportUrl(conversationId, "srt")} target="_blank" rel="noreferrer">
+            <Download size={14} aria-hidden="true" /> .srt
+          </a>
+          <a href={transcriptExportUrl(conversationId, "vtt")} target="_blank" rel="noreferrer">
+            <Download size={14} aria-hidden="true" /> .vtt
+          </a>
         </div>
       </div>
 

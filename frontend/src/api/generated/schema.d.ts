@@ -2289,9 +2289,8 @@ export interface paths {
         };
         /**
          * Export Recap Endpoint
-         * @description Plain text export — the recap is meant to be copied into an email
-         *     or printed, matching the Document export's minimalism (PDF/DOCX
-         *     deliberately deferred, same rationale as app.documents.router).
+         * @description Plain text / DOCX / PDF export — the recap is meant to be copied
+         *     into an email, printed, or attached as a real file (post-GA P0-2).
          */
         get: operations["export_recap_endpoint_api_v1_conversations__conversation_id__recap_export_get"];
         put?: never;
@@ -9799,7 +9798,9 @@ export interface operations {
     };
     export_recap_endpoint_api_v1_conversations__conversation_id__recap_export_get: {
         parameters: {
-            query?: never;
+            query?: {
+                format?: string;
+            };
             header?: never;
             path: {
                 conversation_id: string;

@@ -250,6 +250,32 @@ dependencies:
       ModuleNotFoundError" regardless of how the Ollama host was
       configured.
 
+  - name: python-docx
+    ecosystem: pypi
+    version_constraint: ">=1.2,<2.0"
+    license: MIT
+    license_source_url: https://pypi.org/pypi/python-docx/json
+    approval_status: approved
+    notes: >
+      info.license = MIT (PyPI JSON, version 1.2.0). Post-GA P0-2: DOCX
+      export for Document/Recap (app/documents/export_formats.py). Runs in
+      the `backend` API process (the export endpoint), no network calls.
+      Depends on lxml (BSD-3-Clause, already approved) and
+      typing-extensions (already a transitive dependency elsewhere).
+
+  - name: reportlab
+    ecosystem: pypi
+    version_constraint: ">=5.0,<6.0"
+    license: BSD-3-Clause
+    license_source_url: https://pypi.org/pypi/reportlab/json
+    approval_status: approved
+    notes: >
+      info.license = "BSD license (see license.txt for details)" (PyPI
+      JSON, version 5.0.1); classifiers confirm "License :: OSI Approved
+      :: BSD License". Post-GA P0-2: PDF export for Document/Recap
+      (app/documents/export_formats.py). Pure-Python core, no native
+      dependency, no network calls.
+
   # Phase 4 note: Ollama itself (the local LLM inference server) was never
   # a Python dependency — it was a separate bundled container image (see
   # docs/architecture/adr/0024-llm-provider-selection.md for the original

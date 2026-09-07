@@ -89,7 +89,10 @@ export function approveDocument(conversationId: string, csrfToken: string): Prom
   });
 }
 
-export function documentExportUrl(conversationId: string, format: "text" | "json"): string {
+export function documentExportUrl(
+  conversationId: string,
+  format: "text" | "json" | "docx" | "pdf"
+): string {
   return `${API_PREFIX}/conversations/${conversationId}/document/export?format=${format}`;
 }
 
