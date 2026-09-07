@@ -54,10 +54,13 @@ from app.intelligence.models import (
     FactReviewStatus,
     FactStatus,
 )
+from app.intelligence.rendering import render_fact_statement
 from app.platform.version import APPLICATION_VERSION
 from app.processing.models import ProcessingRun, RunStatus, RunType
 from app.profiles.resolver import NoSystemDefaultProfileError, resolve_effective_config
 from app.review.models import ReviewIssue, ReviewIssueResolution, ReviewIssueStatus
+from app.search.models import SearchSourceType
+from app.search.service import delete_search_entry, upsert_search_entry
 from app.templates.models import TemplateVersion
 
 # Fallback presentation used only if no TemplateVersion can be resolved at
@@ -85,51 +88,6 @@ class ApprovalBlockedError(Exception):
 
 class DocumentNotComposableError(ValueError):
     pass
-
-
-def _effective_value(fact: ExtractedFact) -> dict[str, Any]:
-    """A human CORRECTED value always wins over the original LLM output —
-    the original is never discarded (still on `structured_value`), just
-    superseded for rendering purposes. See FactReviewStatus's docstring."""
-    if fact.review_status == FactReviewStatus.CORRECTED.value and fact.corrected_structured_value:
-        return fact.corrected_structured_value
-    return fact.structured_value
-
-
-def _render_statement(fact: ExtractedFact) -> str:
-    """Byte-identical rendering for the 3 builtin categories (never
-    touched, so every pre-Phase-6/Phase-5 rendered document is unchanged).
-    Any other category — i.e. anything a Phase 6 template defines, like
-    Meeting's agenda_topic/action_item — falls through to a generic
-    "field: value" renderer built from whatever keys the fact actually
-    has, proving the composer isn't secretly still hardcoded to 3
-    categories."""
-    value = _effective_value(fact)
-    keys = set(value.keys())
-    if fact.category == FactCategory.GENERAL_FACT.value and keys <= {
-        "subject", "attribute", "value", "certainty", "evidence_segment_sequences",
-    }:
-        subject = value.get("subject", "?")
-        attribute = value.get("attribute", "?")
-        return f"{subject} — {attribute}: {value.get('value', '?')}"
-    if fact.category == FactCategory.DECISION.value and keys <= {
-        "description", "decided_by", "certainty", "evidence_segment_sequences",
-    }:
-        return str(value.get("description", "?"))
-    if fact.category == FactCategory.TASK.value and keys <= {
-        "description", "assignee", "due_date", "certainty", "evidence_segment_sequences",
-    }:
-        return (
-            f"{value.get('description', '?')} "
-            f"(assignee: {value.get('assignee', 'not mentioned')}, "
-            f"due: {value.get('due_date', 'not mentioned')})"
-        )
-    parts = [
-        f"{key}: {v}"
-        for key, v in value.items()
-        if key not in ("certainty", "evidence_segment_sequences") and v not in (None, "")
-    ]
-    return "; ".join(parts) if parts else "(no details)"
 
 
 async def _resolve_template_version(
@@ -210,7 +168,7 @@ async def compose_document(
         if not category_facts:
             continue
         statements = [
-            {"text": _render_statement(f), "fact_ids": [str(f.id)]} for f in category_facts
+            {"text": render_fact_statement(f), "fact_ids": [str(f.id)]} for f in category_facts
         ]
         sections.append({"category": category, "title": title, "statements": statements})
         text_lines.append(f"## {title}")
@@ -288,6 +246,23 @@ async def compose_document(
     document.status = validated_status.value
     await session.flush()
 
+    from app.conversations.models import Conversation
+
+    conversation = await session.get(Conversation, conversation_id)
+    assert conversation is not None
+    # Keyed on the Document id (never the revision id) so re-composing
+    # replaces this one entry instead of accumulating a stale one per
+    # past revision -- see SearchEntry's module docstring.
+    await upsert_search_entry(
+        session,
+        conversation_id=conversation.id,
+        organization_id=conversation.organization_id,
+        group_id=conversation.group_id,
+        source_type=SearchSourceType.DOCUMENT,
+        source_id=document.id,
+        content=revision.rendered_text,
+    )
+
     run.status = RunStatus.SUCCEEDED.value
     run.completed_at = datetime.now(UTC)
     run.raw_output = {"revision_id": str(revision.id), "section_count": len(sections)}
@@ -347,6 +322,9 @@ async def resolve_review_issue(
         fact.review_status = FactReviewStatus.CONFIRMED.value
     elif action == ReviewIssueResolution.REMOVED:
         fact.review_status = FactReviewStatus.REMOVED.value
+        await delete_search_entry(
+            session, source_type=SearchSourceType.EXTRACTED_FACT, source_id=fact.id
+        )
     elif action == ReviewIssueResolution.CORRECTED:
         if not corrected_value:
             raise ValueError("corrected_value is required for a CORRECT action")
@@ -366,6 +344,21 @@ async def resolve_review_issue(
     fact.reviewed_by_user_id = resolved_by.id
     fact.reviewed_at = now
     await session.flush()
+
+    if action == ReviewIssueResolution.CORRECTED:
+        from app.conversations.models import Conversation
+
+        conversation = await session.get(Conversation, issue.conversation_id)
+        assert conversation is not None
+        await upsert_search_entry(
+            session,
+            conversation_id=conversation.id,
+            organization_id=conversation.organization_id,
+            group_id=conversation.group_id,
+            source_type=SearchSourceType.EXTRACTED_FACT,
+            source_id=fact.id,
+            content=render_fact_statement(fact),
+        )
 
     issue.status = ReviewIssueStatus.RESOLVED.value
     issue.resolved_status = action.value

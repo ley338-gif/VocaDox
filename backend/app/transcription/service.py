@@ -12,6 +12,9 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conversations.models import Conversation
+from app.search.models import SearchSourceType
+from app.search.service import upsert_search_entry
 from app.transcription.alignment import AlignedSegment, AlignmentQuality
 from app.transcription.models import (
     SegmentReviewStatus,
@@ -118,6 +121,10 @@ async def mark_transcript_failed(
     await session.flush()
 
 
+def _segment_text(segment: TranscriptSegment) -> str:
+    return segment.corrected_text or segment.original_text
+
+
 def _review_flag(quality: AlignmentQuality, confidence: float | None) -> tuple[bool, str | None]:
     if quality == AlignmentQuality.OVERLAP:
         return True, "overlapping speech"
@@ -186,6 +193,20 @@ async def persist_aligned_segments(
 
     transcript.status = TranscriptStatus.READY.value
     await session.flush()
+
+    conversation = await session.get(Conversation, transcript.conversation_id)
+    assert conversation is not None  # FK integrity guards this in practice
+    for row in rows:
+        if _segment_text(row):
+            await upsert_search_entry(
+                session,
+                conversation_id=conversation.id,
+                organization_id=conversation.organization_id,
+                group_id=conversation.group_id,
+                source_type=SearchSourceType.TRANSCRIPT_SEGMENT,
+                source_id=row.id,
+                content=_segment_text(row),
+            )
     return rows
 
 
@@ -220,6 +241,20 @@ async def correct_segment(
     segment.corrected_text = new_text
     segment.review_status = SegmentReviewStatus.CORRECTED.value
     await session.flush()
+
+    transcript = await session.get(Transcript, segment.transcript_id)
+    assert transcript is not None
+    conversation = await session.get(Conversation, transcript.conversation_id)
+    assert conversation is not None
+    await upsert_search_entry(
+        session,
+        conversation_id=conversation.id,
+        organization_id=conversation.organization_id,
+        group_id=conversation.group_id,
+        source_type=SearchSourceType.TRANSCRIPT_SEGMENT,
+        source_id=segment.id,
+        content=_segment_text(segment),
+    )
     return correction
 
 

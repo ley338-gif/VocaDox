@@ -10,7 +10,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   correctSegment,
@@ -50,10 +50,14 @@ export function TranscriptPanel({
   conversationId,
   audioPlayerRef,
   activeMs,
+  focusSegmentId,
 }: {
   conversationId: string;
   audioPlayerRef: React.RefObject<AudioPlayerHandle | null>;
   activeMs: number;
+  /** Set when arriving from a search result (post-GA P0-1) — scrolls to
+   * and briefly highlights this one segment once its row has rendered. */
+  focusSegmentId?: string;
 }) {
   const { csrfToken, hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -160,6 +164,14 @@ export function TranscriptPanel({
     return match?.id ?? null;
   }, [segmentsQuery.data, activeMs]);
 
+  // Arriving from a search result hit (post-GA P0-1): scroll to and
+  // highlight the target segment once its row exists in the DOM.
+  useEffect(() => {
+    if (!focusSegmentId || !segmentsQuery.data) return;
+    const el = document.getElementById(`transcript-segment-${focusSegmentId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusSegmentId, segmentsQuery.data]);
+
   if (transcriptQuery.isLoading || processingQuery.isLoading) {
     return <Skeleton height="6rem" />;
   }
@@ -265,7 +277,7 @@ export function TranscriptPanel({
             segment={segment}
             speakerColorKey={speakerColorKeyFor(speakers, segment.speaker_id)}
             speakerName={speakerLabel(speakers, segment.speaker_id)}
-            active={segment.id === activeSegmentId}
+            active={segment.id === activeSegmentId || segment.id === focusSegmentId}
             editing={editingSegmentId === segment.id}
             editValue={editValue}
             canCorrect={hasPermission("transcript:correct")}
