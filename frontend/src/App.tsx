@@ -6,6 +6,7 @@ import { RequireAuth, RequirePermission } from "./auth/RequireAuth";
 import { DesignSystemPage } from "./design-system/DesignSystemPage";
 import { ToastProvider } from "./design-system/Toast";
 import { AdminAboutPage } from "./pages/AdminAboutPage";
+import { AskVocaDoxPage } from "./pages/AskVocaDoxPage";
 import { AdminAnalyticsPage } from "./pages/AdminAnalyticsPage";
 import { AdminAuditPage } from "./pages/AdminAuditPage";
 import { AdminAuthenticationPage } from "./pages/AdminAuthenticationPage";
@@ -80,6 +81,14 @@ export function App() {
             element={
               <RequirePermission code="task:read">
                 <TasksListPage />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="/app/ask"
+            element={
+              <RequirePermission code="ask:query">
+                <AskVocaDoxPage />
               </RequirePermission>
             }
           />

@@ -9,6 +9,7 @@ import {
   MessagesSquare,
   Plug,
   ShieldCheck,
+  Sparkles,
   Users,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ export const APP_SECTIONS: NavSection[] = [
       { to: "/app", label: "Dashboard", icon: LayoutDashboard },
       { to: "/app/conversations", label: "Gespräche", icon: MessagesSquare },
       { to: "/app/tasks", label: "Aufgaben", icon: ClipboardList, permission: "task:read" },
+      { to: "/app/ask", label: "Ask VocaDox", icon: Sparkles, permission: "ask:query" },
     ],
   },
   {
