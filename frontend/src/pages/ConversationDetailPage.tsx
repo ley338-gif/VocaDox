@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  Bookmark,
   AlertTriangle,
   CheckSquare,
   Clock,
@@ -888,9 +889,9 @@ export function ConversationDetailPage() {
         </div>
 
         <aside className={styles.sidebar}>
-          <Card title="Marker">
+          <SidePanelCard icon={<Bookmark size={16} aria-hidden="true" />} title="Marker">
             {markersQuery.data && markersQuery.data.length === 0 && (
-              <EmptyState title="Noch keine Marker" />
+              <p className={styles.sidebarEmpty}>Noch keine Marker</p>
             )}
             <ul className={styles.list}>
               {markersQuery.data?.map((marker) => (
@@ -924,11 +925,11 @@ export function ConversationDetailPage() {
                 </Button>
               </div>
             )}
-          </Card>
+          </SidePanelCard>
 
           <SidePanelCard icon={<Users size={16} aria-hidden="true" />} title="Teilnehmer">
             {participantsQuery.data && participantsQuery.data.length === 0 && (
-              <EmptyState title="Noch keine Teilnehmer" />
+              <p className={styles.sidebarEmpty}>Noch keine Teilnehmer</p>
             )}
             <ul className={styles.list}>
               {participantsQuery.data?.map((participant) => (
@@ -972,7 +973,9 @@ export function ConversationDetailPage() {
               ))}
             </ul>
             {hasPermission("conversation:manage-participants") && (
-              <div className={styles.addRowStacked}>
+              <details className={styles.sidebarDisclosure}>
+                <summary>Teilnehmer hinzufügen</summary>
+                <div className={styles.addRowStacked}>
                 {(knownSpeakersQuery.data ?? []).length > 0 && (
                   <Select
                     aria-label="Bekannte Person auswählen"
@@ -1023,11 +1026,12 @@ export function ConversationDetailPage() {
                     Hinzufügen
                   </Button>
                 </div>
-              </div>
+                </div>
+              </details>
             )}
             {(speakersQuery.data ?? []).length > 0 && (
-              <>
-                <p className={styles.sidebarSubheading}>Sprecher verwalten</p>
+              <details className={styles.sidebarDisclosure}>
+                <summary>Sprecher verwalten</summary>
                 <div className={styles.speakerBadgeRow}>
                   {speakersQuery.data?.map((speaker) => (
                     <SpeakerBadge
@@ -1066,16 +1070,19 @@ export function ConversationDetailPage() {
                     </Button>
                   </div>
                 )}
-              </>
+              </details>
             )}
           </SidePanelCard>
 
           {hasPermission("fact:read") && (
             <SidePanelCard icon={<Gauge size={16} aria-hidden="true" />} title="Vollständigkeit">
-              <CompletenessPanel
-                completeness={completenessQuery.data}
-                isLoading={completenessQuery.isLoading}
-              />
+              <details className={styles.sidebarDisclosure}>
+                <summary>{completenessQuery.data ? `${Math.round(completenessQuery.data.overall_score * 100)}% vollständig · Details` : "Auswertung anzeigen"}</summary>
+                <CompletenessPanel
+                  completeness={completenessQuery.data}
+                  isLoading={completenessQuery.isLoading}
+                />
+              </details>
             </SidePanelCard>
           )}
 
@@ -1091,7 +1098,7 @@ export function ConversationDetailPage() {
             >
               {tasksQuery.isLoading && <Skeleton height="2rem" />}
               {!tasksQuery.isLoading && openTasks.length === 0 && (
-                <EmptyState title="Keine offenen Aufgaben" />
+                <p className={styles.sidebarEmpty}>Keine offenen Aufgaben</p>
               )}
               <ul className={styles.taskPreviewList}>
                 {openTasks.slice(0, 5).map((task) => (
