@@ -62,8 +62,7 @@
   border-color: var(--accent);
 }
 
-.recentList,
-.taskList {
+.recentList {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -120,47 +119,6 @@
 .recentChevron {
   color: var(--text-muted);
   flex-shrink: 0;
-}
-
-.taskItem {
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--border-default);
-}
-
-.taskItem:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.taskLink {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  border: none;
-  background: none;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-}
-
-.taskBody {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.taskDescription {
-  color: var(--text-primary);
-  font-size: var(--font-body-sm-size);
-}
-
-.taskMeta {
-  color: var(--text-muted);
-  font-size: var(--font-caption-size);
 }
 
 .searchResults {
