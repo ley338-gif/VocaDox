@@ -21,7 +21,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import ColumnElement, delete, literal_column, or_, select, text
+from sqlalchemy import ColumnElement, delete, func, literal_column, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -131,23 +131,31 @@ async def search_entries(
         )
 
     if _dialect_name(session) == "postgresql":
-        # `literal_column`, not `text` -- a `TextClause` has no inherent
-        # result type/name for SQLAlchemy to alias, so `.label()` on one
-        # raises `NotImplementedError` (only ever exercised against real
-        # Postgres; the SQLite fallback below never hits this code path,
-        # which is exactly how this went uncaught by the test suite until
-        # a live deployment surfaced it via Ask VocaDox).
-        match_clause = text("search_entries.tsv @@ plainto_tsquery('german', :q)")
-        rank_expr: ColumnElement[Any] = literal_column(
-            "ts_rank(search_entries.tsv, plainto_tsquery('german', :q))"
-        )
-        snippet_expr: ColumnElement[Any] = literal_column(
-            "ts_headline('german', search_entries.content, "
-            "plainto_tsquery('german', :q), "
-            "'StartSel=✦,StopSel=✦,MaxWords=35,MinWords=15,MaxFragments=1')"
+        # Real `func.*()` calls, not raw `text()`/`literal_column()` SQL
+        # strings -- two real bugs were found here against a live
+        # Postgres deployment (neither ever exercised by the SQLite-only
+        # test suite): (1) a `text()` clause has no result type/name for
+        # SQLAlchemy to alias, so `.label()` on one raises
+        # NotImplementedError; (2) `literal_column()` renders its string
+        # completely verbatim, including a `:q` placeholder inside it --
+        # unlike `text()`, it never recognizes or binds that placeholder,
+        # so asyncpg received a literal `:q` instead of the parameter
+        # value. `func.*()` calls are real SQLAlchemy constructs: they
+        # support `.label()` and any plain Python argument (like `query`
+        # below) is bound automatically and safely, with no manual
+        # placeholder/params-dict bookkeeping to get wrong.
+        tsv_column: ColumnElement[Any] = literal_column("search_entries.tsv")
+        tsquery = func.plainto_tsquery("german", query)
+        match_clause = tsv_column.op("@@")(tsquery)
+        rank_expr = func.ts_rank(tsv_column, tsquery)
+        snippet_expr = func.ts_headline(
+            "german",
+            SearchEntry.content,
+            tsquery,
+            "StartSel=✦,StopSel=✦,MaxWords=35,MinWords=15,MaxFragments=1",
         )
         count_stmt = select(SearchEntry.id).where(match_clause, *base_filters)
-        count_result = await session.execute(count_stmt, {"q": query})
+        count_result = await session.execute(count_stmt)
         total = len(count_result.all())
 
         pg_stmt: Select[Any] = (
@@ -157,7 +165,7 @@ async def search_entries(
             .limit(limit)
             .offset(offset)
         )
-        result = await session.execute(pg_stmt, {"q": query})
+        result = await session.execute(pg_stmt)
         return [
             SearchHit(entry=row.SearchEntry, snippet=row.snippet, rank=row.rank)
             for row in result.all()
