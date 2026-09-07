@@ -29,6 +29,7 @@ import { DataTable, type DataTableColumn } from "../design-system/Table";
 import { Pagination } from "../design-system/Pagination";
 import { Tabs, type TabItem } from "../design-system/Tabs";
 import { CONVERSATION_TYPE_LABELS } from "../lib/conversationLabels";
+import { formatDuration } from "../lib/formatDuration";
 import { getRecentConversations } from "../lib/recentConversations";
 import styles from "./ConversationsListPage.module.css";
 
@@ -133,13 +134,6 @@ function formatRelativeDateTime(iso: string): string {
   yesterday.setDate(now.getDate() - 1);
   if (date.toDateString() === yesterday.toDateString()) return `gestern, ${time}`;
   return `${date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}, ${time}`;
-}
-
-function formatDuration(durationMs: number): string {
-  const totalSeconds = Math.round(durationMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 const COLUMNS: DataTableColumn<Conversation>[] = [
