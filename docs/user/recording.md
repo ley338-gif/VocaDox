@@ -30,6 +30,27 @@ isn't supported in this browser" message with a suggestion to use
 6. Once uploaded, the conversation's Audio tab shows a full player with
    your markers overlaid on the seek bar.
 
+## Live transcript & live draft (preview only)
+
+While actively recording, a **Live-Transkript** panel appears once
+enough audio has been captured, updating roughly every 10 seconds — and,
+once there's enough content, a short **Live-Entwurf** (a few provisional
+bullet points). Both are clearly labeled provisional/unconfirmed for a
+reason:
+
+- The live transcript is re-generated from the recording-so-far each
+  update, not perfectly incremental — wording right at the edge of the
+  most recent update can shift slightly as more audio is added.
+- **Neither the live transcript nor the live draft is saved anywhere.**
+  Once you upload the recording, both are discarded and replaced by the
+  real, reviewable transcript and document your organization's normal
+  processing pipeline produces — the same one that's always run after
+  a recording is uploaded.
+- If the live preview stops updating (a network hiccup, a backend
+  restart), your recording itself is unaffected — it's still being
+  captured normally in your browser, and will upload and process
+  normally when you stop and click Upload.
+
 ## If something goes wrong
 
 - **Upload fails** (network issue): you can **Retry** without re-recording

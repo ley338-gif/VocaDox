@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ApiError } from "../api/client";
 import { addMarker, finalizeRecording } from "../api/conversations";
 import { Button } from "../design-system/Button";
+import { useLiveTranscript } from "../recording/useLiveTranscript";
 import { isRecordingSupported, useRecorder } from "../recording/useRecorder";
 import styles from "./RecordingWorkspace.module.css";
 
@@ -33,6 +34,12 @@ export function RecordingWorkspace({
   const [consentGiven, setConsentGiven] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const recorder = useRecorder();
+  const live = useLiveTranscript(
+    conversationId,
+    csrfToken,
+    recorder.state === "recording",
+    recorder.getLiveChunkBlob
+  );
 
   if (!isRecordingSupported()) {
     return (
@@ -93,6 +100,7 @@ export function RecordingWorkspace({
         )
       );
       recorder.uploadSucceeded();
+      live.reset();
       onFinalized();
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Upload failed.";
@@ -176,7 +184,15 @@ export function RecordingWorkspace({
         )}
         {recorder.state === "stopped" && (
           <>
-            <Button variant="secondary" type="button" onClick={recorder.discard} aria-label="Discard recording">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => {
+                live.reset();
+                recorder.discard();
+              }}
+              aria-label="Discard recording"
+            >
               <Trash2 size={16} aria-hidden="true" /> Discard
             </Button>
             <Button variant="primary" type="button" onClick={() => void handleFinalize()}>
@@ -198,6 +214,22 @@ export function RecordingWorkspace({
         )}
         {recorder.state === "uploaded" && <span>Recording uploaded.</span>}
       </div>
+
+      {(recorder.state === "recording" || recorder.state === "paused") && live.transcriptText && (
+        <div className={styles.livePreview}>
+          <p className={styles.livePreviewLabel}>
+            Live-Transkript (vorläufig — wird nach dem Hochladen durch die geprüfte Version
+            ersetzt)
+          </p>
+          <p className={styles.liveTranscriptText}>{live.transcriptText}</p>
+          {live.draftText && (
+            <>
+              <p className={styles.livePreviewLabel}>Live-Entwurf (vorläufig, unbestätigt)</p>
+              <p className={styles.liveDraftText}>{live.draftText}</p>
+            </>
+          )}
+        </div>
+      )}
 
       {recorder.markers.length > 0 && (
         <ul className={styles.markerList} aria-label="Markers">
