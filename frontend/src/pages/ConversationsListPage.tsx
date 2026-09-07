@@ -1,24 +1,61 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Inbox, ListChecks, Mic, Plus, Upload } from "lucide-react";
+import {
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+  Circle,
+  Clock,
+  Inbox,
+  ListChecks,
+  Mic,
+  Plus,
+  Upload,
+} from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import type { Conversation } from "../api/conversations";
+import type { Conversation, ConversationStatus } from "../api/conversations";
 import { getConversation, getConversationStats, listConversations } from "../api/conversations";
+import type { FollowUpTask } from "../api/longitudinal";
 import { listTasks } from "../api/longitudinal";
 import { search as searchContent, type SearchResult } from "../api/search";
 import { useAuth } from "../auth/useAuth";
 import { Button } from "../design-system/Button";
 import { Card } from "../design-system/Card";
 import { Select, TextInput } from "../design-system/FormControls";
+import { IconAvatar } from "../design-system/IconAvatar";
 import { EmptyState, ErrorState, Skeleton } from "../design-system/States";
 import { StatusBadge } from "../design-system/StatusBadge";
 import { DataTable, type DataTableColumn } from "../design-system/Table";
 import { Pagination } from "../design-system/Pagination";
 import { Tabs, type TabItem } from "../design-system/Tabs";
 import { CONVERSATION_TYPE_LABELS } from "../lib/conversationLabels";
-import { getRecentConversationIds } from "../lib/recentConversations";
+import { getRecentConversations } from "../lib/recentConversations";
 import styles from "./ConversationsListPage.module.css";
+
+// Same STATUS_MAP tones as StatusBadge (design-system/StatusBadge.tsx) —
+// just paired with a glyph for the sidebar's round icon avatars instead
+// of a text pill, so a given status still reads the same color everywhere.
+const CONVERSATION_STATUS_ICON: Record<ConversationStatus, { icon: ReactNode; tone: "neutral" | "info" | "success" | "danger" }> = {
+  created: { icon: <Circle size={16} aria-hidden="true" />, tone: "neutral" },
+  recording: { icon: <Mic size={16} aria-hidden="true" />, tone: "info" },
+  uploaded: { icon: <Upload size={16} aria-hidden="true" />, tone: "info" },
+  normalizing: { icon: <Activity size={16} aria-hidden="true" />, tone: "info" },
+  ready: { icon: <CheckCircle2 size={16} aria-hidden="true" />, tone: "success" },
+  failed: { icon: <AlertCircle size={16} aria-hidden="true" />, tone: "danger" },
+  deleted: { icon: <Circle size={16} aria-hidden="true" />, tone: "neutral" },
+};
+
+function taskIcon(task: FollowUpTask) {
+  // No dedicated "urgency" field on a task — a due date is the one real
+  // signal available to distinguish "needs attention soon" from a plain
+  // open item, matching the two icon styles in the reference mockup.
+  return task.due_date
+    ? { icon: <Clock size={16} aria-hidden="true" />, tone: "warning" as const }
+    : { icon: <Circle size={16} aria-hidden="true" />, tone: "info" as const };
+}
 
 const SEARCH_SOURCE_LABELS: Record<SearchResult["source_type"], string> = {
   transcript_segment: "Transkript",
@@ -98,6 +135,17 @@ const STATUS_TAB_FILTER: Record<StatusTab, string> = {
   ready: "ready",
   failed: "failed",
 };
+
+function formatRelativeDateTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const time = date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  if (date.toDateString() === now.toDateString()) return `heute, ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return `gestern, ${time}`;
+  return `${date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}, ${time}`;
+}
 
 function formatDuration(durationMs: number): string {
   const totalSeconds = Math.round(durationMs / 1000);
@@ -182,18 +230,18 @@ export function ConversationsListPage() {
     { id: "failed", label: `Fehler (${failedCount})` },
   ];
 
-  const recentIds = getRecentConversationIds().slice(0, 4);
+  const recentEntries = getRecentConversations().slice(0, 4);
   const recentQueries = useQueries({
-    queries: recentIds.map((id) => ({
-      queryKey: ["conversation", id],
-      queryFn: () => getConversation(id),
+    queries: recentEntries.map((entry) => ({
+      queryKey: ["conversation", entry.id],
+      queryFn: () => getConversation(entry.id),
       staleTime: 30_000,
       retry: false,
     })),
   });
   const recentConversations = recentQueries
-    .map((q) => q.data)
-    .filter((c): c is Conversation => Boolean(c));
+    .map((q, index) => (q.data ? { conversation: q.data, openedAt: recentEntries[index].openedAt } : null))
+    .filter((entry): entry is { conversation: Conversation; openedAt: string } => entry !== null);
 
   const tasksQuery = useQuery({
     queryKey: ["tasks", { status: "open" }],
@@ -314,15 +362,23 @@ export function ConversationsListPage() {
               <EmptyState title="Noch nichts geöffnet" description="Geöffnete Gespräche erscheinen hier." />
             ) : (
               <ul className={styles.recentList}>
-                {recentConversations.map((conversation) => (
+                {recentConversations.map(({ conversation, openedAt }) => (
                   <li key={conversation.id}>
                     <button
                       type="button"
                       className={styles.recentItem}
                       onClick={() => navigate(`/app/conversations/${conversation.id}`)}
                     >
-                      <span className={styles.recentTitle}>{conversation.title}</span>
-                      <StatusBadge status={conversation.status} />
+                      <IconAvatar {...CONVERSATION_STATUS_ICON[conversation.status]} />
+                      <span className={styles.recentBody}>
+                        <span className={styles.recentTitle}>{conversation.title}</span>
+                        <span className={styles.recentMeta}>
+                          {conversation.description || CONVERSATION_TYPE_LABELS[conversation.conversation_type]}
+                          {" · "}
+                          {formatRelativeDateTime(openedAt)}
+                        </span>
+                      </span>
+                      <ChevronRight size={16} aria-hidden="true" className={styles.recentChevron} />
                     </button>
                   </li>
                 ))}
@@ -356,8 +412,11 @@ export function ConversationsListPage() {
                           navigate(`/app/conversations/${task.conversation_id}`, { state: { tab: "tasks" } })
                         }
                       >
-                        <span className={styles.taskDescription}>{task.description}</span>
-                        {task.due_date && <span className={styles.taskMeta}>Fällig: {task.due_date}</span>}
+                        <IconAvatar {...taskIcon(task)} />
+                        <span className={styles.taskBody}>
+                          <span className={styles.taskDescription}>{task.description}</span>
+                          {task.due_date && <span className={styles.taskMeta}>Fällig: {task.due_date}</span>}
+                        </span>
                       </button>
                     </li>
                   ))}
