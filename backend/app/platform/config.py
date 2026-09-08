@@ -100,6 +100,12 @@ class Settings(BaseSettings):
         "operators should set this deliberately for production deployments.",
     )
 
+    # -- Templates (post-GA: org-editable freeform layout + letterhead) -----
+    max_letterhead_logo_size_bytes: int = Field(
+        default=2 * 1024 * 1024,  # 2 MiB -- a logo, not a general media asset.
+        description="Hard cap on an uploaded TemplateVersion letterhead logo image.",
+    )
+
     # -- Speech / diarization processing (Phase 3) ---------------------------
     speech_provider: str = Field(
         default="fake",

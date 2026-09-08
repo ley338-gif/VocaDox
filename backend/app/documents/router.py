@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.authz import authorize_conversation_access
 from app.conversations.models import ConversationParticipant, ParticipantType
+from app.core.storage import get_storage_provider
 from app.documents.api_schemas import (
     ApprovalBlockedResponse,
     ComposeRequest,
@@ -39,7 +40,10 @@ from app.identity.models import User
 from app.intelligence.api_schemas import ReviewIssueResponse
 from app.intelligence.models import ExtractedFact
 from app.platform.db.session import get_session
+from app.providers.storage import StorageProvider
 from app.review.models import ReviewIssue, ReviewIssueResolution
+from app.templates.letterhead import load_letterhead_logo
+from app.templates.models import TemplateVersion
 
 router = APIRouter(prefix="/conversations", tags=["documents"])
 
@@ -57,6 +61,20 @@ def _letter_chrome(
 ) -> tuple[list[str], list[str]]:
     subject = f"Betreff: {conversation_title} vom {generated_at.strftime('%d.%m.%Y')}"
     return [subject, "", _LETTER_SALUTATION], [_LETTER_CLOSING]
+
+
+def _section_lines(statements: list[dict], *, is_freeform: bool) -> list[str]:
+    """A "freeform" document_layout's `structured_content` is one aggregate
+    statement whose text may contain the author's own paragraph breaks
+    (`\\n\\n`) -- ExportSection.lines needs each paragraph as its own
+    flowable line, not one blob with literal newlines inside it (neither
+    python-docx nor reportlab's Paragraph interprets embedded `\\n` as a
+    line break)."""
+    if is_freeform:
+        text = statements[0]["text"] if statements else ""
+        paragraphs = [p for p in text.split("\n\n") if p.strip()]
+        return paragraphs or [text]
+    return [st["text"] for st in statements]
 
 
 async def _get_document_or_404(db: AsyncSession, conversation_id: uuid.UUID) -> Document:
@@ -181,6 +199,7 @@ async def export_document_endpoint(
     format: str = "text",  # noqa: A002 - matches the query param name intentionally
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_session),
+    storage: StorageProvider = Depends(get_storage_provider),
 ) -> Response:
     """Plain text / JSON export of the current revision (spec: "at minimum
     plain text and/or a simple structured format"). See
@@ -204,6 +223,7 @@ async def export_document_endpoint(
     revision_text = revision.rendered_text
     revision_created_at = revision.created_at
     revision_document_layout = revision.document_layout
+    revision_template_version_id = revision.template_version_id
     document_id = document.id
     # Same "capture primitives before commit" rule as the revision fields
     # above — `conversation` (returned by authorize_conversation_access)
@@ -243,18 +263,31 @@ async def export_document_endpoint(
     meta_lines = [f"Status: {revision_status} (revision {revision_number})"]
 
     if format in ("docx", "pdf"):
+        is_letter = revision_document_layout == "letter"
+        is_freeform = revision_document_layout == "freeform"
         sections = [
-            ExportSection(heading=s["title"], lines=[st["text"] for st in s["statements"]])
+            ExportSection(
+                heading=s["title"],
+                lines=_section_lines(s["statements"], is_freeform=is_freeform),
+            )
             for s in revision_content
         ]
         filename = f"document-{document_id}-r{revision_number}.{format}"
-        is_letter = revision_document_layout == "letter"
         export_title = "Arztbrief" if is_letter else "Dokumentation"
         intro_lines, closing_lines = (
             _letter_chrome(conversation_title=conversation_title, generated_at=revision_created_at)
             if is_letter
             else (None, None)
         )
+        letterhead_logo_bytes: bytes | None = None
+        if revision_template_version_id is not None:
+            template_version = await db.get(TemplateVersion, revision_template_version_id)
+            if template_version is not None and template_version.letterhead_logo_asset_key:
+                loaded = await load_letterhead_logo(
+                    storage, template_version.letterhead_logo_asset_key
+                )
+                if loaded is not None:
+                    letterhead_logo_bytes, _content_type = loaded
         if format == "docx":
             content = render_docx(
                 title=export_title,
@@ -262,7 +295,8 @@ async def export_document_endpoint(
                 sections=sections,
                 intro_lines=intro_lines,
                 closing_lines=closing_lines,
-                bullet=not is_letter,
+                bullet=not (is_letter or is_freeform),
+                letterhead_logo_bytes=letterhead_logo_bytes,
             )
             media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         else:
@@ -272,6 +306,7 @@ async def export_document_endpoint(
                 sections=sections,
                 intro_lines=intro_lines,
                 closing_lines=closing_lines,
+                letterhead_logo_bytes=letterhead_logo_bytes,
             )
             media_type = "application/pdf"
         return Response(
