@@ -3,13 +3,12 @@ import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
-  AVATAR_PRESETS,
   type AdminOrganization,
   type AdminUserDetail,
-  type Gender,
-  avatarUrl,
   createUser,
+  defaultAvatarForGender,
   getUser,
+  isAutoManagedAvatar,
   listGroups,
   listOrganizations,
   listUsers,
@@ -17,9 +16,11 @@ import {
   updateUser,
   uploadAvatar,
 } from "../api/admin";
-import { ApiError } from "../api/client";
+import { ApiError, type Gender } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
+import { AvatarPicker } from "../components/AvatarPicker";
+import { AvatarThumb } from "../components/AvatarThumb";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
 import { FormField } from "../design-system/FormField";
@@ -191,39 +192,6 @@ export function AdminUsersPage() {
   );
 }
 
-function AvatarThumb({ assetKey, label }: { assetKey: string | null; label: string }) {
-  const url = avatarUrl(assetKey);
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt=""
-        style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", display: "block" }}
-      />
-    );
-  }
-  const initial = label.trim().charAt(0).toUpperCase() || "?";
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: "32px",
-        height: "32px",
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--surface-sunken)",
-        color: "var(--text-muted)",
-        fontSize: "var(--font-caption-size)",
-        fontWeight: 600,
-      }}
-    >
-      {initial}
-    </span>
-  );
-}
-
 function UserGroups({
   userId,
   groupNameById,
@@ -295,7 +263,6 @@ function EditUserModal({
   const queryClient = useQueryClient();
   const detailQuery = useQuery({ queryKey: ["admin", "user", userId], queryFn: () => getUser(userId) });
   const [form, setForm] = useState<EditForm | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -303,19 +270,18 @@ function EditUserModal({
     if (detailQuery.data) setForm(emptyEditForm(detailQuery.data));
   }, [detailQuery.data]);
 
-  async function handleAvatarFile(fileList: FileList | null) {
-    const file = fileList?.[0];
-    if (!file || !csrfToken || !form) return;
-    setUploadingAvatar(true);
-    setError(null);
-    try {
-      const { asset_key } = await uploadAvatar(file, csrfToken);
-      setForm({ ...form, avatar_asset_key: asset_key });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Avatar konnte nicht hochgeladen werden.");
-    } finally {
-      setUploadingAvatar(false);
-    }
+  function handleGenderChange(gender: Gender | "") {
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            gender,
+            avatar_asset_key: isAutoManagedAvatar(current.avatar_asset_key)
+              ? defaultAvatarForGender(gender || null)
+              : current.avatar_asset_key,
+          }
+        : current
+    );
   }
 
   async function handleSave() {
@@ -357,61 +323,15 @@ function EditUserModal({
         <Skeleton height="12rem" />
       ) : (
         <div style={{ display: "grid", gap: "var(--space-3)", maxWidth: "480px" }}>
-          <div>
-            <p style={{ marginBottom: "var(--space-2)", fontWeight: 600 }}>Avatar</p>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-              <AvatarThumbLarge assetKey={form.avatar_asset_key} label={form.display_name} />
-              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                {AVATAR_PRESETS.map((preset) => (
-                  <button
-                    key={preset.key}
-                    type="button"
-                    aria-label={preset.label}
-                    onClick={() => setForm({ ...form, avatar_asset_key: preset.key })}
-                    style={{
-                      padding: 0,
-                      border:
-                        form.avatar_asset_key === preset.key
-                          ? "2px solid var(--accent)"
-                          : "2px solid transparent",
-                      borderRadius: "50%",
-                      cursor: "pointer",
-                      background: "none",
-                    }}
-                  >
-                    <img
-                      src={avatarUrl(preset.key) ?? undefined}
-                      alt={preset.label}
-                      style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover", display: "block" }}
-                    />
-                  </button>
-                ))}
-                <label style={{ display: "flex", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    disabled={uploadingAvatar}
-                    onChange={(e) => void handleAvatarFile(e.target.files)}
-                    style={{ display: "none" }}
-                    id={`avatar-upload-${userId}`}
-                  />
-                  <Button
-                    variant="tertiary"
-                    type="button"
-                    disabled={uploadingAvatar}
-                    onClick={() => document.getElementById(`avatar-upload-${userId}`)?.click()}
-                  >
-                    {uploadingAvatar ? "Lädt hoch…" : "Eigenes Bild…"}
-                  </Button>
-                </label>
-                {form.avatar_asset_key && (
-                  <Button variant="tertiary" type="button" onClick={() => setForm({ ...form, avatar_asset_key: null })}>
-                    Entfernen
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
+          <AvatarPicker
+            assetKey={form.avatar_asset_key}
+            displayLabel={form.display_name}
+            onChange={(avatar_asset_key) => setForm({ ...form, avatar_asset_key })}
+            onUpload={(file) => {
+              if (!csrfToken) throw new Error("Fehlendes CSRF-Token.");
+              return uploadAvatar(file, csrfToken);
+            }}
+          />
 
           <FormField label="Vorname">
             <TextInput value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
@@ -426,7 +346,7 @@ function EditUserModal({
             <TextInput value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </FormField>
           <FormField label="Geschlecht">
-            <Select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value as Gender | "" })}>
+            <Select value={form.gender} onChange={(e) => handleGenderChange(e.target.value as Gender | "")}>
               <option value="">keine Angabe</option>
               <option value="male">{GENDER_LABELS.male}</option>
               <option value="female">{GENDER_LABELS.female}</option>
@@ -483,39 +403,6 @@ function EditUserModal({
         </div>
       )}
     </Modal>
-  );
-}
-
-function AvatarThumbLarge({ assetKey, label }: { assetKey: string | null; label: string }) {
-  const url = avatarUrl(assetKey);
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt=""
-        style={{ width: "64px", height: "64px", borderRadius: "50%", objectFit: "cover", display: "block" }}
-      />
-    );
-  }
-  const initial = label.trim().charAt(0).toUpperCase() || "?";
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: "64px",
-        height: "64px",
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--surface-sunken)",
-        color: "var(--text-muted)",
-        fontSize: "var(--font-h2-size)",
-        fontWeight: 600,
-      }}
-    >
-      {initial}
-    </span>
   );
 }
 

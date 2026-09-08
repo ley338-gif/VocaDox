@@ -48,6 +48,28 @@ class CurrentUserResponse(BaseModel):
     email: str | None
     permissions: list[str]
     groups: list[GroupSummary]
+    first_name: str | None = None
+    last_name: str | None = None
+    gender: GenderOption | None = None
+    avatar_asset_key: str | None = None
+
+
+class SelfUpdateRequest(BaseModel):
+    """`PATCH /auth/me` -- a user editing their OWN profile, deliberately a
+    narrower field set than admin's `UserUpdateRequest`: no `is_active`,
+    `group_ids`, or `organization_ids` -- self-service never lets a user
+    grant themselves group/organization membership or reactivate a
+    disabled account, only their own personal identity fields (spec:
+    self-editing "entsprechend seiner Rechte" -- a user's rights over
+    their own profile are real but bounded, admin-level changes still
+    require `user:manage` via the existing admin endpoint)."""
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    email: str | None = Field(default=None, max_length=320)
+    first_name: str | None = Field(default=None, max_length=255)
+    last_name: str | None = Field(default=None, max_length=255)
+    gender: GenderOption | None = None
+    avatar_asset_key: str | None = Field(default=None, max_length=512)
 
 
 class CsrfTokenResponse(BaseModel):

@@ -1,6 +1,6 @@
 import { createContext } from "react";
 
-import type { GroupSummary } from "../api/client";
+import type { Gender, GroupSummary } from "../api/client";
 
 export interface AuthUser {
   userId: string;
@@ -12,6 +12,10 @@ export interface AuthUser {
    * scoped visibility reuses the existing Group model as "team") — used
    * e.g. by NewConversationPage's team picker. */
   groups: GroupSummary[];
+  firstName: string | null;
+  lastName: string | null;
+  gender: Gender | null;
+  avatarAssetKey: string | null;
 }
 
 export interface AuthState {
@@ -22,6 +26,10 @@ export interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   hasPermission: (code: string) => boolean;
+  /** Re-fetches GET /auth/me and updates `user` in place -- used after a
+   * self-service profile edit (MyProfileModal) so the topbar/avatar
+   * reflect the change immediately, without a full page reload. */
+  refreshUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthState | undefined>(undefined);

@@ -35,6 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: response.email,
           permissions: response.permissions,
           groups: response.groups,
+          firstName: response.first_name,
+          lastName: response.last_name,
+          gender: response.gender,
+          avatarAssetKey: response.avatar_asset_key,
         });
         try {
           const csrfResponse = await apiCsrf();
@@ -60,6 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: null,
       permissions: [],
       groups: [],
+      firstName: null,
+      lastName: null,
+      gender: null,
+      avatarAssetKey: null,
     });
     const me = await apiMe();
     setUser({
@@ -69,6 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: me.email,
       permissions: me.permissions,
       groups: me.groups,
+      firstName: me.first_name,
+      lastName: me.last_name,
+      gender: me.gender,
+      avatarAssetKey: me.avatar_asset_key,
     });
   }, []);
 
@@ -91,9 +103,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const refreshUser = useCallback(async () => {
+    const me = await apiMe();
+    setUser({
+      userId: me.user_id,
+      username: me.username,
+      displayName: me.display_name,
+      email: me.email,
+      permissions: me.permissions,
+      groups: me.groups,
+      firstName: me.first_name,
+      lastName: me.last_name,
+      gender: me.gender,
+      avatarAssetKey: me.avatar_asset_key,
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ user, csrfToken, loading, login, logout, hasPermission }),
-    [user, csrfToken, loading, login, logout, hasPermission]
+    () => ({ user, csrfToken, loading, login, logout, hasPermission, refreshUser }),
+    [user, csrfToken, loading, login, logout, hasPermission, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

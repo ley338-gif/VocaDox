@@ -4,9 +4,9 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
 
-vi.mock("../auth/useAuth", () => ({ useAuth: () => ({ user: { displayName: "Test" }, csrfToken: null, hasPermission: () => true, logout: vi.fn() }) }));
+vi.mock("../auth/useAuth", () => ({ useAuth: () => ({ user: { displayName: "Test", avatarAssetKey: null }, csrfToken: null, hasPermission: () => true, logout: vi.fn() }) }));
 vi.mock("../recording/useOfflineQueueSync", () => ({ useOfflineQueueSync: () => ({ pendingCount: 0 }) }));
-vi.mock("../api/admin", () => ({ getDashboard: () => new Promise(() => {}) }));
+vi.mock("../api/admin", () => ({ getDashboard: () => new Promise(() => {}), avatarUrl: () => null }));
 
 function show(components?: { healthy: boolean }[]) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });

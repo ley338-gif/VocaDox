@@ -116,6 +116,39 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /**
+         * Update Me Endpoint
+         * @description Self-service profile edit -- see `SelfUpdateRequest`'s docstring for
+         *     exactly which fields this deliberately excludes. Reuses the same
+         *     `update_user()` the admin PATCH uses (and so the same audit event
+         *     type, `user.updated` -- `updated_user_id == actor.id` is what marks
+         *     this as a self-edit in the audit log, not a new event type).
+         */
+        patch: operations["update_me_endpoint_api_v1_auth_me_patch"];
+        trace?: never;
+    };
+    "/api/v1/auth/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload My Avatar Endpoint
+         * @description Self-service counterpart to `POST /admin/users/avatar` -- any
+         *     authenticated user may upload an avatar image for themselves (only
+         *     `PATCH /auth/me` actually assigns the returned key onto their own
+         *     row; this alone never mutates anything). Same upload/validation, just
+         *     without the `user:manage` gate that endpoint needs since it can
+         *     target *any* user.
+         */
+        post: operations["upload_my_avatar_endpoint_api_v1_auth_me_avatar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -1639,7 +1672,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Avatar Endpoint */
+        /**
+         * Get Avatar Endpoint
+         * @description Only `get_current_user` (not `user:manage`) -- an avatar image is
+         *     not sensitive data, and this is the one serving endpoint shared by
+         *     both the admin Users page and every user's own profile/topbar
+         *     (`POST /auth/me/avatar` uploads to the same store), so it must be
+         *     readable by any authenticated user, not just admins. Stays under the
+         *     `/admin/users` path only to avoid a second identical handler under
+         *     `/auth` -- the URL prefix is not the security boundary here, the
+         *     permission dependency is.
+         */
         get: operations["get_avatar_endpoint_api_v1_admin_users_avatar__asset_key__get"];
         put?: never;
         post?: never;
@@ -2941,6 +2984,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_my_avatar_endpoint_api_v1_auth_me_avatar_post */
+        Body_upload_my_avatar_endpoint_api_v1_auth_me_avatar_post: {
+            /** File */
+            file: string;
+        };
         /** CategoryCoverageResponse */
         CategoryCoverageResponse: {
             /** Category */
@@ -3215,6 +3263,14 @@ export interface components {
             permissions: string[];
             /** Groups */
             groups: components["schemas"]["GroupSummary"][];
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Gender */
+            gender?: ("male" | "female" | "diverse") | null;
+            /** Avatar Asset Key */
+            avatar_asset_key?: string | null;
         };
         /** DashboardResponse */
         DashboardResponse: {
@@ -5063,6 +5119,31 @@ export interface components {
             /** Through Segment Id */
             through_segment_id?: string | null;
         };
+        /**
+         * SelfUpdateRequest
+         * @description `PATCH /auth/me` -- a user editing their OWN profile, deliberately a
+         *     narrower field set than admin's `UserUpdateRequest`: no `is_active`,
+         *     `group_ids`, or `organization_ids` -- self-service never lets a user
+         *     grant themselves group/organization membership or reactivate a
+         *     disabled account, only their own personal identity fields (spec:
+         *     self-editing "entsprechend seiner Rechte" -- a user's rights over
+         *     their own profile are real but bounded, admin-level changes still
+         *     require `user:manage` via the existing admin endpoint).
+         */
+        SelfUpdateRequest: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Gender */
+            gender?: ("male" | "female" | "diverse") | null;
+            /** Avatar Asset Key */
+            avatar_asset_key?: string | null;
+        };
         /** ServiceAccountCreateRequest */
         ServiceAccountCreateRequest: {
             /** Name */
@@ -6134,6 +6215,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+        };
+    };
+    update_me_endpoint_api_v1_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelfUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_my_avatar_endpoint_api_v1_auth_me_avatar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_my_avatar_endpoint_api_v1_auth_me_avatar_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

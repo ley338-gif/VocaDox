@@ -64,6 +64,10 @@ describe("LoginPage", () => {
         email: null,
         permissions: [],
         groups: [],
+        first_name: null,
+        last_name: null,
+        gender: null,
+        avatar_asset_key: null,
       });
 
     renderLoginPage();
