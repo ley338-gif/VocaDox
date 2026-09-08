@@ -2996,7 +2996,7 @@ dependencies:
   approval_status: approved
 - name: narwhals
   ecosystem: pypi
-  version: 2.25.0
+  version: 2.26.0
   scope: worker
   direct: false
   license: MIT

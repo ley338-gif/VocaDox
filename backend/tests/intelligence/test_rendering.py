@@ -28,7 +28,8 @@ def _fact(category: str, structured_value: dict) -> ExtractedFact:
 
 def test_generic_fallback_renders_description_unlabeled_with_unlabeled_annotations() -> None:
     fact = _fact(
-        "symptom", {"description": "Atemnot", "onset": "bei Treppensteigen", "severity": "besonders"}
+        "symptom",
+        {"description": "Atemnot", "onset": "bei Treppensteigen", "severity": "besonders"},
     )
     assert render_fact_statement(fact) == "Atemnot (bei Treppensteigen, besonders)"
 
@@ -45,7 +46,10 @@ def test_generic_fallback_renders_finding_result_unlabeled() -> None:
 
 def test_generic_fallback_never_shows_any_raw_field_label() -> None:
     symptom = render_fact_statement(
-        _fact("symptom", {"description": "Husten", "onset": "seit 3 Tagen", "severity": "NOT_MENTIONED"})
+        _fact(
+            "symptom",
+            {"description": "Husten", "onset": "seit 3 Tagen", "severity": "NOT_MENTIONED"},
+        )
     )
     assert "description:" not in symptom
     assert "onset:" not in symptom
