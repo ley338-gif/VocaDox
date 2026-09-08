@@ -1,0 +1,24 @@
+[project]
+name = "gdt-bridge"
+version = "0.1.0"
+description = "Prototype GDT connector for VocaDox (ADR-0041) -- watches a local folder for inbound GDT patient-data files, creates VocaDox conversations via the Integration API, and writes GDT result files (PDF-reference or embedded-text) back once a document is approved. Never a dependency of the VocaDox backend, and never depended on by it -- see docs/architecture/adr/0041-gdt-export-and-connector-prototype.md."
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+dependencies = [
+    # BSD-3-Clause -- HTTP client for calling VocaDox's Integration API.
+    "httpx>=0.27,<1.0",
+    # Apache-2.0 (verified: https://pypi.org/pypi/watchdog/json) -- local
+    # folder watching. New to this project: no folder-watching library
+    # existed anywhere in the VocaDox repo before this connector (see
+    # ADR-0041's Consequences).
+    "watchdog>=4.0,<5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

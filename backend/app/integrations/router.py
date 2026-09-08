@@ -19,15 +19,22 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import record_event
-from app.conversations.models import Conversation, ConversationType, PrivacyMode
-from app.conversations.schemas import ConversationCreateRequest, ConversationResponse
-from app.conversations.service import create_conversation, list_conversations
+from app.conversations.models import Conversation, ConversationType, ParticipantType, PrivacyMode
+from app.conversations.schemas import (
+    ConversationCreateRequest,
+    ConversationResponse,
+    ParticipantCreateRequest,
+    ParticipantResponse,
+)
+from app.conversations.service import add_participant, create_conversation, list_conversations
+from app.core.storage import get_storage_provider
 from app.documents.api_schemas import ComposeRequest, DocumentResponse, DocumentRevisionResponse
+from app.documents.export_service import render_document_export
 from app.documents.models import Document, DocumentRevision
 from app.documents.service import (
     ApprovalBlockedError,
@@ -66,6 +73,7 @@ from app.integrations.service import (
     update_webhook,
 )
 from app.platform.db.session import get_session
+from app.providers.storage import StorageProvider
 from app.templates.api_schemas import TemplateResponse
 from app.templates.service import list_templates
 from app.transcription.models import Transcript
@@ -87,6 +95,7 @@ _require_webhook_write = require_permission("webhook:write")
 AVAILABLE_SCOPES: tuple[str, ...] = (
     "conversation:read",
     "conversation:create",
+    "conversation:manage-participants",
     "transcript:read",
     "document:read",
     "document:edit",
@@ -98,6 +107,7 @@ AVAILABLE_SCOPES: tuple[str, ...] = (
 # the factory inline) -- one per scope this phase's Integration API grants.
 _require_conversation_read = require_scope("conversation:read")
 _require_conversation_create = require_scope("conversation:create")
+_require_conversation_manage_participants = require_scope("conversation:manage-participants")
 _require_transcript_read = require_scope("transcript:read")
 _require_document_read = require_scope("document:read")
 _require_document_edit = require_scope("document:edit")
@@ -466,6 +476,47 @@ async def api_create_conversation(
     return ConversationResponse.model_validate(conversation)
 
 
+@api_router.post(
+    "/conversations/{conversation_id}/participants",
+    response_model=ParticipantResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def api_create_participant(
+    conversation_id: uuid.UUID,
+    payload: ParticipantCreateRequest,
+    account: ServiceAccount = Depends(_require_conversation_manage_participants),
+    db: AsyncSession = Depends(get_session),
+) -> ParticipantResponse:
+    """No owner attribution required -- unlike conversation/document
+    writes, neither `add_participant` nor the human-facing
+    `POST /conversations/{id}/participants` route attributes a
+    participant to a user; a connector (e.g. the GDT bridge, ADR-0041)
+    can add a PATIENT participant purely from data pulled out of an
+    inbound file, with no VocaDox user in the loop."""
+    await _get_scoped_conversation(db, account, conversation_id)
+    participant = await add_participant(
+        db,
+        conversation_id=conversation_id,
+        display_name=payload.display_name,
+        participant_type=ParticipantType(payload.participant_type),
+        external_reference=payload.external_reference,
+        notes=payload.notes,
+        known_speaker_id=payload.known_speaker_id,
+    )
+    await record_event(
+        db,
+        event_type="conversation.participant_added",
+        user_id=account.owner_user_id,
+        event_metadata={
+            "conversation_id": str(conversation_id),
+            "participant_id": str(participant.id),
+            "via": "service_account",
+        },
+    )
+    await db.commit()
+    return ParticipantResponse.model_validate(participant)
+
+
 @api_router.get("/conversations/{conversation_id}/transcript", response_model=TranscriptResponse)
 async def api_get_transcript(
     conversation_id: uuid.UUID,
@@ -507,6 +558,90 @@ async def api_get_document(
         DocumentRevisionResponse.model_validate(revision) if revision is not None else None
     )
     return resp
+
+
+@api_router.get("/conversations/{conversation_id}/document/export")
+async def api_export_document(
+    conversation_id: uuid.UUID,
+    format: str = "text",  # noqa: A002 - matches the query param name intentionally
+    account: ServiceAccount = Depends(_require_document_read),
+    db: AsyncSession = Depends(get_session),
+    storage: StorageProvider = Depends(get_storage_provider),
+) -> Response:
+    """Mirrors `app.documents.router.export_document_endpoint` for
+    service-account callers -- the human router has no session cookie a
+    connector could present, so this scope-gated equivalent is what a
+    connector (e.g. the GDT bridge, ADR-0041) actually calls to download
+    export bytes (`pdf`/`gdt-pdf`/`gdt-text`/etc.), not the JSON-metadata-
+    only `GET .../document` route above. No `_require_owner()` -- like
+    every other read-only route in this file, this doesn't attribute
+    anything to a user."""
+    conversation = await _get_scoped_conversation(db, account, conversation_id)
+    result = await db.execute(select(Document).where(Document.conversation_id == conversation_id))
+    document = result.scalar_one_or_none()
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="no document composed yet"
+        )
+    if document.current_revision_id is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="no revision to export")
+    revision = await db.get(DocumentRevision, document.current_revision_id)
+    assert revision is not None
+    # Same "capture primitives before commit" rule as the human export
+    # route -- see app.documents.router's comment for why.
+    revision_number = revision.revision_number
+    revision_status = revision.status
+    revision_content = revision.structured_content
+    revision_text = revision.rendered_text
+    revision_created_at = revision.created_at
+    revision_document_layout = revision.document_layout
+    revision_template_version_id = revision.template_version_id
+    document_id = document.id
+    conversation_title = conversation.title
+    conversation_started_at = conversation.started_at
+    conversation_ended_at = conversation.ended_at
+    conversation_external_reference = conversation.external_reference
+    conversation_external_reference_type = conversation.external_reference_type
+
+    await record_event(
+        db,
+        event_type="document.exported",
+        user_id=account.owner_user_id,
+        event_metadata={
+            "conversation_id": str(conversation_id),
+            "document_id": str(document_id),
+            "revision_id": str(revision.id),
+            "format": format,
+            "via": "service_account",
+        },
+    )
+    await db.commit()
+
+    payload = await render_document_export(
+        db,
+        storage,
+        format=format,
+        conversation_id=conversation_id,
+        document_id=document_id,
+        conversation_title=conversation_title,
+        conversation_started_at=conversation_started_at,
+        conversation_ended_at=conversation_ended_at,
+        conversation_external_reference=conversation_external_reference,
+        conversation_external_reference_type=conversation_external_reference_type,
+        revision_number=revision_number,
+        revision_status=revision_status,
+        revision_content=revision_content,
+        revision_text=revision_text,
+        revision_created_at=revision_created_at,
+        revision_document_layout=revision_document_layout,
+        revision_template_version_id=revision_template_version_id,
+    )
+    headers = (
+        {"Content-Disposition": f'attachment; filename="{payload.filename}"'}
+        if payload.filename
+        else None
+    )
+    return Response(content=payload.content, media_type=payload.media_type, headers=headers)
 
 
 @api_router.post(

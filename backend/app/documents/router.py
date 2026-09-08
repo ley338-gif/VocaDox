@@ -7,16 +7,13 @@ document is exactly as sensitive as the facts/transcript it derives from.
 
 from __future__ import annotations
 
-import json as _json
 import uuid
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations.authz import authorize_conversation_access
-from app.conversations.models import ConversationParticipant, ParticipantType
 from app.core.storage import get_storage_provider
 from app.documents.api_schemas import (
     ApprovalBlockedResponse,
@@ -25,8 +22,7 @@ from app.documents.api_schemas import (
     DocumentRevisionResponse,
     ResolveReviewIssueRequest,
 )
-from app.documents.export_formats import ExportSection, render_docx, render_pdf
-from app.documents.fhir_export import render_fhir_document_reference
+from app.documents.export_service import render_document_export
 from app.documents.models import Document, DocumentRevision
 from app.documents.service import (
     ApprovalBlockedError,
@@ -42,39 +38,8 @@ from app.intelligence.models import ExtractedFact
 from app.platform.db.session import get_session
 from app.providers.storage import StorageProvider
 from app.review.models import ReviewIssue, ReviewIssueResolution
-from app.templates.letterhead import load_letterhead_logo
-from app.templates.models import TemplateVersion
 
 router = APIRouter(prefix="/conversations", tags=["documents"])
-
-# post-GA: static chrome for a `document_layout="letter"` export (see
-# app.templates.seed's "medical_consultation" template) — never
-# fact-derived, so it deliberately stays outside `structured_content`
-# (every statement there must trace back to real fact_ids; a salutation/
-# closing line never could). Mirrored in the frontend's DocumentContent.tsx.
-_LETTER_SALUTATION = "Sehr geehrte Kolleginnen und Kollegen,"
-_LETTER_CLOSING = "Mit freundlichen kollegialen Grüßen"
-
-
-def _letter_chrome(
-    *, conversation_title: str, generated_at: datetime
-) -> tuple[list[str], list[str]]:
-    subject = f"Betreff: {conversation_title} vom {generated_at.strftime('%d.%m.%Y')}"
-    return [subject, "", _LETTER_SALUTATION], [_LETTER_CLOSING]
-
-
-def _section_lines(statements: list[dict], *, is_freeform: bool) -> list[str]:
-    """A "freeform" document_layout's `structured_content` is one aggregate
-    statement whose text may contain the author's own paragraph breaks
-    (`\\n\\n`) -- ExportSection.lines needs each paragraph as its own
-    flowable line, not one blob with literal newlines inside it (neither
-    python-docx nor reportlab's Paragraph interprets embedded `\\n` as a
-    line break)."""
-    if is_freeform:
-        text = statements[0]["text"] if statements else ""
-        paragraphs = [p for p in text.split("\n\n") if p.strip()]
-        return paragraphs or [text]
-    return [st["text"] for st in statements]
 
 
 async def _get_document_or_404(db: AsyncSession, conversation_id: uuid.UUID) -> Document:
@@ -201,11 +166,10 @@ async def export_document_endpoint(
     db: AsyncSession = Depends(get_session),
     storage: StorageProvider = Depends(get_storage_provider),
 ) -> Response:
-    """Plain text / JSON export of the current revision (spec: "at minimum
-    plain text and/or a simple structured format"). See
-    docs/architecture/adr's compliance notes / PHASE_5_VALIDATION_REPORT.md
-    for why PDF/DOCX generation is deliberately deferred rather than adding
-    an unresearched new dependency under time pressure."""
+    """Exports the current revision. Supported `format` values: `text`
+    (default), `json`, `docx`, `pdf`, `fhir` (P3-1, ADR-0039), `gdt-pdf`/
+    `gdt-text` (ADR-0041). See `app.documents.export_service.
+    render_document_export` for the actual per-format rendering."""
     conversation = await authorize_conversation_access(
         db, user=user, conversation_id=conversation_id, permission_code="document:read"
     )
@@ -250,101 +214,31 @@ async def export_document_endpoint(
     )
     await db.commit()
 
-    if format == "json":
-        payload = {
-            "document_id": str(document_id),
-            "conversation_id": str(conversation_id),
-            "revision_number": revision_number,
-            "status": revision_status,
-            "sections": revision_content,
-        }
-        return Response(content=_json.dumps(payload, indent=2), media_type="application/json")
-
-    meta_lines = [f"Status: {revision_status} (revision {revision_number})"]
-
-    if format in ("docx", "pdf"):
-        is_letter = revision_document_layout == "letter"
-        is_freeform = revision_document_layout == "freeform"
-        sections = [
-            ExportSection(
-                heading=s["title"],
-                lines=_section_lines(s["statements"], is_freeform=is_freeform),
-            )
-            for s in revision_content
-        ]
-        filename = f"document-{document_id}-r{revision_number}.{format}"
-        export_title = "Arztbrief" if is_letter else "Dokumentation"
-        intro_lines, closing_lines = (
-            _letter_chrome(conversation_title=conversation_title, generated_at=revision_created_at)
-            if is_letter
-            else (None, None)
-        )
-        letterhead_logo_bytes: bytes | None = None
-        if revision_template_version_id is not None:
-            template_version = await db.get(TemplateVersion, revision_template_version_id)
-            if template_version is not None and template_version.letterhead_logo_asset_key:
-                loaded = await load_letterhead_logo(
-                    storage, template_version.letterhead_logo_asset_key
-                )
-                if loaded is not None:
-                    letterhead_logo_bytes, _content_type = loaded
-        if format == "docx":
-            content = render_docx(
-                title=export_title,
-                meta_lines=meta_lines,
-                sections=sections,
-                intro_lines=intro_lines,
-                closing_lines=closing_lines,
-                bullet=not (is_letter or is_freeform),
-                letterhead_logo_bytes=letterhead_logo_bytes,
-            )
-            media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        else:
-            content = render_pdf(
-                title=export_title,
-                meta_lines=meta_lines,
-                sections=sections,
-                intro_lines=intro_lines,
-                closing_lines=closing_lines,
-                letterhead_logo_bytes=letterhead_logo_bytes,
-            )
-            media_type = "application/pdf"
-        return Response(
-            content=content,
-            media_type=media_type,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-        )
-
-    if format == "fhir":
-        participant_result = await db.execute(
-            select(ConversationParticipant.display_name).where(
-                ConversationParticipant.conversation_id == conversation_id,
-                ConversationParticipant.participant_type == ParticipantType.PATIENT.value,
-            )
-        )
-        subject_display = participant_result.scalars().first()
-        resource = render_fhir_document_reference(
-            document_id=document_id,
-            conversation_title=conversation_title,
-            subject_display=subject_display,
-            revision_number=revision_number,
-            revision_status=revision_status,
-            rendered_text=revision_text,
-            generated_at=revision_created_at,
-            started_at=conversation_started_at,
-            ended_at=conversation_ended_at,
-            external_reference=conversation_external_reference,
-            external_reference_type=conversation_external_reference_type,
-        )
-        filename = f"document-{document_id}-r{revision_number}.fhir.json"
-        return Response(
-            content=_json.dumps(resource, indent=2),
-            media_type="application/fhir+json",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-        )
-
-    body = "\n\n".join(meta_lines) + "\n\n" + revision_text
-    return Response(content=body, media_type="text/plain")
+    payload = await render_document_export(
+        db,
+        storage,
+        format=format,
+        conversation_id=conversation_id,
+        document_id=document_id,
+        conversation_title=conversation_title,
+        conversation_started_at=conversation_started_at,
+        conversation_ended_at=conversation_ended_at,
+        conversation_external_reference=conversation_external_reference,
+        conversation_external_reference_type=conversation_external_reference_type,
+        revision_number=revision_number,
+        revision_status=revision_status,
+        revision_content=revision_content,
+        revision_text=revision_text,
+        revision_created_at=revision_created_at,
+        revision_document_layout=revision_document_layout,
+        revision_template_version_id=revision_template_version_id,
+    )
+    headers = (
+        {"Content-Disposition": f'attachment; filename="{payload.filename}"'}
+        if payload.filename
+        else None
+    )
+    return Response(content=payload.content, media_type=payload.media_type, headers=headers)
 
 
 async def _get_fact_or_404(

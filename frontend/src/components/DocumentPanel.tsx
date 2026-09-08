@@ -139,6 +139,20 @@ export function DocumentPanel({
                 >
                   <Download size={16} aria-hidden="true" /> FHIR
                 </a>
+                <a
+                  className={panelStyles.exportLink}
+                  href={documentExportUrl(conversationId, "gdt-pdf")}
+                  title="GDT mit PDF-Verweis — für den Import in ein Praxisverwaltungssystem"
+                >
+                  <Download size={16} aria-hidden="true" /> GDT (PDF)
+                </a>
+                <a
+                  className={panelStyles.exportLink}
+                  href={documentExportUrl(conversationId, "gdt-text")}
+                  title="GDT mit eingebettetem Text — ohne separate PDF-Datei"
+                >
+                  <Download size={16} aria-hidden="true" /> GDT (Text)
+                </a>
               </>
             )}
           </div>

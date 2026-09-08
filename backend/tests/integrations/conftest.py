@@ -25,6 +25,7 @@ from tests.conversations.conftest import (  # noqa: F401
     login,
     seeded,
 )
+from tests.processing.conftest import processing_env  # noqa: F401
 
 
 class _CapturingHandler(BaseHTTPRequestHandler):
