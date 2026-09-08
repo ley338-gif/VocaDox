@@ -49,6 +49,10 @@ describe("RequireAuth", () => {
       email: null,
       permissions: [],
       groups: [],
+      first_name: null,
+      last_name: null,
+      gender: null,
+      avatar_asset_key: null,
     });
 
     render(
@@ -86,6 +90,10 @@ describe("RequirePermission", () => {
       email: null,
       permissions: ["conversation:read"],
       groups: [],
+      first_name: null,
+      last_name: null,
+      gender: null,
+      avatar_asset_key: null,
     });
 
     render(
@@ -118,6 +126,10 @@ describe("RequirePermission", () => {
       email: null,
       permissions: ["system:admin"],
       groups: [],
+      first_name: null,
+      last_name: null,
+      gender: null,
+      avatar_asset_key: null,
     });
 
     render(

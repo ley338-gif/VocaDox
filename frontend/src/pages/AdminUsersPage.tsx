@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import {
   type AdminOrganization,
   type AdminUserDetail,
-  type Gender,
   createUser,
   defaultAvatarForGender,
   getUser,
@@ -17,7 +16,7 @@ import {
   updateUser,
   uploadAvatar,
 } from "../api/admin";
-import { ApiError } from "../api/client";
+import { ApiError, type Gender } from "../api/client";
 import { useAuth } from "../auth/useAuth";
 import { AdminLayout } from "../components/AdminLayout";
 import { AvatarPicker } from "../components/AvatarPicker";
