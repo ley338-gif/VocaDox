@@ -89,8 +89,13 @@ async def create_template(
     review_rules: dict[str, Any] | None,
     created_by: User,
     document_layout: str = "sections",
+    document_body: str | None = None,
+    letterhead_logo_asset_key: str | None = None,
+    organization_id: uuid.UUID | None = None,
 ) -> Template:
-    template = Template(key=key, name=name, description=description)
+    template = Template(
+        key=key, name=name, description=description, organization_id=organization_id
+    )
     session.add(template)
     await session.flush()
     version = TemplateVersion(
@@ -101,6 +106,8 @@ async def create_template(
         presentation=presentation,
         review_rules=review_rules,
         document_layout=document_layout,
+        document_body=document_body,
+        letterhead_logo_asset_key=letterhead_logo_asset_key,
         created_by_user_id=created_by.id if created_by else None,
     )
     session.add(version)
@@ -117,6 +124,8 @@ async def create_draft_version(
     review_rules: dict[str, Any] | None,
     created_by: User,
     document_layout: str = "sections",
+    document_body: str | None = None,
+    letterhead_logo_asset_key: str | None = None,
 ) -> TemplateVersion:
     """Never mutates an existing version — always a brand new DRAFT row,
     numbered one past the highest version_number this template has ever
@@ -132,11 +141,39 @@ async def create_draft_version(
         presentation=presentation,
         review_rules=review_rules,
         document_layout=document_layout,
+        document_body=document_body,
+        letterhead_logo_asset_key=letterhead_logo_asset_key,
         created_by_user_id=created_by.id if created_by else None,
     )
     session.add(version)
     await session.flush()
     return version
+
+
+async def set_template_organization(
+    session: AsyncSession,
+    *,
+    template: Template,
+    organization_id: uuid.UUID | None,
+    changed_by: User | None,
+) -> Template:
+    """Reassigns which organization a template is tagged for (or clears it
+    back to global with `None`) — a plain metadata edit, not a content
+    change, so it's unaffected by `TemplateVersion`'s immutability guard
+    (organization_id lives on `Template`, not `TemplateVersion`)."""
+    template.organization_id = organization_id
+    await session.flush()
+    await record_event(
+        session,
+        event_type="template.organization_changed",
+        user_id=changed_by.id if changed_by else None,
+        event_metadata={
+            "template_id": str(template.id),
+            "template_key": template.key,
+            "organization_id": str(organization_id) if organization_id else None,
+        },
+    )
+    return template
 
 
 async def publish_template_version(

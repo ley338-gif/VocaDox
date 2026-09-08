@@ -5,6 +5,11 @@ on the admin surface."""
 
 from __future__ import annotations
 
+import uuid as _uuid
+
+import pytest
+from app.templates.models import ImmutablePublishedVersionError, TemplateVersion
+
 from tests.conversations.conftest import login
 
 
@@ -119,6 +124,109 @@ async def test_create_version_publish_never_mutates_prior_version(client, seeded
         await client.get(f"/api/v1/templates/{template['id']}", headers=headers)
     ).json()
     assert template_after["current_published_version_id"] == v2["id"]
+
+
+async def test_template_organization_can_be_tagged_and_reassigned(client, seeded) -> None:  # noqa: ANN001
+    """post-GA: light org-scoping (see app.templates.router's docstring) —
+    a template can be created global (organization_id omitted/None), tagged
+    to an organization at creation, and reassigned/cleared afterward via
+    `PATCH /{template_id}` — a plain metadata edit, not a versioned content
+    change."""
+    headers = await login(client, "carol", "yet another strong pw 789")
+
+    global_resp = await client.post(
+        "/api/v1/templates",
+        json={
+            "key": "test-global-template",
+            "name": "Global Template",
+            "extraction_categories": [{"key": "general_fact", "builtin": True}],
+            "presentation": [{"category": "general_fact", "title": "Facts"}],
+        },
+        headers=headers,
+    )
+    assert global_resp.status_code == 201, global_resp.text
+    assert global_resp.json()["organization_id"] is None
+
+    org_resp = await client.post(
+        "/api/v1/templates",
+        json={
+            "key": "test-org-template",
+            "name": "Org Template",
+            "organization_id": seeded["org_a"],
+            "extraction_categories": [{"key": "general_fact", "builtin": True}],
+            "presentation": [{"category": "general_fact", "title": "Facts"}],
+        },
+        headers=headers,
+    )
+    assert org_resp.status_code == 201, org_resp.text
+    org_template = org_resp.json()
+    assert org_template["organization_id"] == seeded["org_a"]
+
+    reassign_resp = await client.patch(
+        f"/api/v1/templates/{org_template['id']}",
+        json={"organization_id": seeded["org_b"]},
+        headers=headers,
+    )
+    assert reassign_resp.status_code == 200, reassign_resp.text
+    assert reassign_resp.json()["organization_id"] == seeded["org_b"]
+
+    clear_resp = await client.patch(
+        f"/api/v1/templates/{org_template['id']}",
+        json={"organization_id": None},
+        headers=headers,
+    )
+    assert clear_resp.status_code == 200, clear_resp.text
+    assert clear_resp.json()["organization_id"] is None
+
+
+async def test_published_template_version_content_is_immutable_at_orm_level(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    """Real, ORM-enforced immutability for the two newest content columns
+    (`document_body`/`letterhead_logo_asset_key`) — mirrors
+    `tests/documents/test_approval_and_immutability.py`'s pattern of
+    attempting a real mutation and confirming it's rejected, not merely
+    "no route happens to call update.\""""
+    headers = await login(client, "carol", "yet another strong pw 789")
+    create_resp = await client.post(
+        "/api/v1/templates",
+        json={
+            "key": "test-immutable-freeform",
+            "name": "Test Immutable Freeform",
+            "extraction_categories": [{"key": "decision", "builtin": True}],
+            "presentation": [{"category": "decision", "title": "Decisions"}],
+            "document_layout": "freeform",
+            "document_body": "Original: [decision_1]",
+        },
+        headers=headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    template = create_resp.json()
+    versions_resp = await client.get(
+        f"/api/v1/templates/{template['id']}/versions", headers=headers
+    )
+    v1 = versions_resp.json()[0]
+    publish_resp = await client.post(
+        f"/api/v1/templates/{template['id']}/versions/{v1['id']}/publish", headers=headers
+    )
+    assert publish_resp.status_code == 200, publish_resp.text
+
+    _, sessionmaker, _queue, _storage = processing_env
+    async with sessionmaker() as session:
+        version = await session.get(TemplateVersion, _uuid.UUID(v1["id"]))
+        assert version is not None
+        version.document_body = "TAMPERED"
+        with pytest.raises(ImmutablePublishedVersionError):
+            await session.flush()
+        await session.rollback()
+
+    async with sessionmaker() as session:
+        version = await session.get(TemplateVersion, _uuid.UUID(v1["id"]))
+        assert version is not None
+        version.letterhead_logo_asset_key = "tampered/key"
+        with pytest.raises(ImmutablePublishedVersionError):
+            await session.flush()
+        await session.rollback()
 
 
 async def test_template_write_requires_permission(client, seeded) -> None:  # noqa: ANN001

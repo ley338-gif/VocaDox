@@ -45,6 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import record_event
 from app.documents.models import Document, DocumentRevision, DocumentRevisionStatus
+from app.documents.placeholders import group_facts_by_category, substitute_placeholders
 from app.documents.state_machine import transition
 from app.identity.models import User
 from app.intelligence.models import (
@@ -145,35 +146,63 @@ async def compose_document(
     # DB with no Phase 6 seed applied), so behavior for that edge case is
     # unchanged.
     template_version = await _resolve_template_version(session, conversation_id)
-    presentation = (
-        template_version.presentation if template_version is not None else _FALLBACK_PRESENTATION
-    )
-    known_categories = {p["category"] for p in presentation}
-    # A fact whose category isn't in the resolved template's presentation
-    # (e.g. facts left over from an earlier extraction run under a
-    # different template) still gets a section — appended at the end,
-    # titled from the raw category string — so a document composition
-    # never silently drops a real, non-removed fact.
-    extra_categories = sorted({f.category for f in facts} - known_categories)
-    full_presentation = list(presentation) + [
-        {"category": c, "title": c.replace("_", " ").title()} for c in extra_categories
-    ]
 
     sections: list[dict[str, Any]] = []
     text_lines: list[str] = []
-    for entry in full_presentation:
-        category = entry["category"]
-        title = entry["title"]
-        category_facts = [f for f in facts if f.category == category]
-        if not category_facts:
-            continue
-        statements = [
-            {"text": render_fact_statement(f), "fact_ids": [str(f.id)]} for f in category_facts
+    if template_version is not None and template_version.document_layout == "freeform":
+        # Post-GA: the template author's own free-text body, with inline
+        # placeholders substituted from this conversation's facts — see
+        # app.documents.placeholders. Rendered as ONE aggregate pseudo-
+        # section (title=None so export/frontend never synthesize a
+        # heading for it) rather than per-category sections, since a
+        # freeform letter is one continuous piece of prose, not a list of
+        # bulleted categories. `fact_ids` is exactly the set of facts the
+        # substitution actually used — never padded — preserving the same
+        # "every statement's fact_ids is real, traceable evidence"
+        # invariant every other layout already upholds.
+        substituted_text, used_fact_ids = substitute_placeholders(
+            template_version.document_body or "", group_facts_by_category(facts)
+        )
+        sections.append(
+            {
+                "category": "__document_body__",
+                "title": None,
+                "statements": [
+                    {"text": substituted_text, "fact_ids": [str(fid) for fid in used_fact_ids]}
+                ],
+            }
+        )
+        text_lines.append(substituted_text)
+    else:
+        presentation = (
+            template_version.presentation
+            if template_version is not None
+            else _FALLBACK_PRESENTATION
+        )
+        known_categories = {p["category"] for p in presentation}
+        # A fact whose category isn't in the resolved template's
+        # presentation (e.g. facts left over from an earlier extraction
+        # run under a different template) still gets a section — appended
+        # at the end, titled from the raw category string — so a document
+        # composition never silently drops a real, non-removed fact.
+        extra_categories = sorted({f.category for f in facts} - known_categories)
+        full_presentation = list(presentation) + [
+            {"category": c, "title": c.replace("_", " ").title()} for c in extra_categories
         ]
-        sections.append({"category": category, "title": title, "statements": statements})
-        text_lines.append(f"## {title}")
-        text_lines.extend(f"- {s['text']}" for s in statements)
-        text_lines.append("")
+
+        for entry in full_presentation:
+            category = entry["category"]
+            title = entry["title"]
+            category_facts = [f for f in facts if f.category == category]
+            if not category_facts:
+                continue
+            statements = [
+                {"text": render_fact_statement(f), "fact_ids": [str(f.id)]} for f in category_facts
+            ]
+            sections.append({"category": category, "title": title, "statements": statements})
+            text_lines.append(f"## {title}")
+            text_lines.extend(f"- {s['text']}" for s in statements)
+            text_lines.append("")
 
     blocking = await _open_blocking_issues(session, conversation_id=conversation_id)
     new_status = (

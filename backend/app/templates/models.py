@@ -36,7 +36,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Uuid, event, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, Uuid, event, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.db.session import Base
@@ -102,6 +102,17 @@ class Template(Base):
     key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # Post-GA, light org-scoping (deliberately not a new RBAC/authz layer —
+    # see app.templates.router's module docstring): NULL means a global
+    # template available to every organization, exactly like every
+    # pre-existing seeded template (general/meeting/medical_consultation).
+    # Non-NULL just tags which organization a globally-permissioned admin
+    # created this template for -- the same "admin picks the org from a
+    # dropdown" pattern app.integrations.models.Webhook already uses, not
+    # per-org self-service isolation.
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     current_published_version_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("template_versions.id", ondelete="SET NULL"), nullable=True
     )
@@ -137,6 +148,17 @@ class TemplateVersion(Base):
     # `layout` branch. A plain string, not a StrEnum, so a future layout
     # doesn't need a migration to add -- only renderer support.
     document_layout: Mapped[str] = mapped_column(String(32), nullable=False, default="sections")
+    # Post-GA: the free-text body a "freeform" layout renders instead of
+    # `presentation`-driven sections -- the template author's own prose
+    # (their own salutation/letterhead wording/phrasing), with inline
+    # placeholders like "[decision_1]" substituted at compose time (see
+    # app.documents.placeholders). Unused by "sections"/"letter".
+    document_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Post-GA: an opaque app.providers.storage.StorageProvider key for an
+    # uploaded logo image, inserted into the DOCX/PDF header at export time
+    # (see app.documents.export_formats). No DB row of its own -- the key
+    # is the only handle, exactly like every other StorageProvider caller.
+    letterhead_logo_asset_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -168,6 +190,8 @@ def _forbid_mutating_published_template_version(
             or content_history.presentation.history.has_changes()
             or content_history.review_rules.history.has_changes()
             or content_history.document_layout.history.has_changes()
+            or content_history.document_body.history.has_changes()
+            or content_history.letterhead_logo_asset_key.history.has_changes()
         )
         if content_changed:
             raise ImmutablePublishedVersionError(
