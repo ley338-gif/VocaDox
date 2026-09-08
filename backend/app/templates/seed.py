@@ -12,11 +12,15 @@ Seeds, per spec §42's Phase 6 scope:
     (agenda_topic/decision-with-rationale/action_item-with-owner), proving
     the Template Engine actually drives different extraction behavior, not
     a renamed copy of general.
-  - **medical_consultation** (published v1, post-GA) — same
-    symptom/medication/diagnosis foundation, now composed with
-    `document_layout="letter"` (a formal Arztbrief: Betreff, Diagnose,
-    Verlauf/Anamnese, Prozedere/Empfehlung, prose paragraphs instead of
-    bullets — see app.documents.service.compose_document and
+  - **medical_consultation** (published, post-GA) — five categories
+    (Anamnese/Befund/Diagnose/Therapie/Prozedere-Empfehlung — Befund and
+    Prozedere/Empfehlung are genuinely separate from Anamnese and
+    Therapie respectively, not folded in, so both a Krankenblatt-style
+    chart note and a real Arztbrief have somewhere to put examiner
+    findings and follow-up plans), composed with `document_layout="letter"`
+    (a formal Arztbrief: Betreff, Anrede, the five sections above as prose
+    paragraphs instead of bullets, Grußformel — see
+    app.documents.service.compose_document and
     app.documents.export_formats) instead of the generic flat-section
     layout every other template uses.
   - **psychotherapy** (DRAFT only, never published) — data-model-ready
@@ -148,8 +152,14 @@ _MEETING_PRESENTATION = [
     {"category": "action_item", "title": "Action Items"},
 ]
 
-# Foundation-only (spec: "Medical/Psychotherapy prepared as foundation
-# only") — data-model-ready, deliberately minimal, DRAFT/never published.
+# Post-GA, published — see module docstring. Five categories map onto a
+# classic Arztbrief/Krankenblatt structure: Anamnese (patient-reported),
+# Befund (examiner-observed, kept separate from Anamnese since the two
+# have different evidentiary weight in a real chart note), Diagnose,
+# Therapie (medication), and Prozedere/Empfehlung (follow-up plan/next
+# steps — deliberately its own category, not folded into medication,
+# since a recommendation like "erneut untersuchen in zwei Wochen" or a
+# warning sign to watch for is not a medication).
 _MEDICAL_CATEGORIES = [
     {
         "key": "symptom",
@@ -160,6 +170,25 @@ _MEDICAL_CATEGORIES = [
             {"name": "description", "max_length": 512},
             {"name": "onset", "max_length": 128, "description": "'NOT_MENTIONED' if not stated."},
             {"name": "severity", "max_length": 64, "description": "'NOT_MENTIONED' if not stated."},
+        ],
+    },
+    {
+        "key": "finding",
+        "fact_type": "finding",
+        "item_field": "findings",
+        "instruction": (
+            "Extract objective examination findings explicitly stated by the examiner "
+            "(e.g. auscultation, vital signs, test/measurement results) -- not symptoms the "
+            "patient reported about themselves, which is a separate category. For each, note "
+            "the finding and its result/value."
+        ),
+        "fields": [
+            {"name": "description", "max_length": 512},
+            {
+                "name": "result",
+                "max_length": 256,
+                "description": "The observed value/result, or 'NOT_MENTIONED' if not stated.",
+            },
         ],
     },
     {
@@ -184,11 +213,32 @@ _MEDICAL_CATEGORIES = [
         "instruction": "Extract diagnoses explicitly stated during the consultation.",
         "fields": [{"name": "description", "max_length": 512}],
     },
+    {
+        "key": "recommendation",
+        "fact_type": "recommendation",
+        "item_field": "recommendations",
+        "instruction": (
+            "Extract recommendations, follow-up plans, or warning signs the clinician "
+            "communicated to the patient -- e.g. further tests, a follow-up appointment, or "
+            "when to seek care again -- but NOT medications, which are a separate category. "
+            "For each, note the timeframe if one was given."
+        ),
+        "fields": [
+            {"name": "description", "max_length": 512},
+            {
+                "name": "timeframe",
+                "max_length": 128,
+                "description": "'NOT_MENTIONED' if not stated.",
+            },
+        ],
+    },
 ]
 _MEDICAL_PRESENTATION = [
-    {"category": "symptom", "title": "Verlauf / Anamnese"},
+    {"category": "symptom", "title": "Anamnese"},
+    {"category": "finding", "title": "Befund"},
     {"category": "diagnosis", "title": "Diagnose"},
-    {"category": "medication", "title": "Prozedere / Empfehlung"},
+    {"category": "medication", "title": "Therapie"},
+    {"category": "recommendation", "title": "Prozedere / Empfehlung"},
 ]
 
 _PSYCHOTHERAPY_CATEGORIES = [
@@ -251,9 +301,10 @@ async def apply_seed(session: AsyncSession) -> None:
         key="medical_consultation",
         name="Medical Consultation",
         description=(
-            "Symptom/Diagnose/Medikation-Extraktion, komponiert als formaler Arztbrief "
-            "(Betreff, Diagnose, Verlauf/Anamnese, Prozedere/Empfehlung) statt der generischen "
-            "Abschnitts-Ansicht — post-GA, wählbar über ein Verarbeitungsprofil."
+            "Anamnese/Befund/Diagnose/Therapie/Prozedere-Extraktion, komponiert als formaler "
+            "Arztbrief (Betreff, Anamnese, Befund, Diagnose, Therapie, Prozedere/Empfehlung) "
+            "statt der generischen Abschnitts-Ansicht — post-GA, wählbar über ein "
+            "Verarbeitungsprofil."
         ),
         categories=_MEDICAL_CATEGORIES,
         presentation=_MEDICAL_PRESENTATION,

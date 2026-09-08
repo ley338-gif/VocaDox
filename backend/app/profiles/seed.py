@@ -42,12 +42,13 @@ async def apply_seed(session: AsyncSession) -> None:
 
 
 async def apply_processing_profile_seed(session: AsyncSession) -> None:
-    """Idempotent bootstrap for Phase 6's two initial, real, end-user-
-    selectable Processing Profiles (spec §19): "General" (the SYSTEM
-    DEFAULT layer's fallback — see app.profiles.resolver) and "Meeting".
-    Must run AFTER `app.templates.seed.apply_seed` (needs the general/
-    meeting templates' published versions to exist) and this module's own
-    `apply_seed` (needs the extraction ModelProfile to exist)."""
+    """Idempotent bootstrap for Phase 6's real, end-user-selectable
+    Processing Profiles (spec §19): "General" (the SYSTEM DEFAULT layer's
+    fallback — see app.profiles.resolver), "Meeting", and (post-GA)
+    "Medizinisch" (medical_consultation). Must run AFTER
+    `app.templates.seed.apply_seed` (needs each referenced template's
+    published version to exist) and this module's own `apply_seed` (needs
+    the extraction ModelProfile to exist)."""
     from app.profiles.service import (
         create_processing_profile,
         get_processing_profile_by_key,
@@ -125,6 +126,15 @@ async def apply_processing_profile_seed(session: AsyncSession) -> None:
         name="Meeting",
         description="Agenda topics, decisions with rationale, action items with owner/due date.",
         template_key="meeting",
+        is_default=False,
+    )
+    await _seed_processing_profile(
+        key="medical_consultation",
+        name="Medizinisch",
+        description=(
+            "Anamnese/Befund/Diagnose/Therapie/Prozedere, komponiert als formaler Arztbrief."
+        ),
+        template_key="medical_consultation",
         is_default=False,
     )
 

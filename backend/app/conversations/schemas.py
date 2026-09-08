@@ -20,8 +20,11 @@ class ConversationCreateRequest(BaseModel):
     privacy_mode: PrivacyMode = PrivacyMode.STANDARD
     # Phase 6 (spec §19): the friendly Processing Profile name the user
     # picked when starting this conversation (e.g. "General", "Meeting").
-    # Omitted/None means the SYSTEM DEFAULT layer applies (see
-    # app.profiles.resolver) — unchanged pre-Phase-6 behavior.
+    # Omitted/None: `app.conversations.service._resolve_default_profile_id`
+    # pre-fills a profile matching `conversation_type` when one exists
+    # (post-GA), otherwise the SYSTEM DEFAULT layer applies (see
+    # app.profiles.resolver) — unchanged pre-Phase-6 behavior. Either way
+    # the resolved value is returned on the response below, never hidden.
     processing_profile_id: uuid.UUID | None = None
     # Post-GA team-scoped visibility (app.conversations.authz): the Group
     # ("team") this conversation belongs to. None means visible to the

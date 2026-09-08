@@ -221,4 +221,4 @@ async def test_medical_consultation_template_composes_as_letter(
     assert revision["document_layout"] == "letter"
     titles = {s["title"] for s in revision["structured_content"]}
     assert "Diagnose" in titles
-    assert "Verlauf / Anamnese" in titles
+    assert "Anamnese" in titles
