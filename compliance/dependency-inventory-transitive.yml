@@ -595,49 +595,49 @@ dependencies:
   approval_status: approved
 - name: '@vitest/expect'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/mocker'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/pretty-format'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/runner'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/snapshot'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/spy'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/utils'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
