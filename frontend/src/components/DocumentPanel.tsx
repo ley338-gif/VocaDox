@@ -162,6 +162,7 @@ export function DocumentPanel({
           actions={
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
               {revision.document_layout === "letter" && <StatusBadge status="letter" label="Brief-Format" />}
+              {revision.document_layout === "freeform" && <StatusBadge status="freeform" label="Freitext" />}
               <StatusBadge status={revision.status} />
               {revision.status === "approved" && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--color-success)" }}>
