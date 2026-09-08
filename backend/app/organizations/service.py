@@ -49,3 +49,45 @@ async def list_members(
         )
     )
     return list(result.scalars().all())
+
+
+async def list_organization_ids_for_user(
+    session: AsyncSession, user_id: uuid.UUID
+) -> list[uuid.UUID]:
+    result = await session.execute(
+        select(OrganizationMembership.organization_id).where(
+            OrganizationMembership.user_id == user_id
+        )
+    )
+    return [row[0] for row in result.all()]
+
+
+async def remove_member(
+    session: AsyncSession, *, organization_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
+    result = await session.execute(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.user_id == user_id,
+        )
+    )
+    membership = result.scalar_one_or_none()
+    if membership is not None:
+        await session.delete(membership)
+        await session.flush()
+
+
+async def set_user_organizations(
+    session: AsyncSession, *, user_id: uuid.UUID, organization_ids: list[uuid.UUID]
+) -> None:
+    """Replaces the user's full organization-membership set with exactly
+    `organization_ids` (adds missing, removes extras) -- mirrors
+    `app.identity.service.set_user_groups` exactly, used by the admin
+    "assign organizations" action on `PATCH /admin/users/{id}` rather than
+    exposing raw add/remove plumbing to the frontend."""
+    current = set(await list_organization_ids_for_user(session, user_id))
+    target = set(organization_ids)
+    for organization_id in target - current:
+        await add_member(session, organization_id=organization_id, user_id=user_id)
+    for organization_id in current - target:
+        await remove_member(session, organization_id=organization_id, user_id=user_id)

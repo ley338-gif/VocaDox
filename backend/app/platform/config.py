@@ -106,6 +106,12 @@ class Settings(BaseSettings):
         description="Hard cap on an uploaded TemplateVersion letterhead logo image.",
     )
 
+    # -- Identity (post-GA: fuller admin user-management UI) -----------------
+    max_avatar_size_bytes: int = Field(
+        default=2 * 1024 * 1024,  # 2 MiB -- a profile photo, not a general media asset.
+        description="Hard cap on an uploaded User avatar image.",
+    )
+
     # -- Speech / diarization processing (Phase 3) ---------------------------
     speech_provider: str = Field(
         default="fake",
