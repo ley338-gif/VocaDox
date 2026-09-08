@@ -66,3 +66,179 @@ async def test_create_user_rejects_duplicate_username(client, seeded) -> None:  
         headers=headers,
     )
     assert resp.status_code == 409
+
+
+async def test_update_user_profile_fields(client, seeded) -> None:  # noqa: ANN001
+    """Post-GA: fuller admin editing -- name/gender/avatar, not just
+    display_name/email/is_active."""
+    headers = await login(client, "carol", "yet another strong pw 789")
+    create_resp = await client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "erin",
+            "password": "a brand new strong password",
+            "display_name": "Erin",
+        },
+        headers=headers,
+    )
+    user_id = create_resp.json()["id"]
+
+    resp = await client.patch(
+        f"/api/v1/admin/users/{user_id}",
+        json={"first_name": "Erin", "last_name": "Example", "gender": "female"},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["first_name"] == "Erin"
+    assert body["last_name"] == "Example"
+    assert body["gender"] == "female"
+
+    # An explicit null clears a previously-set field back to "keine Angabe".
+    clear_resp = await client.patch(
+        f"/api/v1/admin/users/{user_id}", json={"gender": None}, headers=headers
+    )
+    assert clear_resp.status_code == 200, clear_resp.text
+    assert clear_resp.json()["gender"] is None
+
+
+async def test_update_user_rejects_invalid_gender(client, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "carol", "yet another strong pw 789")
+    users_resp = await client.get("/api/v1/admin/users", headers=headers)
+    bob_id = next(u["id"] for u in users_resp.json() if u["username"] == "bob")
+    resp = await client.patch(
+        f"/api/v1/admin/users/{bob_id}", json={"gender": "not-a-real-option"}, headers=headers
+    )
+    assert resp.status_code == 422
+
+
+async def test_assign_user_organizations(client, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "carol", "yet another strong pw 789")
+
+    org_resp = await client.post(
+        "/api/v1/organizations",
+        json={"name": "Radiology", "slug": "radiology"},
+        headers=headers,
+    )
+    org_id = org_resp.json()["id"]
+
+    users_resp = await client.get("/api/v1/admin/users", headers=headers)
+    bob_id = next(u["id"] for u in users_resp.json() if u["username"] == "bob")
+
+    resp = await client.patch(
+        f"/api/v1/admin/users/{bob_id}", json={"organization_ids": [org_id]}, headers=headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["organization_ids"] == [org_id]
+
+    members_resp = await client.get(f"/api/v1/organizations/{org_id}/members", headers=headers)
+    assert any(m["user_id"] == bob_id for m in members_resp.json())
+
+    # Setting to an empty list actually removes the membership -- a real
+    # replace, not an additive-only merge.
+    clear_resp = await client.patch(
+        f"/api/v1/admin/users/{bob_id}", json={"organization_ids": []}, headers=headers
+    )
+    assert clear_resp.status_code == 200, clear_resp.text
+    assert clear_resp.json()["organization_ids"] == []
+
+
+async def test_upload_and_serve_avatar(client, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "carol", "yet another strong pw 789")
+    png_bytes = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00"
+        b"\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    upload_resp = await client.post(
+        "/api/v1/admin/users/avatar",
+        files={"file": ("avatar.png", png_bytes, "image/png")},
+        headers=headers,
+    )
+    assert upload_resp.status_code == 201, upload_resp.text
+    asset_key = upload_resp.json()["asset_key"]
+
+    get_resp = await client.get(f"/api/v1/admin/users/avatar/{asset_key}", headers=headers)
+    assert get_resp.status_code == 200
+    assert get_resp.headers["content-type"] == "image/png"
+    assert get_resp.content == png_bytes
+
+    users_resp = await client.get("/api/v1/admin/users", headers=headers)
+    bob_id = next(u["id"] for u in users_resp.json() if u["username"] == "bob")
+    patch_resp = await client.patch(
+        f"/api/v1/admin/users/{bob_id}",
+        json={"avatar_asset_key": asset_key},
+        headers=headers,
+    )
+    assert patch_resp.status_code == 200, patch_resp.text
+    assert patch_resp.json()["avatar_asset_key"] == asset_key
+
+
+async def test_upload_avatar_rejects_non_image(client, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "carol", "yet another strong pw 789")
+    resp = await client.post(
+        "/api/v1/admin/users/avatar",
+        files={"file": ("not-an-image.txt", b"hello world", "text/plain")},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_admin_set_password_lifecycle(client, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "carol", "yet another strong pw 789")
+    create_resp = await client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "frank",
+            "password": "franks original password",
+            "display_name": "Frank",
+        },
+        headers=headers,
+    )
+    user_id = create_resp.json()["id"]
+
+    reset_resp = await client.post(
+        f"/api/v1/admin/users/{user_id}/set-password",
+        json={"new_password": "a completely new password"},
+        headers=headers,
+    )
+    assert reset_resp.status_code == 204, reset_resp.text
+
+    # The old password no longer works; the new one does.
+    old_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "frank", "password": "franks original password"},
+    )
+    assert old_login.status_code == 401
+
+    new_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "frank", "password": "a completely new password"},
+    )
+    assert new_login.status_code == 200
+
+
+async def test_admin_set_password_rejects_too_short(client, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "carol", "yet another strong pw 789")
+    users_resp = await client.get("/api/v1/admin/users", headers=headers)
+    bob_id = next(u["id"] for u in users_resp.json() if u["username"] == "bob")
+    resp = await client.post(
+        f"/api/v1/admin/users/{bob_id}/set-password",
+        json={"new_password": "short"},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+async def test_set_password_requires_permission(client, seeded) -> None:  # noqa: ANN001
+    carol_headers = await login(client, "carol", "yet another strong pw 789")
+    users_resp = await client.get("/api/v1/admin/users", headers=carol_headers)
+    bob_id = next(u["id"] for u in users_resp.json() if u["username"] == "bob")
+
+    alice_headers = await login(client, "alice", "a very strong password 123")
+    resp = await client.post(
+        f"/api/v1/admin/users/{bob_id}/set-password",
+        json={"new_password": "a completely new password"},
+        headers=alice_headers,
+    )
+    assert resp.status_code == 403

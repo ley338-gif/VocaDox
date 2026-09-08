@@ -48,6 +48,24 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
 
+    # Post-GA: structured profile fields, additive to `display_name` (never
+    # replacing it -- every existing caller/response that reads
+    # `display_name` keeps working unchanged). Both nullable since neither
+    # is required to create a user (matches `display_name` being the only
+    # mandatory name field, unchanged since Phase 1).
+    first_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Free-form-enough to add an option later without a migration, but
+    # validated against a closed set at the API boundary (GenderOption in
+    # app.identity.schemas) so it never silently drifts into typo'd values.
+    gender: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Either an opaque StorageProvider key (an uploaded custom photo -- see
+    # app.identity.avatar, same no-DB-row pattern as
+    # TemplateVersion.letterhead_logo_asset_key) or a "preset:<name>"
+    # sentinel resolved by the frontend to a bundled static default avatar
+    # image -- never both at once, and never a raw filesystem path.
+    avatar_asset_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
     # Nullable: users authenticated via a future external provider (OIDC /
     # LDAP_AD / REVERSE_PROXY) never have a local password hash.
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)

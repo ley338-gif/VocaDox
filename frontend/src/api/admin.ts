@@ -35,6 +35,8 @@ function jsonInit(method: string, body: unknown, csrfToken: string): RequestInit
 
 // -- Users / Groups / Roles --------------------------------------------
 
+export type Gender = "male" | "female" | "diverse";
+
 export interface AdminUser {
   id: string;
   username: string;
@@ -42,10 +44,15 @@ export interface AdminUser {
   email: string | null;
   auth_provider: string;
   is_active: boolean;
+  first_name: string | null;
+  last_name: string | null;
+  gender: Gender | null;
+  avatar_asset_key: string | null;
 }
 
 export interface AdminUserDetail extends AdminUser {
   group_ids: string[];
+  organization_ids: string[];
 }
 
 export function listUsers(): Promise<AdminUser[]> {
@@ -62,7 +69,11 @@ export function createUser(
     password: string;
     display_name: string;
     email?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    gender?: Gender | null;
     group_ids?: string[];
+    organization_ids?: string[];
   },
   csrfToken: string
 ): Promise<AdminUserDetail> {
@@ -75,12 +86,70 @@ export function updateUser(
     display_name: string;
     email: string | null;
     is_active: boolean;
+    first_name: string | null;
+    last_name: string | null;
+    gender: Gender | null;
+    avatar_asset_key: string | null;
     group_ids: string[];
+    organization_ids: string[];
   }>,
   csrfToken: string
 ): Promise<AdminUserDetail> {
   return request(`/admin/users/${userId}`, jsonInit("PATCH", payload, csrfToken));
 }
+
+export async function setUserPassword(
+  userId: string,
+  newPassword: string,
+  csrfToken: string
+): Promise<void> {
+  await request(
+    `/admin/users/${userId}/set-password`,
+    jsonInit("POST", { new_password: newPassword }, csrfToken)
+  );
+}
+
+export async function uploadAvatar(file: File, csrfToken: string): Promise<{ asset_key: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_PREFIX}/admin/users/avatar`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "X-CSRF-Token": csrfToken },
+    body: formData,
+  });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (body.detail) detail = body.detail;
+    } catch {
+      // no JSON body
+    }
+    throw new ApiError(response.status, detail);
+  }
+  return (await response.json()) as { asset_key: string };
+}
+
+const AVATAR_PRESET_PREFIX = "preset:";
+
+/** Resolves `User.avatar_asset_key` to a displayable image URL, or `null`
+ * for "no avatar" -- a `"preset:<name>"` sentinel maps to a bundled
+ * static default image (see frontend/public/avatars/), never a backend
+ * call; anything else is an uploaded custom photo served through the
+ * admin-only avatar endpoint. */
+export function avatarUrl(assetKey: string | null): string | null {
+  if (!assetKey) return null;
+  if (assetKey.startsWith(AVATAR_PRESET_PREFIX)) {
+    return `/avatars/${assetKey.slice(AVATAR_PRESET_PREFIX.length)}.png`;
+  }
+  return `${API_PREFIX}/admin/users/avatar/${assetKey}`;
+}
+
+export const AVATAR_PRESETS: { key: string; label: string }[] = [
+  { key: `${AVATAR_PRESET_PREFIX}male`, label: "Avatar 1" },
+  { key: `${AVATAR_PRESET_PREFIX}female`, label: "Avatar 2" },
+];
 
 export interface AdminGroup {
   id: string;

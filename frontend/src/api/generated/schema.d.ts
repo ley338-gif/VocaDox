@@ -1609,6 +1609,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Avatar Endpoint
+         * @description User-agnostic — an avatar is uploaded first and its returned
+         *     `asset_key` is included in a subsequent `POST /admin/users` or
+         *     `PATCH /admin/users/{id}` payload (no `User` needs to exist yet, and
+         *     the same uploaded image can be re-used across users).
+         */
+        post: operations["upload_avatar_endpoint_api_v1_admin_users_avatar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/avatar/{asset_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Avatar Endpoint */
+        get: operations["get_avatar_endpoint_api_v1_admin_users_avatar__asset_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}": {
         parameters: {
             query?: never;
@@ -1629,6 +1669,32 @@ export interface paths {
          *     to "list/view/create/deactivate users" never hard-deletes a user row.
          */
         patch: operations["update_user_endpoint_api_v1_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/set-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set User Password Endpoint
+         * @description Admin-initiated password reset. The client is responsible for its
+         *     own "repeat password" double-entry confirmation before ever calling
+         *     this -- see `SetPasswordRequest`'s docstring. Gets its own audit event
+         *     type (`user.password_reset_by_admin`), distinct from the generic
+         *     `user.updated` a profile-field PATCH records, and never logs/echoes
+         *     the password itself (see app.identity.passwords's module docstring on
+         *     why raw passwords are never passed to the structured logger).
+         */
+        post: operations["set_user_password_endpoint_api_v1_admin_users__user_id__set_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/groups": {
@@ -2825,6 +2891,11 @@ export interface components {
             /** Scopes */
             scopes: string[];
         };
+        /** AvatarUploadResponse */
+        AvatarUploadResponse: {
+            /** Asset Key */
+            asset_key: string;
+        };
         /** BackupResponse */
         BackupResponse: {
             /**
@@ -2852,6 +2923,11 @@ export interface components {
         };
         /** Body_ingest_live_chunk_endpoint_api_v1_conversations__conversation_id__live_chunks_post */
         Body_ingest_live_chunk_endpoint_api_v1_conversations__conversation_id__live_chunks_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_avatar_endpoint_api_v1_admin_users_avatar_post */
+        Body_upload_avatar_endpoint_api_v1_admin_users_avatar_post: {
             /** File */
             file: string;
         };
@@ -5087,6 +5163,21 @@ export interface components {
             /** Last Used At */
             last_used_at: string | null;
         };
+        /**
+         * SetPasswordRequest
+         * @description Admin-initiated reset, `POST /admin/users/{id}/set-password` --
+         *     deliberately its own request/endpoint, never folded into
+         *     `UserUpdateRequest`, so a password change always gets its own
+         *     dedicated audit event and is never silently bundled into an unrelated
+         *     profile-field PATCH. The client is expected to enforce a matching
+         *     "repeat password" confirmation itself before ever sending this
+         *     request -- there is nothing here to confirm server-side, since only
+         *     one password value is transmitted.
+         */
+        SetPasswordRequest: {
+            /** New Password */
+            new_password: string;
+        };
         /** ShareLinkResponse */
         ShareLinkResponse: {
             /**
@@ -5473,8 +5564,16 @@ export interface components {
             display_name: string;
             /** Email */
             email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Gender */
+            gender?: ("male" | "female" | "diverse") | null;
             /** Group Ids */
             group_ids?: string[];
+            /** Organization Ids */
+            organization_ids?: string[];
         };
         /** UserDetailResponse */
         UserDetailResponse: {
@@ -5493,8 +5592,18 @@ export interface components {
             auth_provider: string;
             /** Is Active */
             is_active: boolean;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Gender */
+            gender?: ("male" | "female" | "diverse") | null;
+            /** Avatar Asset Key */
+            avatar_asset_key?: string | null;
             /** Group Ids */
             group_ids: string[];
+            /** Organization Ids */
+            organization_ids: string[];
         };
         /** UserSummaryResponse */
         UserSummaryResponse: {
@@ -5513,6 +5622,14 @@ export interface components {
             auth_provider: string;
             /** Is Active */
             is_active: boolean;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Gender */
+            gender?: ("male" | "female" | "diverse") | null;
+            /** Avatar Asset Key */
+            avatar_asset_key?: string | null;
         };
         /** UserUpdateRequest */
         UserUpdateRequest: {
@@ -5522,8 +5639,18 @@ export interface components {
             email?: string | null;
             /** Is Active */
             is_active?: boolean | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Gender */
+            gender?: ("male" | "female" | "diverse") | null;
+            /** Avatar Asset Key */
+            avatar_asset_key?: string | null;
             /** Group Ids */
             group_ids?: string[] | null;
+            /** Organization Ids */
+            organization_ids?: string[] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -9132,6 +9259,70 @@ export interface operations {
             };
         };
     };
+    upload_avatar_endpoint_api_v1_admin_users_avatar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_avatar_endpoint_api_v1_admin_users_avatar_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_avatar_endpoint_api_v1_admin_users_avatar__asset_key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_user_endpoint_api_v1_admin_users__user_id__get: {
         parameters: {
             query?: never;
@@ -9186,6 +9377,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserDetailResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_password_endpoint_api_v1_admin_users__user_id__set_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -31,16 +31,34 @@ async def create_local_user(
     password: str,
     display_name: str,
     email: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    gender: str | None = None,
 ) -> User:
     user = User(
         username=username,
         display_name=display_name,
         email=email,
+        first_name=first_name,
+        last_name=last_name,
+        gender=gender,
         password_hash=hash_password(password),
         auth_provider=AuthProviderType.LOCAL.value,
         is_active=True,
     )
     session.add(user)
+    await session.flush()
+    return user
+
+
+async def set_user_password(session: AsyncSession, user: User, *, password: str) -> User:
+    """Admin-initiated password reset (`user:manage`, never self-service --
+    see app.identity.router's dedicated `POST .../set-password`, kept
+    separate from `update_user` so it gets its own audit event type and
+    is never silently bundled into an unrelated profile-field PATCH).
+    Raises ValueError (via `hash_password`) if `password` is too short --
+    same validation every local-user password already goes through."""
+    user.password_hash = hash_password(password)
     await session.flush()
     return user
 
@@ -120,6 +138,9 @@ async def get_user(session: AsyncSession, user_id: uuid.UUID) -> User | None:
     return await session.get(User, user_id)
 
 
+_UNSET = object()
+
+
 async def update_user(
     session: AsyncSession,
     user: User,
@@ -127,13 +148,32 @@ async def update_user(
     display_name: str | None = None,
     email: str | None = None,
     is_active: bool | None = None,
+    first_name: str | None | object = _UNSET,
+    last_name: str | None | object = _UNSET,
+    gender: str | None | object = _UNSET,
+    avatar_asset_key: str | None | object = _UNSET,
 ) -> User:
+    """`first_name`/`last_name`/`gender`/`avatar_asset_key` distinguish
+    "not provided" (`_UNSET`, leave unchanged) from "explicitly cleared"
+    (`None`, e.g. removing an avatar or a previously-set gender) -- unlike
+    `display_name`/`email`/`is_active` above, which the router's
+    `UserUpdateRequest.model_dump(exclude_unset=True)` already filters to
+    only-provided fields before this ever sees `None` for them, so a plain
+    `is not None` check there always meant "was provided"."""
     if display_name is not None:
         user.display_name = display_name
     if email is not None:
         user.email = email
     if is_active is not None:
         user.is_active = is_active
+    if first_name is not _UNSET:
+        user.first_name = first_name  # type: ignore[assignment]
+    if last_name is not _UNSET:
+        user.last_name = last_name  # type: ignore[assignment]
+    if gender is not _UNSET:
+        user.gender = gender  # type: ignore[assignment]
+    if avatar_asset_key is not _UNSET:
+        user.avatar_asset_key = avatar_asset_key  # type: ignore[assignment]
     await session.flush()
     return user
 

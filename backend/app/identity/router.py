@@ -4,12 +4,15 @@ GET /auth/me."""
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import record_event
+from app.core.storage import get_storage_provider
 from app.identity.auth_providers import LocalAuthProvider
+from app.identity.avatar import load_avatar, upload_avatar
 from app.identity.deps import (
     get_current_session,
     get_current_user,
@@ -20,6 +23,7 @@ from app.identity.deps import (
 from app.identity.models import Group, User
 from app.identity.rbac import get_user_permissions
 from app.identity.schemas import (
+    AvatarUploadResponse,
     CsrfTokenResponse,
     CurrentUserResponse,
     GroupCreateRequest,
@@ -30,6 +34,7 @@ from app.identity.schemas import (
     LoginRequest,
     LoginResponse,
     RoleResponse,
+    SetPasswordRequest,
     UserCreateRequest,
     UserDetailResponse,
     UserSummaryResponse,
@@ -50,12 +55,16 @@ from app.identity.service import (
     list_users,
     set_group_roles,
     set_user_groups,
+    set_user_password,
     update_group,
     update_user,
 )
 from app.identity.sessions import SESSION_COOKIE_NAME, SessionData, SessionStore
+from app.media.validation import UploadValidationError
+from app.organizations.service import list_organization_ids_for_user, set_user_organizations
 from app.platform.config import get_settings
 from app.platform.db.session import get_session
+from app.providers.storage import StorageProvider
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 admin_users_router = APIRouter(prefix="/admin/users", tags=["administration"])
@@ -72,6 +81,14 @@ def _client_ip(request: Request) -> str | None:
 
 def _user_agent(request: Request) -> str | None:
     return request.headers.get("user-agent")
+
+
+async def _upload_chunks(file: UploadFile, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -189,12 +206,75 @@ async def me(
 # -- Phase 7: Admin Portal — Users -------------------------------------------
 
 
+async def _user_detail(db: AsyncSession, user: User) -> UserDetailResponse:
+    group_ids = await list_group_ids_for_user(db, user.id)
+    organization_ids = await list_organization_ids_for_user(db, user.id)
+    return UserDetailResponse(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        email=user.email,
+        auth_provider=user.auth_provider,
+        is_active=user.is_active,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        gender=user.gender,  # type: ignore[arg-type]
+        avatar_asset_key=user.avatar_asset_key,
+        group_ids=group_ids,
+        organization_ids=organization_ids,
+    )
+
+
 @admin_users_router.get("", response_model=list[UserSummaryResponse])
 async def list_users_endpoint(
     _user: User = Depends(_require_user_manage),
     db: AsyncSession = Depends(get_session),
 ) -> list[UserSummaryResponse]:
     return [UserSummaryResponse.model_validate(u) for u in await list_users(db)]
+
+
+# Registered before the dynamic "/{user_id}" routes below so these literal
+# paths are never shadowed -- same reasoning as
+# app.templates.router's letterhead-logo endpoints.
+@admin_users_router.post(
+    "/avatar", response_model=AvatarUploadResponse, status_code=status.HTTP_201_CREATED
+)
+async def upload_avatar_endpoint(
+    file: UploadFile,
+    _user: User = Depends(_require_user_manage),
+    storage: StorageProvider = Depends(get_storage_provider),
+    _csrf: None = Depends(require_csrf),
+) -> AvatarUploadResponse:
+    """User-agnostic — an avatar is uploaded first and its returned
+    `asset_key` is included in a subsequent `POST /admin/users` or
+    `PATCH /admin/users/{id}` payload (no `User` needs to exist yet, and
+    the same uploaded image can be re-used across users)."""
+    settings = get_settings()
+    try:
+        asset_key = await upload_avatar(
+            _upload_chunks(file),
+            temp_dir=settings.upload_temp_dir,
+            max_size_bytes=settings.max_avatar_size_bytes,
+            storage=storage,
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.reason
+        ) from exc
+    return AvatarUploadResponse(asset_key=asset_key)
+
+
+@admin_users_router.get("/avatar/{asset_key:path}")
+async def get_avatar_endpoint(
+    asset_key: str,
+    _user: User = Depends(_require_user_manage),
+    storage: StorageProvider = Depends(get_storage_provider),
+) -> Response:
+    loaded = await load_avatar(storage, asset_key)
+    if loaded is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="avatar not found")
+    data, content_type = loaded
+    return Response(content=data, media_type=content_type)
 
 
 @admin_users_router.post(
@@ -216,9 +296,16 @@ async def create_user_endpoint(
         password=payload.password,
         display_name=payload.display_name,
         email=payload.email,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        gender=payload.gender,
     )
     if payload.group_ids:
         await set_user_groups(db, user_id=new_user.id, group_ids=payload.group_ids)
+    if payload.organization_ids:
+        await set_user_organizations(
+            db, user_id=new_user.id, organization_ids=payload.organization_ids
+        )
     await record_event(
         db,
         event_type="user.created",
@@ -228,16 +315,7 @@ async def create_user_endpoint(
     )
     await db.commit()
     await db.refresh(new_user)
-    group_ids = await list_group_ids_for_user(db, new_user.id)
-    return UserDetailResponse(
-        id=new_user.id,
-        username=new_user.username,
-        display_name=new_user.display_name,
-        email=new_user.email,
-        auth_provider=new_user.auth_provider,
-        is_active=new_user.is_active,
-        group_ids=group_ids,
-    )
+    return await _user_detail(db, new_user)
 
 
 async def _get_user_or_404(db: AsyncSession, user_id: uuid.UUID) -> User:
@@ -254,16 +332,7 @@ async def get_user_endpoint(
     db: AsyncSession = Depends(get_session),
 ) -> UserDetailResponse:
     found = await _get_user_or_404(db, user_id)
-    group_ids = await list_group_ids_for_user(db, found.id)
-    return UserDetailResponse(
-        id=found.id,
-        username=found.username,
-        display_name=found.display_name,
-        email=found.email,
-        auth_provider=found.auth_provider,
-        is_active=found.is_active,
-        group_ids=group_ids,
-    )
+    return await _user_detail(db, found)
 
 
 @admin_users_router.patch("/{user_id}", response_model=UserDetailResponse)
@@ -277,10 +346,16 @@ async def update_user_endpoint(
     """Also the deactivation endpoint (`is_active: false`) — spec: admin UI
     to "list/view/create/deactivate users" never hard-deletes a user row."""
     found = await _get_user_or_404(db, user_id)
-    changes = payload.model_dump(exclude_unset=True, exclude={"group_ids"})
+    changes = payload.model_dump(
+        exclude_unset=True, exclude={"group_ids", "organization_ids"}
+    )
     found = await update_user(db, found, **changes)
     if payload.group_ids is not None:
         await set_user_groups(db, user_id=found.id, group_ids=payload.group_ids)
+    if payload.organization_ids is not None:
+        await set_user_organizations(
+            db, user_id=found.id, organization_ids=payload.organization_ids
+        )
     await record_event(
         db,
         event_type="user.updated",
@@ -290,16 +365,39 @@ async def update_user_endpoint(
     )
     await db.commit()
     await db.refresh(found)
-    group_ids = await list_group_ids_for_user(db, found.id)
-    return UserDetailResponse(
-        id=found.id,
-        username=found.username,
-        display_name=found.display_name,
-        email=found.email,
-        auth_provider=found.auth_provider,
-        is_active=found.is_active,
-        group_ids=group_ids,
+    return await _user_detail(db, found)
+
+
+@admin_users_router.post("/{user_id}/set-password", status_code=status.HTTP_204_NO_CONTENT)
+async def set_user_password_endpoint(
+    user_id: uuid.UUID,
+    payload: SetPasswordRequest,
+    actor: User = Depends(_require_user_manage),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> None:
+    """Admin-initiated password reset. The client is responsible for its
+    own "repeat password" double-entry confirmation before ever calling
+    this -- see `SetPasswordRequest`'s docstring. Gets its own audit event
+    type (`user.password_reset_by_admin`), distinct from the generic
+    `user.updated` a profile-field PATCH records, and never logs/echoes
+    the password itself (see app.identity.passwords's module docstring on
+    why raw passwords are never passed to the structured logger)."""
+    found = await _get_user_or_404(db, user_id)
+    try:
+        await set_user_password(db, found, password=payload.new_password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+    await record_event(
+        db,
+        event_type="user.password_reset_by_admin",
+        user_id=actor.id,
+        username=actor.username,
+        event_metadata={"target_user_id": str(found.id)},
     )
+    await db.commit()
 
 
 # -- Phase 7: Admin Portal — Groups -------------------------------------------
