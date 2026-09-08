@@ -18,7 +18,7 @@ app.documents.placeholders / app.documents.service.compose_document).
 No existing column is dropped or renamed; no existing row's meaning
 changes; no backfill needed.
 
-Revision ID: 0024_template_org_scope_and_freeform
+Revision ID: 0024_template_org_freeform
 Revises: 0023_document_layout
 Create Date: 2026-09-08
 
@@ -29,7 +29,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0024_template_org_scope_and_freeform"
+revision: str = "0024_template_org_freeform"
 down_revision: str | None = "0023_document_layout"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None

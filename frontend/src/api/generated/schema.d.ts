@@ -1292,7 +1292,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Template Organization Endpoint
+         * @description Reassigns (or clears, with `null`) which organization this template
+         *     is tagged for — a plain metadata edit, never touches any
+         *     `TemplateVersion`'s immutable content.
+         */
+        patch: operations["update_template_organization_endpoint_api_v1_templates__template_id__patch"];
         trace?: never;
     };
     "/api/v1/templates/{template_id}/versions": {
@@ -5153,6 +5159,8 @@ export interface components {
             name: string;
             /** Description */
             description?: string | null;
+            /** Organization Id */
+            organization_id?: string | null;
             /** Extraction Categories */
             extraction_categories: {
                 [key: string]: unknown;
@@ -5170,6 +5178,15 @@ export interface components {
              * @default sections
              */
             document_layout: string;
+            /** Document Body */
+            document_body?: string | null;
+            /** Letterhead Logo Asset Key */
+            letterhead_logo_asset_key?: string | null;
+        };
+        /** TemplateOrganizationUpdateRequest */
+        TemplateOrganizationUpdateRequest: {
+            /** Organization Id */
+            organization_id?: string | null;
         };
         /** TemplateResponse */
         TemplateResponse: {
@@ -5184,6 +5201,8 @@ export interface components {
             name: string;
             /** Description */
             description: string | null;
+            /** Organization Id */
+            organization_id: string | null;
             /** Current Published Version Id */
             current_published_version_id: string | null;
             /**
@@ -5216,6 +5235,10 @@ export interface components {
              * @default sections
              */
             document_layout: string;
+            /** Document Body */
+            document_body?: string | null;
+            /** Letterhead Logo Asset Key */
+            letterhead_logo_asset_key?: string | null;
         };
         /** TemplateVersionResponse */
         TemplateVersionResponse: {
@@ -5247,6 +5270,10 @@ export interface components {
             } | null;
             /** Document Layout */
             document_layout: string;
+            /** Document Body */
+            document_body: string | null;
+            /** Letterhead Logo Asset Key */
+            letterhead_logo_asset_key: string | null;
             /** Created By User Id */
             created_by_user_id: string | null;
             /**
@@ -8269,6 +8296,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_template_organization_endpoint_api_v1_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateOrganizationUpdateRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
