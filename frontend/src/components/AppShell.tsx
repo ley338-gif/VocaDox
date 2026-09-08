@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AudioLines, ChevronLeft, ChevronRight, LogOut, RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { AudioLines, ChevronLeft, ChevronRight, LogOut, RefreshCw, Search, ShieldCheck, UserCircle } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
@@ -7,6 +7,8 @@ import { getDashboard } from "../api/admin";
 import { useAuth } from "../auth/useAuth";
 import { useOfflineQueueSync } from "../recording/useOfflineQueueSync";
 import styles from "./AppShell.module.css";
+import { AvatarThumb } from "./AvatarThumb";
+import { MyProfileModal } from "./MyProfileModal";
 import { ADMIN_SECTIONS, APP_SECTIONS, type NavSection } from "./navigation";
 
 const SIDEBAR_COLLAPSED_KEY = "vocadox.sidebarCollapsed";
@@ -44,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
   const [isNarrowViewport, setIsNarrowViewport] = useState(matchesNarrowViewport);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -234,12 +237,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
           <div className={styles.topbarRight} ref={userMenuRef}>
             <button type="button" className={styles.userButton} aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((open) => !open)}>
-              <span className={styles.avatar}>{(user?.displayName ?? "?").slice(0, 1).toUpperCase()}</span>
+              <AvatarThumb assetKey={user?.avatarAssetKey} label={user?.displayName ?? "?"} size={24} />
               {user?.displayName}
             </button>
             {userMenuOpen && (
               <div className={styles.userMenu}>
                 <div className={styles.userMenuName}>{user?.displayName}</div>
+                <button
+                  type="button"
+                  className={styles.navLink}
+                  style={{ width: "100%", background: "none", border: "none", cursor: "pointer" }}
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    setShowProfileModal(true);
+                  }}
+                >
+                  <UserCircle size={16} aria-hidden="true" />
+                  <span>Mein Profil</span>
+                </button>
                 <button
                   type="button"
                   className={styles.navLink}
@@ -258,6 +273,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         <main className={styles.main}>{children}</main>
       </div>
+
+      {showProfileModal && <MyProfileModal onClose={() => setShowProfileModal(false)} />}
     </div>
   );
 }

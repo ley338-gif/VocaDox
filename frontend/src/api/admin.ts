@@ -5,7 +5,7 @@
  * api/conversations.ts / api/templates.ts / api/profiles.ts.
  */
 
-import { ApiError } from "./client";
+import { ApiError, type Gender } from "./client";
 
 const API_PREFIX = "/api/v1";
 
@@ -34,8 +34,6 @@ function jsonInit(method: string, body: unknown, csrfToken: string): RequestInit
 }
 
 // -- Users / Groups / Roles --------------------------------------------
-
-export type Gender = "male" | "female" | "diverse";
 
 export interface AdminUser {
   id: string;
@@ -136,8 +134,10 @@ const AVATAR_PRESET_PREFIX = "preset:";
 /** Resolves `User.avatar_asset_key` to a displayable image URL, or `null`
  * for "no avatar" -- a `"preset:<name>"` sentinel maps to a bundled
  * static default image (see frontend/public/avatars/), never a backend
- * call; anything else is an uploaded custom photo served through the
- * admin-only avatar endpoint. */
+ * call; anything else is an uploaded custom photo served through
+ * `GET /admin/users/avatar/{key}` -- despite the path, that endpoint only
+ * requires being logged in (not `user:manage`), since it's shared with
+ * every user's own self-service avatar (`POST /auth/me/avatar`). */
 export function avatarUrl(assetKey: string | null): string | null {
   if (!assetKey) return null;
   if (assetKey.startsWith(AVATAR_PRESET_PREFIX)) {
@@ -150,6 +150,25 @@ export const AVATAR_PRESETS: { key: string; label: string }[] = [
   { key: `${AVATAR_PRESET_PREFIX}male`, label: "Avatar 1" },
   { key: `${AVATAR_PRESET_PREFIX}female`, label: "Avatar 2" },
 ];
+
+/** True for `null`/`undefined` and for either bundled preset -- i.e.
+ * "nothing a person deliberately uploaded". Used to decide whether
+ * changing gender is allowed to auto-pick a matching default avatar:
+ * that auto-pick must never clobber a real custom photo. */
+export function isAutoManagedAvatar(assetKey: string | null | undefined): boolean {
+  return !assetKey || assetKey.startsWith(AVATAR_PRESET_PREFIX);
+}
+
+/** The default avatar for a given gender -- `"preset:male"`/
+ * `"preset:female"` for männlich/weiblich, `null` (blank, falls back to
+ * initials) for divers or "keine Angabe". Only ever applied by callers
+ * when `isAutoManagedAvatar` is true for the current avatar, so picking
+ * a gender never overwrites an uploaded photo. */
+export function defaultAvatarForGender(gender: Gender | null): string | null {
+  if (gender === "male") return `${AVATAR_PRESET_PREFIX}male`;
+  if (gender === "female") return `${AVATAR_PRESET_PREFIX}female`;
+  return null;
+}
 
 export interface AdminGroup {
   id: string;

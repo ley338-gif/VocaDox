@@ -34,6 +34,7 @@ from app.identity.schemas import (
     LoginRequest,
     LoginResponse,
     RoleResponse,
+    SelfUpdateRequest,
     SetPasswordRequest,
     UserCreateRequest,
     UserDetailResponse,
@@ -186,11 +187,7 @@ async def csrf(
     return CsrfTokenResponse(csrf_token=session_data.csrf_token)
 
 
-@router.get("/me", response_model=CurrentUserResponse)
-async def me(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_session),
-) -> CurrentUserResponse:
+async def _current_user_response(db: AsyncSession, user: User) -> CurrentUserResponse:
     permissions = await get_user_permissions(db, user.id)
     groups = await list_user_groups(db, user.id)
     return CurrentUserResponse(
@@ -200,7 +197,75 @@ async def me(
         email=user.email,
         permissions=sorted(permissions),
         groups=[GroupSummary(id=g.id, name=g.name) for g in groups],
+        first_name=user.first_name,
+        last_name=user.last_name,
+        gender=user.gender,  # type: ignore[arg-type]
+        avatar_asset_key=user.avatar_asset_key,
     )
+
+
+@router.get("/me", response_model=CurrentUserResponse)
+async def me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+) -> CurrentUserResponse:
+    return await _current_user_response(db, user)
+
+
+@router.patch("/me", response_model=CurrentUserResponse)
+async def update_me_endpoint(
+    payload: SelfUpdateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> CurrentUserResponse:
+    """Self-service profile edit -- see `SelfUpdateRequest`'s docstring for
+    exactly which fields this deliberately excludes. Reuses the same
+    `update_user()` the admin PATCH uses (and so the same audit event
+    type, `user.updated` -- `updated_user_id == actor.id` is what marks
+    this as a self-edit in the audit log, not a new event type)."""
+    changes = payload.model_dump(exclude_unset=True)
+    user = await update_user(db, user, **changes)
+    await record_event(
+        db,
+        event_type="user.updated",
+        user_id=user.id,
+        username=user.username,
+        event_metadata={"updated_user_id": str(user.id), "fields": sorted(changes.keys())},
+    )
+    await db.commit()
+    await db.refresh(user)
+    return await _current_user_response(db, user)
+
+
+@router.post(
+    "/me/avatar", response_model=AvatarUploadResponse, status_code=status.HTTP_201_CREATED
+)
+async def upload_my_avatar_endpoint(
+    file: UploadFile,
+    _user: User = Depends(get_current_user),
+    storage: StorageProvider = Depends(get_storage_provider),
+    _csrf: None = Depends(require_csrf),
+) -> AvatarUploadResponse:
+    """Self-service counterpart to `POST /admin/users/avatar` -- any
+    authenticated user may upload an avatar image for themselves (only
+    `PATCH /auth/me` actually assigns the returned key onto their own
+    row; this alone never mutates anything). Same upload/validation, just
+    without the `user:manage` gate that endpoint needs since it can
+    target *any* user."""
+    settings = get_settings()
+    try:
+        asset_key = await upload_avatar(
+            _upload_chunks(file),
+            temp_dir=settings.upload_temp_dir,
+            max_size_bytes=settings.max_avatar_size_bytes,
+            storage=storage,
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.reason
+        ) from exc
+    return AvatarUploadResponse(asset_key=asset_key)
 
 
 # -- Phase 7: Admin Portal — Users -------------------------------------------
@@ -267,9 +332,17 @@ async def upload_avatar_endpoint(
 @admin_users_router.get("/avatar/{asset_key:path}")
 async def get_avatar_endpoint(
     asset_key: str,
-    _user: User = Depends(_require_user_manage),
+    _user: User = Depends(get_current_user),
     storage: StorageProvider = Depends(get_storage_provider),
 ) -> Response:
+    """Only `get_current_user` (not `user:manage`) -- an avatar image is
+    not sensitive data, and this is the one serving endpoint shared by
+    both the admin Users page and every user's own profile/topbar
+    (`POST /auth/me/avatar` uploads to the same store), so it must be
+    readable by any authenticated user, not just admins. Stays under the
+    `/admin/users` path only to avoid a second identical handler under
+    `/auth` -- the URL prefix is not the security boundary here, the
+    permission dependency is."""
     loaded = await load_avatar(storage, asset_key)
     if loaded is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="avatar not found")
