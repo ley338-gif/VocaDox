@@ -74,18 +74,21 @@ def render_fact_statement(fact: ExtractedFact) -> str:
     # categories included). Every current Template schema (app.templates.
     # seed) puts the fact's actual content in a field named "description"
     # or "name" — that field renders unlabeled, like prose, exactly as a
-    # reader expects a sentence to start; only the remaining fields (e.g.
-    # onset/severity/dose) get an explicit "label: value" annotation, and
-    # only once the extractor actually found a value ('NOT_MENTIONED' is
-    # deliberately omitted rather than rendered as noise). Never render a
-    # raw field name — "description"/"name" included — as a visible label
-    # in the composed document or Kurzfassung.
+    # reader expects a sentence to start. The remaining fields (onset,
+    # severity, result, dose, frequency, timeframe, ...) are just as much
+    # internal schema field names as "description"/"name" are, so they
+    # render unlabeled too -- plain values, in the schema's own field
+    # order (e.g. onset before severity, dose before frequency — see
+    # app.templates.seed), not "key: value" pairs -- and only once the
+    # extractor actually found a value ('NOT_MENTIONED' is deliberately
+    # omitted rather than rendered as noise). No raw field name is ever
+    # rendered as a visible label in the composed document or Kurzfassung.
     excluded = {"certainty", "evidence_segment_sequences"}
     primary_key = "description" if "description" in value else ("name" if "name" in value else None)
     if primary_key is not None:
         primary = value.get(primary_key)
         annotations = [
-            f"{key}: {v}"
+            str(v)
             for key, v in value.items()
             if key not in excluded and key != primary_key and v not in (None, "", "NOT_MENTIONED")
         ]

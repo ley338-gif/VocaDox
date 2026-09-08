@@ -4,7 +4,10 @@
  * category (e.g. the Meeting template's action_item, or Medical's
  * symptom/finding) — a fact's shape depends on the template that
  * produced it, so a renderer that only knows the 3 Phase-4 builtin
- * categories' fields renders "?" / "(?, due ?)" for anything else.
+ * categories' fields renders "?" / "(?, due ?)" for anything else. That
+ * fallback never renders a raw schema field name (description, name,
+ * onset, severity, result, dose, ...) as a visible label — see its own
+ * comment below.
  *
  * Shared between FactsPanel (raw structured_value) and ReviewWizard
  * (corrected_structured_value ?? structured_value) — that was the only
@@ -39,11 +42,13 @@ export function factSummary(category: FactCategory | string, value: Record<strin
   // of the 3 builtin ones above (Post-GA medical/meeting/psychotherapy
   // categories included). Every current Template schema puts the fact's
   // actual content in a field named "description" or "name" — that field
-  // renders unlabeled, like prose; only the remaining fields (e.g.
-  // onset/severity/dose) get an explicit "label: value" annotation, and
-  // only once the extractor actually found a value ('NOT_MENTIONED' is
-  // deliberately omitted rather than rendered as noise). Never render a
-  // raw field name — "description"/"name" included — as a visible label.
+  // renders unlabeled, like prose. The remaining fields (onset, severity,
+  // result, dose, frequency, timeframe, ...) are just as much internal
+  // schema field names as "description"/"name" are, so they render
+  // unlabeled too — plain values, in the schema's own field order, not
+  // "key: value" pairs — and only once the extractor actually found a
+  // value ('NOT_MENTIONED' is deliberately omitted rather than rendered
+  // as noise). No raw field name is ever rendered as a visible label.
   const excluded = ["certainty", "evidence_segment_sequences"];
   const isUsable = (v: unknown) => v !== null && v !== "" && v !== "NOT_MENTIONED";
   const primaryKey = "description" in value ? "description" : "name" in value ? "name" : null;
@@ -51,7 +56,7 @@ export function factSummary(category: FactCategory | string, value: Record<strin
     const primary = value[primaryKey];
     const annotations = Object.entries(value)
       .filter(([key, v]) => !excluded.includes(key) && key !== primaryKey && isUsable(v))
-      .map(([key, v]) => `${key}: ${String(v)}`);
+      .map(([, v]) => String(v));
     if (primary === null || primary === undefined || primary === "") {
       return annotations.length > 0 ? annotations.join("; ") : "(no details)";
     }

@@ -9,24 +9,28 @@ describe("factSummary", () => {
     );
   });
 
-  it("renders a Template-defined category's description field unlabeled, with other fields as annotations", () => {
+  it("renders a Template-defined category's description field unlabeled, with other fields as unlabeled annotations", () => {
     expect(
       factSummary("symptom", { description: "Atemnot", onset: "bei Treppensteigen", severity: "besonders" }),
-    ).toBe("Atemnot (onset: bei Treppensteigen, severity: besonders)");
+    ).toBe("Atemnot (bei Treppensteigen, besonders)");
   });
 
-  it("never shows the raw 'description' or 'name' field label", () => {
+  it("never shows any raw field label — description/name or the secondary fields", () => {
     const symptom = factSummary("symptom", { description: "Atemnot", onset: "bei Treppensteigen" });
-    expect(symptom).not.toMatch(/^description:/);
+    expect(symptom).not.toMatch(/description:|onset:/);
     const medication = factSummary("medication", { name: "Ramipril", dose: "5mg", frequency: "1x täglich" });
-    expect(medication).not.toMatch(/^name:/);
-    expect(medication).toBe("Ramipril (dose: 5mg, frequency: 1x täglich)");
+    expect(medication).not.toMatch(/name:|dose:|frequency:/);
+    expect(medication).toBe("Ramipril (5mg, 1x täglich)");
   });
 
   it("omits NOT_MENTIONED annotations instead of rendering them as noise", () => {
     expect(factSummary("finding", { description: "Atemgeräusch normal", result: "NOT_MENTIONED" })).toBe(
       "Atemgeräusch normal",
     );
+  });
+
+  it("renders a finding's result field unlabeled too", () => {
+    expect(factSummary("finding", { description: "Atemgeräusch", result: "normal" })).toBe("Atemgeräusch (normal)");
   });
 
   it("renders a bare description/name with no annotations unlabeled", () => {

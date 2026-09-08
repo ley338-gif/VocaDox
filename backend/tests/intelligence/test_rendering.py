@@ -26,23 +26,32 @@ def _fact(category: str, structured_value: dict) -> ExtractedFact:
     )
 
 
-def test_generic_fallback_renders_description_unlabeled_with_annotations() -> None:
+def test_generic_fallback_renders_description_unlabeled_with_unlabeled_annotations() -> None:
     fact = _fact(
         "symptom", {"description": "Atemnot", "onset": "bei Treppensteigen", "severity": "besonders"}
     )
-    assert render_fact_statement(fact) == "Atemnot (onset: bei Treppensteigen, severity: besonders)"
+    assert render_fact_statement(fact) == "Atemnot (bei Treppensteigen, besonders)"
 
 
-def test_generic_fallback_renders_name_unlabeled_with_annotations() -> None:
+def test_generic_fallback_renders_name_unlabeled_with_unlabeled_annotations() -> None:
     fact = _fact("medication", {"name": "Ramipril", "dose": "5mg", "frequency": "1x täglich"})
-    assert render_fact_statement(fact) == "Ramipril (dose: 5mg, frequency: 1x täglich)"
+    assert render_fact_statement(fact) == "Ramipril (5mg, 1x täglich)"
 
 
-def test_generic_fallback_never_shows_raw_description_or_name_label() -> None:
-    symptom = render_fact_statement(_fact("symptom", {"description": "Husten", "onset": "NOT_MENTIONED"}))
-    assert not symptom.startswith("description:")
-    medication = render_fact_statement(_fact("medication", {"name": "Ramipril"}))
-    assert not medication.startswith("name:")
+def test_generic_fallback_renders_finding_result_unlabeled() -> None:
+    fact = _fact("finding", {"description": "Atemgeräusch", "result": "normal"})
+    assert render_fact_statement(fact) == "Atemgeräusch (normal)"
+
+
+def test_generic_fallback_never_shows_any_raw_field_label() -> None:
+    symptom = render_fact_statement(
+        _fact("symptom", {"description": "Husten", "onset": "seit 3 Tagen", "severity": "NOT_MENTIONED"})
+    )
+    assert "description:" not in symptom
+    assert "onset:" not in symptom
+    medication = render_fact_statement(_fact("medication", {"name": "Ramipril", "dose": "5mg"}))
+    assert "name:" not in medication
+    assert "dose:" not in medication
 
 
 def test_generic_fallback_omits_not_mentioned_annotations() -> None:
