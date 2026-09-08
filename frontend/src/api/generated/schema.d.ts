@@ -1260,6 +1260,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/templates/letterhead-logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Letterhead Logo Endpoint
+         * @description Template-agnostic — a logo is uploaded first and its returned
+         *     `asset_key` is included in a subsequent `POST /templates` or
+         *     `POST /{template_id}/versions` payload (no `Template`/`TemplateVersion`
+         *     needs to exist yet). Registered before `/{template_id}` below so this
+         *     literal path is never shadowed by the dynamic one.
+         */
+        post: operations["upload_letterhead_logo_endpoint_api_v1_templates_letterhead_logo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/letterhead-logo/{asset_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Letterhead Logo Endpoint */
+        get: operations["get_letterhead_logo_endpoint_api_v1_templates_letterhead_logo__asset_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/templates": {
         parameters: {
             query?: never;
@@ -2814,6 +2855,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_letterhead_logo_endpoint_api_v1_templates_letterhead_logo_post */
+        Body_upload_letterhead_logo_endpoint_api_v1_templates_letterhead_logo_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post */
         Body_upload_media_endpoint_api_v1_conversations__conversation_id__media_post: {
             /** File */
@@ -3599,6 +3645,11 @@ export interface components {
             structured_output: boolean;
             /** Detail */
             detail: string | null;
+        };
+        /** LetterheadLogoUploadResponse */
+        LetterheadLogoUploadResponse: {
+            /** Asset Key */
+            asset_key: string;
         };
         /** LifecycleEventResponse */
         LifecycleEventResponse: {
@@ -8229,6 +8280,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AboutResponse"];
+                };
+            };
+        };
+    };
+    upload_letterhead_logo_endpoint_api_v1_templates_letterhead_logo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_letterhead_logo_endpoint_api_v1_templates_letterhead_logo_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LetterheadLogoUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_letterhead_logo_endpoint_api_v1_templates_letterhead_logo__asset_key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

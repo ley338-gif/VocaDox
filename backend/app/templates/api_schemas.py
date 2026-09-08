@@ -70,6 +70,10 @@ class TemplateOrganizationUpdateRequest(BaseModel):
     organization_id: uuid.UUID | None = None
 
 
+class LetterheadLogoUploadResponse(BaseModel):
+    asset_key: str
+
+
 class PromptVersionResponse(BaseModel):
     id: uuid.UUID
     prompt_id: uuid.UUID

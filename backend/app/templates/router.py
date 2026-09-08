@@ -15,14 +15,20 @@ permission, not be open to every user")."""
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.storage import get_storage_provider
 from app.identity.deps import get_current_user, require_csrf, require_permission
 from app.identity.models import User
+from app.media.validation import UploadValidationError
+from app.platform.config import get_settings
 from app.platform.db.session import get_session
+from app.providers.storage import StorageProvider
 from app.templates.api_schemas import (
+    LetterheadLogoUploadResponse,
     PromptCreateRequest,
     PromptResponse,
     PromptVersionCreateRequest,
@@ -33,6 +39,7 @@ from app.templates.api_schemas import (
     TemplateVersionCreateRequest,
     TemplateVersionResponse,
 )
+from app.templates.letterhead import load_letterhead_logo, upload_letterhead_logo
 from app.templates.models import (
     ImmutablePublishedVersionError,
     InvalidVersionTransitionError,
@@ -61,6 +68,60 @@ prompts_router = APIRouter(prefix="/prompts", tags=["templates"])
 
 _require_template_read = require_permission("template:read")
 _require_template_write = require_permission("template:write")
+
+
+async def _upload_chunks(file: UploadFile, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+
+
+@router.post(
+    "/letterhead-logo",
+    response_model=LetterheadLogoUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_letterhead_logo_endpoint(
+    file: UploadFile,
+    _user: User = Depends(_require_template_write),
+    storage: StorageProvider = Depends(get_storage_provider),
+    _csrf: None = Depends(require_csrf),
+) -> LetterheadLogoUploadResponse:
+    """Template-agnostic — a logo is uploaded first and its returned
+    `asset_key` is included in a subsequent `POST /templates` or
+    `POST /{template_id}/versions` payload (no `Template`/`TemplateVersion`
+    needs to exist yet). Registered before `/{template_id}` below so this
+    literal path is never shadowed by the dynamic one."""
+    settings = get_settings()
+    try:
+        asset_key = await upload_letterhead_logo(
+            _upload_chunks(file),
+            temp_dir=settings.upload_temp_dir,
+            max_size_bytes=settings.max_letterhead_logo_size_bytes,
+            storage=storage,
+        )
+    except UploadValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.reason
+        ) from exc
+    return LetterheadLogoUploadResponse(asset_key=asset_key)
+
+
+@router.get("/letterhead-logo/{asset_key:path}")
+async def get_letterhead_logo_endpoint(
+    asset_key: str,
+    _user: User = Depends(_require_template_read),
+    storage: StorageProvider = Depends(get_storage_provider),
+) -> Response:
+    loaded = await load_letterhead_logo(storage, asset_key)
+    if loaded is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="letterhead logo not found"
+        )
+    data, content_type = loaded
+    return Response(content=data, media_type=content_type)
 
 
 async def _get_template_or_404(db: AsyncSession, template_id: uuid.UUID) -> Template:
