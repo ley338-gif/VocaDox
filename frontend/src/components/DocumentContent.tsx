@@ -42,6 +42,30 @@ export function DocumentContent({
     return <p className={styles.empty}>(Keine Fakten zum Zusammenstellen)</p>;
   }
 
+  if (layout === "freeform") {
+    // Post-GA: `sections` is one aggregate pseudo-section (title=null) —
+    // see backend app.documents.service.compose_document. The author's
+    // own text already contains all letterhead/salutation/closing
+    // wording verbatim, so nothing is synthesized here (unlike "letter").
+    // `maxStatements` has no natural "N statements" meaning for a single
+    // flowing body — reinterpreted as "max paragraphs" instead, the only
+    // sane adaptation for the Übersicht "Kurzfassung" preview.
+    const bodyText = sections[0]?.statements[0]?.text ?? "";
+    const allParagraphs = bodyText.split(/\n\n+/).filter((p) => p.trim());
+    const shown = maxStatements != null ? allParagraphs.slice(0, maxStatements) : allParagraphs;
+    const wasTruncated = maxStatements != null && allParagraphs.length > maxStatements;
+    return (
+      <div className={styles.freeform}>
+        {shown.map((paragraph, index) => (
+          <p key={index} className={styles.freeformParagraph}>
+            {paragraph}
+          </p>
+        ))}
+        {wasTruncated && <p className={styles.truncated}>…</p>}
+      </div>
+    );
+  }
+
   let remaining = maxStatements ?? Infinity;
   let truncated = false;
   const visibleSections = sections

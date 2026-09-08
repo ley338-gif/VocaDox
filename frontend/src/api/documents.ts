@@ -37,7 +37,10 @@ export interface DocumentStatement {
 
 export interface DocumentSection {
   category: string;
-  title: string;
+  // null for the "freeform" layout's single aggregate pseudo-section
+  // (see backend app.documents.service.compose_document) -- never
+  // rendered as a heading there, unlike "sections"/"letter".
+  title: string | null;
   statements: DocumentStatement[];
 }
 
@@ -45,7 +48,7 @@ export interface DocumentSection {
 // renders the same sections as a formal letter (subject line,
 // salutation, prose paragraphs, closing) — see DocumentContent.tsx's
 // `layout` prop and backend app.documents.service.compose_document.
-export type DocumentLayout = "sections" | "letter";
+export type DocumentLayout = "sections" | "letter" | "freeform";
 
 export interface DocumentRevision {
   id: string;

@@ -66,3 +66,17 @@
   color: var(--text-primary);
   margin: var(--space-2) 0 0;
 }
+
+.freeform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.freeformParagraph {
+  color: var(--text-secondary);
+  font-size: var(--font-body-base-size);
+  line-height: var(--font-body-lg-line);
+  margin: 0;
+  white-space: pre-wrap;
+}
