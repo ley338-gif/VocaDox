@@ -34,10 +34,11 @@ def render_fact_statement(fact: ExtractedFact) -> str:
     """Byte-identical rendering for the 3 builtin categories (never
     touched, so every pre-Phase-6/Phase-5 rendered document is unchanged).
     Any other category — i.e. anything a Phase 6 template defines, like
-    Meeting's agenda_topic/action_item — falls through to a generic
-    "field: value" renderer built from whatever keys the fact actually
-    has, proving the composer isn't secretly still hardcoded to 3
-    categories.
+    Meeting's action_item or Medical's symptom/finding — falls through to
+    a generic renderer built from whatever keys the fact actually has,
+    proving the composer isn't secretly still hardcoded to 3 categories.
+    See that fallback's own comment for how it avoids exposing raw field
+    names like "description" as visible labels.
 
     A redacted fact (`fact.is_redacted`) always renders as
     `REDACTED_PLACEHOLDER`, regardless of category — this is the one
@@ -68,9 +69,35 @@ def render_fact_statement(fact: ExtractedFact) -> str:
             f"(assignee: {value.get('assignee', 'not mentioned')}, "
             f"due: {value.get('due_date', 'not mentioned')})"
         )
+    # Generic fallback for any category a Template defines that isn't one
+    # of the 3 hardcoded ones above (Post-GA medical/meeting/psychotherapy
+    # categories included). Every current Template schema (app.templates.
+    # seed) puts the fact's actual content in a field named "description"
+    # or "name" — that field renders unlabeled, like prose, exactly as a
+    # reader expects a sentence to start. The remaining fields (onset,
+    # severity, result, dose, frequency, timeframe, ...) are just as much
+    # internal schema field names as "description"/"name" are, so they
+    # render unlabeled too -- plain values, in the schema's own field
+    # order (e.g. onset before severity, dose before frequency — see
+    # app.templates.seed), not "key: value" pairs -- and only once the
+    # extractor actually found a value ('NOT_MENTIONED' is deliberately
+    # omitted rather than rendered as noise). No raw field name is ever
+    # rendered as a visible label in the composed document or Kurzfassung.
+    excluded = {"certainty", "evidence_segment_sequences"}
+    primary_key = "description" if "description" in value else ("name" if "name" in value else None)
+    if primary_key is not None:
+        primary = value.get(primary_key)
+        annotations = [
+            str(v)
+            for key, v in value.items()
+            if key not in excluded and key != primary_key and v not in (None, "", "NOT_MENTIONED")
+        ]
+        if primary in (None, ""):
+            return "; ".join(annotations) if annotations else "(no details)"
+        return f"{primary} ({', '.join(annotations)})" if annotations else str(primary)
     parts = [
         f"{key}: {v}"
         for key, v in value.items()
-        if key not in ("certainty", "evidence_segment_sequences") and v not in (None, "")
+        if key not in excluded and v not in (None, "", "NOT_MENTIONED")
     ]
     return "; ".join(parts) if parts else "(no details)"
