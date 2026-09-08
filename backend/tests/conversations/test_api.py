@@ -32,6 +32,72 @@ async def test_create_and_get_conversation(client: AsyncClient, seeded: dict) ->
     assert get_response.json()["title"] == "Visit 1"
 
 
+async def test_conversation_type_prefills_matching_processing_profile(
+    client: AsyncClient, seeded: dict
+) -> None:
+    """post-GA: creating a conversation without an explicit
+    `processing_profile_id` pre-fills one matching `conversation_type`
+    when a published profile with that key exists (see
+    app.conversations.service._resolve_default_profile_id) — a visible,
+    GET-readable default, not hidden AI behavior switching."""
+    headers = await login(client, "alice", "a very strong password 123")
+    profiles_resp = await client.get("/api/v1/processing-profiles", headers=headers)
+    by_key = {p["key"]: p["id"] for p in profiles_resp.json()}
+
+    response = await client.post(
+        "/api/v1/conversations",
+        json={
+            "title": "Sprechstunde",
+            "organization_id": seeded["org_a"],
+            "conversation_type": "medical",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["processing_profile_id"] == by_key["medical_consultation"]
+
+
+async def test_explicit_processing_profile_id_is_not_overridden(
+    client: AsyncClient, seeded: dict
+) -> None:
+    headers = await login(client, "alice", "a very strong password 123")
+    profiles_resp = await client.get("/api/v1/processing-profiles", headers=headers)
+    by_key = {p["key"]: p["id"] for p in profiles_resp.json()}
+
+    response = await client.post(
+        "/api/v1/conversations",
+        json={
+            "title": "Sprechstunde",
+            "organization_id": seeded["org_a"],
+            "conversation_type": "medical",
+            "processing_profile_id": by_key["meeting"],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["processing_profile_id"] == by_key["meeting"]
+
+
+async def test_conversation_type_with_no_matching_profile_stays_unset(
+    client: AsyncClient, seeded: dict
+) -> None:
+    """`therapy`/`interview`/`other` have no matching published profile
+    (psychotherapy is DRAFT-only, per app.templates.seed) -- falls through
+    to the SYSTEM DEFAULT layer unchanged, same as pre-Phase-6."""
+    headers = await login(client, "alice", "a very strong password 123")
+    response = await client.post(
+        "/api/v1/conversations",
+        json={
+            "title": "Therapiesitzung",
+            "organization_id": seeded["org_a"],
+            "conversation_type": "therapy",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["processing_profile_id"] is None
+
+
 async def test_cannot_create_conversation_in_foreign_organization(
     client: AsyncClient, seeded: dict
 ) -> None:

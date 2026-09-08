@@ -26,8 +26,37 @@ from app.conversations.models import (
 from app.conversations.state_machine import transition
 from app.longitudinal.models import FollowUpTask
 from app.media.models import MediaAsset
+from app.profiles.service import get_processing_profile_by_key
 from app.providers.storage import StorageProvider
 from app.search.service import delete_search_entries_for_conversation
+
+# A visible, overridable pre-fill for `processing_profile_id` when the
+# caller didn't pick one explicitly -- NOT the "hidden AI behavior"
+# `ConversationType.__doc__` warns against: the resolved id is stored as a
+# normal, GET-visible, PATCH-editable column exactly like an explicit
+# choice would be, and `app.profiles.resolver` explains its effect via
+# `field_sources` the same way either way. GENERAL is deliberately absent
+# -- it's already what the SYSTEM DEFAULT layer resolves to, so pre-filling
+# it would only relabel `field_sources` from "system_default" to
+# "processing_profile" for no behavioral difference. THERAPY/INTERVIEW/
+# OTHER have no matching published profile yet and fall through to the
+# system default, same as before this existed.
+_TYPE_DEFAULT_PROFILE_KEY: dict[ConversationType, str] = {
+    ConversationType.MEDICAL: "medical_consultation",
+    ConversationType.MEETING: "meeting",
+}
+
+
+async def _resolve_default_profile_id(
+    session: AsyncSession, conversation_type: ConversationType
+) -> uuid.UUID | None:
+    key = _TYPE_DEFAULT_PROFILE_KEY.get(conversation_type)
+    if key is None:
+        return None
+    profile = await get_processing_profile_by_key(session, key)
+    if profile is None or not profile.enabled or profile.current_published_version_id is None:
+        return None
+    return profile.id
 
 
 async def create_conversation(
@@ -45,6 +74,9 @@ async def create_conversation(
     processing_profile_id: uuid.UUID | None = None,
     group_id: uuid.UUID | None = None,
 ) -> Conversation:
+    if processing_profile_id is None:
+        processing_profile_id = await _resolve_default_profile_id(session, conversation_type)
+
     conversation = Conversation(
         organization_id=organization_id,
         created_by_user_id=created_by_user_id,
