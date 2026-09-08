@@ -229,6 +229,7 @@ export function AdminTemplatesPage() {
                       mode="version"
                       templateId={template.id}
                       organizations={orgsQuery.data ?? []}
+                      copyFrom={versionsQuery.data?.[versionsQuery.data.length - 1]}
                       onCreated={() => {
                         setShowNewVersion(null);
                         void queryClient.invalidateQueries({
@@ -257,16 +258,27 @@ interface PresentationRow {
 /** Shared by both "Neue Vorlage erstellen" and "Neue Entwurfsversion" —
  * the exact same content fields, just a different submit call at the end
  * (create_template vs. create_draft_version), matching
- * AdminProfilesPage.tsx's NewProfileForm/NewVersionForm split. */
+ * AdminProfilesPage.tsx's NewProfileForm/NewVersionForm split.
+ *
+ * `copyFrom` (version mode only) is the template's latest version
+ * (whatever its status — draft/test/published/retired), used to pre-fill
+ * every content field so authoring a new draft is an edit of the last
+ * one instead of retyping the whole template from scratch. Read only at
+ * mount time via useState's lazy initializer -- TemplateForm is always
+ * freshly mounted when "Neue Entwurfsversion" opens (see
+ * AdminTemplatesPage's conditional render), so this never goes stale
+ * while the form is open. */
 function TemplateForm({
   mode,
   templateId,
   organizations,
+  copyFrom,
   onCreated,
 }: {
   mode: "template" | "version";
   templateId?: string;
   organizations: AdminOrganization[];
+  copyFrom?: TemplateVersion;
   onCreated: () => void;
 }) {
   const { csrfToken } = useAuth();
@@ -274,15 +286,23 @@ function TemplateForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [organizationId, setOrganizationId] = useState("");
-  const [categoriesText, setCategoriesText] = useState(
-    '[{"key": "general_fact", "builtin": true}]'
+  const [categoriesText, setCategoriesText] = useState(() =>
+    copyFrom
+      ? JSON.stringify(copyFrom.extraction_categories, null, 2)
+      : '[{"key": "general_fact", "builtin": true}]'
   );
-  const [presentationRows, setPresentationRows] = useState<PresentationRow[]>([
-    { category: "general_fact", title: "Fakten" },
-  ]);
-  const [documentLayout, setDocumentLayout] = useState<DocumentLayoutOption>("sections");
-  const [documentBody, setDocumentBody] = useState("");
-  const [letterheadAssetKey, setLetterheadAssetKey] = useState<string | null>(null);
+  const [presentationRows, setPresentationRows] = useState<PresentationRow[]>(() =>
+    copyFrom
+      ? copyFrom.presentation.map((row) => ({ ...row }))
+      : [{ category: "general_fact", title: "Fakten" }]
+  );
+  const [documentLayout, setDocumentLayout] = useState<DocumentLayoutOption>(
+    () => copyFrom?.document_layout ?? "sections"
+  );
+  const [documentBody, setDocumentBody] = useState(() => copyFrom?.document_body ?? "");
+  const [letterheadAssetKey, setLetterheadAssetKey] = useState<string | null>(
+    () => copyFrom?.letterhead_logo_asset_key ?? null
+  );
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -359,6 +379,11 @@ function TemplateForm({
   return (
     <Card title={mode === "template" ? "Neue Vorlage" : undefined}>
       <div style={{ display: "grid", gap: "var(--space-3)", maxWidth: "560px" }}>
+        {copyFrom && (
+          <p style={{ color: "var(--text-muted)", fontSize: "var(--font-caption-size)", margin: 0 }}>
+            Vorausgefüllt aus Version v{copyFrom.version_number} — bei Bedarf anpassen.
+          </p>
+        )}
         {mode === "template" && (
           <>
             <label>
