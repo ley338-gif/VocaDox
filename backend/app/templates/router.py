@@ -1,8 +1,13 @@
 """REST endpoints for the Template Engine / Prompt admin surface (spec
-§42/§43). Global (platform-wide), NOT organization-scoped — matching
-`docs/architecture/model-management-foundation.md`'s "one global provider
-config for the whole deployment" precedent (per-organization templates are
-explicitly out of scope, same as per-organization provider config).
+§42/§43). Post-GA: a `Template` may carry an optional `organization_id`
+tag (`PATCH /{template_id}`) so an org can get its own custom document
+(e.g. its own Arztbrief/Meetingprotokoll wording + letterhead) — this is
+deliberately still a GLOBAL admin surface, not a new per-org authz layer:
+any user with `template:write` manages every template regardless of its
+`organization_id`, exactly like `app.integrations.router`'s Webhook admin
+already lets a global admin pick which organization a webhook belongs to.
+True per-org self-service isolation (an org's own admin seeing only their
+own templates) is explicitly out of scope.
 Gated by `template:read`/`template:write` — never open to every user (spec:
 "Template/profile management should require an appropriate admin-level
 permission, not be open to every user")."""
@@ -23,6 +28,7 @@ from app.templates.api_schemas import (
     PromptVersionCreateRequest,
     PromptVersionResponse,
     TemplateCreateRequest,
+    TemplateOrganizationUpdateRequest,
     TemplateResponse,
     TemplateVersionCreateRequest,
     TemplateVersionResponse,
@@ -47,6 +53,7 @@ from app.templates.service import (
     list_templates,
     publish_prompt_version,
     publish_template_version,
+    set_template_organization,
 )
 
 router = APIRouter(prefix="/templates", tags=["templates"])
@@ -98,10 +105,13 @@ async def create_template_endpoint(
         key=payload.key,
         name=payload.name,
         description=payload.description,
+        organization_id=payload.organization_id,
         extraction_categories=payload.extraction_categories,
         presentation=payload.presentation,
         review_rules=payload.review_rules,
         document_layout=payload.document_layout,
+        document_body=payload.document_body,
+        letterhead_logo_asset_key=payload.letterhead_logo_asset_key,
         created_by=user,
     )
     await db.commit()
@@ -116,6 +126,26 @@ async def get_template_endpoint(
     db: AsyncSession = Depends(get_session),
 ) -> TemplateResponse:
     return TemplateResponse.model_validate(await _get_template_or_404(db, template_id))
+
+
+@router.patch("/{template_id}", response_model=TemplateResponse)
+async def update_template_organization_endpoint(
+    template_id: uuid.UUID,
+    payload: TemplateOrganizationUpdateRequest,
+    user: User = Depends(_require_template_write),
+    db: AsyncSession = Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+) -> TemplateResponse:
+    """Reassigns (or clears, with `null`) which organization this template
+    is tagged for — a plain metadata edit, never touches any
+    `TemplateVersion`'s immutable content."""
+    template = await _get_template_or_404(db, template_id)
+    updated = await set_template_organization(
+        db, template=template, organization_id=payload.organization_id, changed_by=user
+    )
+    await db.commit()
+    await db.refresh(updated)
+    return TemplateResponse.model_validate(updated)
 
 
 @router.get("/{template_id}/versions", response_model=list[TemplateVersionResponse])
@@ -153,6 +183,8 @@ async def create_template_version_endpoint(
         presentation=payload.presentation,
         review_rules=payload.review_rules,
         document_layout=payload.document_layout,
+        document_body=payload.document_body,
+        letterhead_logo_asset_key=payload.letterhead_logo_asset_key,
         created_by=user,
     )
     await db.commit()
