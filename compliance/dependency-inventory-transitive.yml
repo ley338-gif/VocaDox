@@ -3122,19 +3122,19 @@ dependencies:
   direct: false
   license: MIT-CMU
   approval_status: approved
-- name: pip-api
-  ecosystem: pypi
-  version: 0.0.34
-  scope: dev
-  direct: false
-  license: Apache-2.0
-  approval_status: approved
 - name: pip-requirements-parser
   ecosystem: pypi
   version: 32.0.1
   scope: dev
   direct: false
   license: MIT
+  approval_status: approved
+- name: pip_api
+  ecosystem: pypi
+  version: 0.0.35
+  scope: dev
+  direct: false
+  license: Apache-2.0
   approval_status: approved
 - name: pip_audit
   ecosystem: pypi

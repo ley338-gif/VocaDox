@@ -10,6 +10,7 @@ import {
   History,
   Link2,
   RefreshCw,
+  SlidersHorizontal,
   Sparkles,
   StickyNote,
   Trash2,
@@ -58,6 +59,7 @@ import { DocumentContent } from "../components/DocumentContent";
 import { DocumentPanel } from "../components/DocumentPanel";
 import { FactsPanel } from "../components/FactsPanel";
 import { LongitudinalPanel } from "../components/LongitudinalPanel";
+import { ProcessingProfileCard } from "../components/ProcessingProfileCard";
 import { RecapPanel } from "../components/RecapPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
 import { ReviewWizard } from "../components/ReviewWizard";
@@ -1081,6 +1083,15 @@ export function ConversationDetailPage() {
               </details>
             )}
           </SidePanelCard>
+
+          {hasPermission("processing-profile:read") && (
+            <SidePanelCard
+              icon={<SlidersHorizontal size={16} aria-hidden="true" />}
+              title="Verarbeitungsprofil"
+            >
+              <ProcessingProfileCard conversationId={conversationId} />
+            </SidePanelCard>
+          )}
 
           {hasPermission("fact:read") && (
             <SidePanelCard icon={<Gauge size={16} aria-hidden="true" />} title="Vollständigkeit">
