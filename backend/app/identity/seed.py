@@ -68,6 +68,8 @@ PERMISSIONS: dict[str, str] = {
         "VocaDox) while preserving its evidence chain."
     ),
     "evidence:read": "View the evidence (transcript segments) linked to an extracted fact.",
+    "protocol:read": "View a conversation's generated Protokoll (sections/items/sources).",
+    "protocol:generate": "Trigger LLM Protokoll generation for a conversation's transcript.",
     "review-issue:read": "View review issues (uncertainty/contradiction flags) for a conversation.",
     "review-issue:resolve": (
         "Resolve a review issue via the Review Wizard (confirm/correct/remove)."
@@ -204,6 +206,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "ask:query",
             "fact:extract",
             "evidence:read",
+            "protocol:read",
+            "protocol:generate",
             "review-issue:read",
             "review-issue:resolve",
             "document:read",
@@ -264,6 +268,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "fact:redact",
             "ask:query",
             "evidence:read",
+            "protocol:read",
             "review-issue:read",
             "review-issue:resolve",
             "document:read",
@@ -304,6 +309,8 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "ask:query",
             "fact:extract",
             "evidence:read",
+            "protocol:read",
+            "protocol:generate",
             "review-issue:read",
             "review-issue:resolve",
             "document:read",
@@ -332,6 +339,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "fact:read",
             "ask:query",
             "evidence:read",
+            "protocol:read",
             "review-issue:read",
             "document:read",
             "timeline:read",

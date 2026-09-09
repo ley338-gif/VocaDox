@@ -60,6 +60,8 @@ import { DocumentPanel } from "../components/DocumentPanel";
 import { FactsPanel } from "../components/FactsPanel";
 import { LongitudinalPanel } from "../components/LongitudinalPanel";
 import { ProcessingProfileCard } from "../components/ProcessingProfileCard";
+import { ProtocolPanel } from "../components/ProtocolPanel";
+import { ProtocolStatusCard, ProtocolStructureCard } from "../components/ProtocolSidebarCards";
 import { RecapPanel } from "../components/RecapPanel";
 import { RecordingWorkspace } from "../components/RecordingWorkspace";
 import { ReviewWizard } from "../components/ReviewWizard";
@@ -88,6 +90,7 @@ const TAB_LABELS: Record<Tab, string> = {
   audio: "Audio",
   transcript: "Transkript",
   facts: "Fakten",
+  protocol: "Protokoll",
   timeline: "Verlauf",
   related: "Verwandt",
   tasks: "Aufgaben",
@@ -100,6 +103,7 @@ const PRIMARY_TAB_IDS: Tab[] = [
   "overview",
   "transcript",
   "facts",
+  "protocol",
   "document",
   "review",
   "tasks",
@@ -114,6 +118,7 @@ type Tab =
   | "audio"
   | "transcript"
   | "facts"
+  | "protocol"
   | "timeline"
   | "related"
   | "tasks"
@@ -133,6 +138,12 @@ export function ConversationDetailPage() {
     location.state?.startRecording ? "audio" : (location.state?.tab ?? "overview")
   );
   const [showRecorder, setShowRecorder] = useState(Boolean(location.state?.startRecording));
+  // Set by ProtocolPanel's "Im Transkript öffnen" action — a same-page
+  // tab switch + scroll target, distinct from location.state.
+  // focusSegmentId (which only ever comes from an external navigation,
+  // e.g. a search result) since `tab`'s own useState only reads
+  // location.state once, at mount.
+  const [protocolFocusSegmentId, setProtocolFocusSegmentId] = useState<string | undefined>();
   const audioPlayerRef = useRef<AudioPlayerHandle | null>(null);
   const [activeMs, setActiveMs] = useState(0);
   const [showSpeakerManager, setShowSpeakerManager] = useState(false);
@@ -741,7 +752,7 @@ export function ConversationDetailPage() {
                   conversationId={conversationId}
                   audioPlayerRef={audioPlayerRef}
                   activeMs={activeMs}
-                  focusSegmentId={location.state?.focusSegmentId}
+                  focusSegmentId={location.state?.focusSegmentId ?? protocolFocusSegmentId}
                 />
               </div>
             </div>
@@ -760,6 +771,29 @@ export function ConversationDetailPage() {
                 </div>
               )}
               <FactsPanel conversationId={conversationId} audioPlayerRef={audioPlayerRef} />
+            </div>
+          )}
+
+          {tab === "protocol" && (
+            <div>
+              {sourceMedia && (
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <AudioPlayer
+                    ref={audioPlayerRef}
+                    src={mediaContentUrl(conversationId, sourceMedia.id)}
+                    sourceLabel="Conversation audio"
+                    onTimeUpdateMs={setActiveMs}
+                  />
+                </div>
+              )}
+              <ProtocolPanel
+                conversationId={conversationId}
+                audioPlayerRef={audioPlayerRef}
+                onOpenTranscript={(segmentId) => {
+                  setProtocolFocusSegmentId(segmentId);
+                  setTab("transcript");
+                }}
+              />
             </div>
           )}
 
@@ -1091,6 +1125,16 @@ export function ConversationDetailPage() {
             >
               <ProcessingProfileCard conversationId={conversationId} />
             </SidePanelCard>
+          )}
+
+          {hasPermission("protocol:read") && (
+            <>
+              <ProtocolStatusCard conversationId={conversationId} />
+              <ProtocolStructureCard
+                conversationId={conversationId}
+                onSelectSection={() => setTab("protocol")}
+              />
+            </>
           )}
 
           {hasPermission("fact:read") && (

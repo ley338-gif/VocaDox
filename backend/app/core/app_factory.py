@@ -36,6 +36,7 @@ from app.platform.middleware import RequestIdMiddleware
 from app.platform.version import APPLICATION_VERSION
 from app.profiles.router import processing_router as processing_profiles_router
 from app.profiles.router import router as model_profiles_router
+from app.protocols.router import router as protocols_router
 from app.recap.public_router import router as recap_public_router
 from app.recap.router import router as recap_router
 from app.search.router import router as search_router
@@ -95,5 +96,6 @@ def create_app() -> FastAPI:
     app.include_router(recap_public_router, prefix=settings.api_prefix)
     app.include_router(search_router, prefix=settings.api_prefix)
     app.include_router(vocabulary_router, prefix=settings.api_prefix)
+    app.include_router(protocols_router, prefix=settings.api_prefix)
 
     return app

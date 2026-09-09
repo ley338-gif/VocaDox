@@ -11,6 +11,15 @@ from __future__ import annotations
 
 from app.intelligence.schemas import NOT_MENTIONED
 
+# Re-exported so every existing `from app.intelligence.prompts import
+# render_transcript` caller (app.templates.seed, app.analytics.eval_engine,
+# ...) keeps working unchanged. The actual definition lives in
+# app.transcription.rendering (Post-GA Protokoll) since it's a transcript-
+# domain concern, not an intelligence/extraction one, and a second
+# consumer (app.protocols.service) needed it without depending on this
+# extraction-specific module.
+from app.transcription.rendering import render_transcript  # noqa: F401
+
 SYSTEM_PROMPT = (
     "You are a structured information extraction system. You extract only facts that are "
     "explicitly present in the given transcript. You NEVER invent, infer beyond what is "
@@ -61,13 +70,6 @@ def get_builtin_category_instruction(category: str) -> str:
     it."""
     return _CATEGORY_INSTRUCTIONS[category]
 
-
-def render_transcript(segments: list[tuple[int, str]]) -> str:
-    """`segments` is a list of (sequence, text) tuples in order. Renders
-    each as a `[SEG n] text` line so the model can cite sequence numbers
-    back — the only mechanism by which evidence gets linked (see
-    app.intelligence.schemas' module docstring)."""
-    return "\n".join(f"[SEG {seq}] {text}" for seq, text in segments)
 
 
 def build_prompt(category: str, transcript_text: str) -> str:

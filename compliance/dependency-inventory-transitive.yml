@@ -2975,7 +2975,7 @@ dependencies:
   approval_status: approved
 - name: multidict
   ecosystem: pypi
-  version: 6.7.1
+  version: 6.8.0
   scope: worker
   direct: false
   license: Apache-2.0

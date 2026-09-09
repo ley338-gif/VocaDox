@@ -18,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import record_event
 from app.conversations.models import Conversation
-from app.diarization.models import DetectedSpeaker
 from app.evidence.models import EvidenceType, FactEvidence
 from app.intelligence.contradictions import FactForContradictionCheck, detect_contradictions
 from app.intelligence.models import (
@@ -28,7 +27,7 @@ from app.intelligence.models import (
     FactRedactionEvent,
     FactStatus,
 )
-from app.intelligence.prompts import SYSTEM_PROMPT, build_prompt_from_instruction, render_transcript
+from app.intelligence.prompts import SYSTEM_PROMPT, build_prompt_from_instruction
 from app.intelligence.rendering import render_fact_statement
 from app.intelligence.schemas import NOT_MENTIONED
 from app.intelligence.uncertainty import classify as classify_uncertainty
@@ -40,6 +39,11 @@ from app.search.service import delete_search_entry, upsert_search_entry
 from app.templates.models import TemplateVersion
 from app.templates.schema_builder import ResolvedCategory, resolve_categories
 from app.transcription.models import Transcript, TranscriptSegment
+from app.transcription.rendering import (
+    build_transcript_text,
+    load_speaker_labels,
+    segment_text,
+)
 
 # Hard cap on how much transcript text one extraction call sends, in
 # characters. Long conversations are truncated (oldest-first kept, most
@@ -74,56 +78,24 @@ async def _load_segments(
     return list(result.scalars().all())
 
 
-def _segment_text(segment: TranscriptSegment) -> str:
-    return segment.corrected_text or segment.original_text
+# _segment_text/_load_speaker_labels/_segment_line/_build_transcript_text
+# moved to app.transcription.rendering (Post-GA Protokoll needed the same
+# speaker-labeled transcript text a second caller) — see that module for
+# the implementations; thin wrappers below keep this module's call sites
+# (and _MAX_TRANSCRIPT_CHARS's meaning) unchanged.
+_segment_text = segment_text
 
 
 async def _load_speaker_labels(
     session: AsyncSession, speaker_ids: set[uuid.UUID]
 ) -> dict[uuid.UUID, str]:
-    """Resolves each `DetectedSpeaker.id` to the same `display_label ??
-    internal_label` a human reviewer already sees (see
-    app.diarization.service/the transcript UI's `SpeakerBadge`) — including
-    a real participant name once one has been assigned (`SpeakerAssignRow`
-    sets `display_label` to the participant's `display_name` on
-    assignment), so the extraction LLM is told the same identity a human
-    would use, never a separate/invented one."""
-    if not speaker_ids:
-        return {}
-    result = await session.execute(
-        select(DetectedSpeaker).where(DetectedSpeaker.id.in_(speaker_ids))
-    )
-    return {s.id: s.display_label or s.internal_label for s in result.scalars().all()}
-
-
-def _segment_line(segment: TranscriptSegment, speaker_labels: dict[uuid.UUID, str]) -> str:
-    """Prefixes the segment's text with its speaker's label when one is
-    resolvable, e.g. `[Dr. Müller] ...` — this is the ONLY mechanism by
-    which the extraction LLM learns who said what (see this module's
-    docstring and app.intelligence.prompts.SYSTEM_PROMPT); a segment with
-    no `speaker_id` (no diarization run, or a single-speaker conversation)
-    renders exactly as before, unprefixed."""
-    text = _segment_text(segment)
-    label = speaker_labels.get(segment.speaker_id) if segment.speaker_id else None
-    return f"[{label}] {text}" if label else text
+    return await load_speaker_labels(session, speaker_ids)
 
 
 def _build_transcript_text(
     segments: list[TranscriptSegment], speaker_labels: dict[uuid.UUID, str]
 ) -> str:
-    pairs = [(s.sequence, _segment_line(s, speaker_labels)) for s in segments]
-    text = render_transcript(pairs)
-    if len(text) <= _MAX_TRANSCRIPT_CHARS:
-        return text
-    truncated_pairs: list[tuple[int, str]] = []
-    total = 0
-    for seq, seg_text in pairs:
-        line_len = len(seg_text) + 10
-        if total + line_len > _MAX_TRANSCRIPT_CHARS:
-            break
-        truncated_pairs.append((seq, seg_text))
-        total += line_len
-    return render_transcript(truncated_pairs)
+    return build_transcript_text(segments, speaker_labels, max_chars=_MAX_TRANSCRIPT_CHARS)
 
 
 async def _extract_category(

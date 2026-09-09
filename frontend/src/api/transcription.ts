@@ -84,7 +84,7 @@ export interface TranscriptSegment {
 
 export interface ProcessingJob {
   id: string;
-  job_type: "normalize" | "transcribe" | "diarize" | "align";
+  job_type: "normalize" | "transcribe" | "diarize" | "align" | "extract" | "generate_protocol";
   status: ProcessingJobStatus;
   progress: number;
   attempt: number;
