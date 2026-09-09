@@ -41,6 +41,10 @@ class RunType(StrEnum):
     # ProcessingJob/worker, while still recording a ProcessingRun here for
     # the same provenance guarantee every other stage gets.
     COMPOSITION = "composition"
+    # Post-GA: LLM-driven Protokoll generation (app.protocols.service) —
+    # async via the worker/queue like EXTRACTION, not synchronous like
+    # COMPOSITION, since it calls a provider.
+    PROTOCOL_GENERATION = "protocol_generation"
 
 
 class JobType(StrEnum):
@@ -49,6 +53,11 @@ class JobType(StrEnum):
     DIARIZE = "diarize"
     ALIGN = "align"
     EXTRACT = "extract"  # Phase 4: LLM fact extraction, explicit-trigger only (never auto-chained)
+    # Post-GA: Protokoll generation, explicit-trigger only (never auto-
+    # chained) — dispatched by the same worker-extraction process as
+    # EXTRACT (see app.processing.queues.EXTRACTION_WORKER_JOB_TYPES),
+    # since it's the same kind of LLM work, not a new worker service.
+    GENERATE_PROTOCOL = "generate_protocol"
 
 
 class ProcessingStatus(StrEnum):

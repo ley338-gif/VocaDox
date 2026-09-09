@@ -65,6 +65,15 @@ from app.processing import models as _processing_models  # noqa: F401,E402
 # resolution, both are imported here regardless).
 from app.profiles import models as _profiles_models  # noqa: F401,E402
 
+# Post-GA (Protokoll): protocols/protocol_revisions FK-reference
+# conversations.id/processing_runs.id (circular by design, same pattern
+# as documents/recap); protocol_sections/protocol_items FK-reference
+# protocol_revisions.id/conversation_participants.id;
+# protocol_sources FK-references protocol_sections.id/protocol_items.id/
+# transcript_segments.id -- imported after conversations/processing/
+# transcription/people.
+from app.protocols import models as _protocols_models  # noqa: F401,E402
+
 # Post-GA: recaps/recap_revisions FK-reference conversations.id/users.id
 # (circular by design, same pattern as documents — Recap.current_revision_id
 # -> RecapRevision, RecapRevision.recap_id -> Recap, both declared in the

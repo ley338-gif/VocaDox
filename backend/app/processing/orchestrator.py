@@ -800,3 +800,135 @@ async def execute_extract(
         },
     )
     return run.id
+
+
+# -- Post-GA: Protokoll generation (explicit-trigger only, never auto-
+# chained — same "explicit trigger, not automatic" principle as
+# extraction above) ----------------------------------------------------
+
+
+async def start_protocol_generation(
+    session: AsyncSession,
+    queue: QueueBackend,
+    *,
+    conversation: Conversation,
+    source_media: MediaAsset,
+    requested_by: User,
+) -> ProcessingJob:
+    """API entry point for `POST /conversations/{id}/protocol/generate`. A
+    conversation must be READY (a completed, active Transcript must
+    exist). Always creates a fresh job — re-generation simply creates a
+    new `ProtocolRevision` via a new `ProcessingRun`; nothing is deleted
+    (same "processing history is never destroyed" precedent as
+    extraction). Unlike `start_extraction`, this deliberately does NOT
+    call `_transition_conversation` — protocol generation is an optional,
+    repeatable side-view of an already-READY conversation, not a pipeline
+    gate, so it never changes `Conversation.status`."""
+    transcript = await get_active_ready_transcript(session, source_media_id=source_media.id)
+    if transcript is None:
+        raise ValueError("conversation has no active, ready transcript to generate a protocol from")
+
+    job = await create_and_enqueue_job(
+        session,
+        queue,
+        conversation_id=conversation.id,
+        source_media_id=source_media.id,
+        job_type=JobType.GENERATE_PROTOCOL,
+        created_by_user_id=requested_by.id,
+        job_metadata={"transcript_id": str(transcript.id)},
+    )
+
+    await record_event(
+        session,
+        event_type="protocol_generation.started",
+        user_id=requested_by.id,
+        event_metadata={
+            "conversation_id": str(conversation.id),
+            "transcript_id": str(transcript.id),
+            "job_id": str(job.id),
+        },
+    )
+    return job
+
+
+async def execute_generate_protocol(
+    session: AsyncSession,
+    llm_provider: LLMProvider,
+    job: ProcessingJob,
+) -> uuid.UUID:
+    from app.profiles.models import ModelProfilePurpose
+    from app.profiles.service import get_active_profile
+    from app.protocols.service import run_protocol_generation
+    from app.providers.llm import LLMModelUnavailableError
+
+    metadata = job.job_metadata or {}
+    transcript_id = metadata.get("transcript_id")
+    transcript = (
+        await session.get(Transcript, uuid.UUID(transcript_id)) if transcript_id else None
+    )
+    if transcript is None:
+        transcript = await get_active_ready_transcript(
+            session, source_media_id=job.source_media_id
+        )
+    if transcript is None:
+        raise ValueError("no active, ready transcript to generate a protocol from")
+
+    # Reuses the extraction ModelProfile — Protokoll generation is not
+    # Template-Engine-driven (see docs/architecture/adr/0042-protokoll.md),
+    # so there is no dedicated "protocol" ModelProfilePurpose.
+    profile = await get_active_profile(session, purpose=ModelProfilePurpose.EXTRACTION)
+    if profile is None:
+        raise LLMModelUnavailableError(
+            "no enabled extraction ModelProfile configured — run `python -m app.profiles.seed`"
+        )
+
+    status = llm_provider.status()
+    run = ProcessingRun(
+        conversation_id=job.conversation_id,
+        source_media_id=job.source_media_id,
+        run_type=RunType.PROTOCOL_GENERATION.value,
+        status=RunStatus.RUNNING.value,
+        provider=status.provider,
+        model=status.model,
+        model_revision=status.model_revision,
+        application_version=APPLICATION_VERSION,
+        configuration_snapshot={
+            "model_profile_id": str(profile.id),
+            "temperature": profile.temperature,
+        },
+    )
+    session.add(run)
+    await session.flush()
+
+    outcome = await run_protocol_generation(
+        session,
+        conversation_id=job.conversation_id,
+        transcript=transcript,
+        processing_run_id=run.id,
+        provider=llm_provider,
+        profile=profile,
+    )
+
+    run.status = RunStatus.SUCCEEDED.value
+    run.completed_at = datetime.now(UTC)
+    run.raw_output = {
+        "revision_id": str(outcome.revision_id),
+        "section_count": outcome.section_count,
+        "item_count": outcome.item_count,
+    }
+    await session.flush()
+
+    # event_metadata carries only counts/ids, never protocol content or
+    # transcript text (spec §63).
+    await record_event(
+        session,
+        event_type="protocol_generation.completed",
+        event_metadata={
+            "processing_run_id": str(run.id),
+            "conversation_id": str(job.conversation_id),
+            "revision_id": str(outcome.revision_id),
+            "section_count": outcome.section_count,
+            "item_count": outcome.item_count,
+        },
+    )
+    return run.id

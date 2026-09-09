@@ -1,0 +1,75 @@
+.empty {
+  color: var(--text-muted);
+}
+
+.meta {
+  color: var(--text-muted);
+  font-size: var(--font-caption-size);
+  margin: var(--space-1) 0;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.statusBadge {
+  display: inline-block;
+  background: color-mix(in srgb, var(--color-success) 15%, var(--surface-raised));
+  color: var(--color-success);
+  border-radius: var(--radius-sm, 4px);
+  padding: 2px 8px;
+  font-size: var(--font-caption-size);
+  font-weight: 600;
+}
+
+.countList {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  color: var(--text-secondary);
+  font-size: var(--font-caption-size);
+}
+
+.structureList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.structureItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-1);
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--font-caption-size);
+  color: var(--text-secondary);
+}
+
+.structureItem:hover {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+}
+
+.structureIndex {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.structureTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -39,6 +39,7 @@ from app.processing.orchestrator import (
     execute_align,
     execute_diarize,
     execute_extract,
+    execute_generate_protocol,
     execute_normalize,
     execute_transcribe,
     maybe_trigger_align,
@@ -67,6 +68,7 @@ _STAGE_EXECUTORS = {
     JobType.DIARIZE: "diarize",
     JobType.ALIGN: "align",
     JobType.EXTRACT: "extract",
+    JobType.GENERATE_PROTOCOL: "generate_protocol",
 }
 
 
@@ -260,6 +262,8 @@ class ProcessingWorker:
             return await execute_align(session, job)
         if job_type == JobType.EXTRACT:
             return await execute_extract(session, self._llm_provider, job)
+        if job_type == JobType.GENERATE_PROTOCOL:
+            return await execute_generate_protocol(session, self._llm_provider, job)
         raise ValueError(f"unknown job_type: {job.job_type}")
 
     async def _on_success(
@@ -290,10 +294,10 @@ class ProcessingWorker:
         from app.conversations.state_machine import is_valid_transition
         from app.transcription.service import get_active_transcript, mark_transcript_failed
 
-        # An EXTRACT failure must never mark the (already-succeeded,
-        # unrelated) Transcript as failed — only TRANSCRIBE/DIARIZE/ALIGN
-        # failures affect transcript state.
-        if JobType(job.job_type) != JobType.EXTRACT:
+        # An EXTRACT/GENERATE_PROTOCOL failure must never mark the
+        # (already-succeeded, unrelated) Transcript as failed — only
+        # TRANSCRIBE/DIARIZE/ALIGN failures affect transcript state.
+        if JobType(job.job_type) not in (JobType.EXTRACT, JobType.GENERATE_PROTOCOL):
             transcript = await get_active_transcript(session, source_media_id=job.source_media_id)
             if transcript is not None:
                 await mark_transcript_failed(

@@ -2802,6 +2802,99 @@ export interface paths {
         patch: operations["update_vocabulary_endpoint_api_v1_vocabulary__entry_id__patch"];
         trace?: never;
     };
+    "/api/v1/conversations/{conversation_id}/protocol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Protocol Endpoint */
+        get: operations["get_protocol_endpoint_api_v1_conversations__conversation_id__protocol_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/protocol/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Protocol Revisions Endpoint */
+        get: operations["list_protocol_revisions_endpoint_api_v1_conversations__conversation_id__protocol_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/protocol/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Protocol Endpoint
+         * @description Explicit user action ("Protokoll erstellen"/"Neu erstellen") —
+         *     never triggered automatically once a transcript is READY, same
+         *     "explicit trigger, not automatic" principle as fact extraction.
+         *     Returns 202 immediately; the job runs async (see
+         *     app.processing.orchestrator.execute_generate_protocol) — poll
+         *     `GET .../protocol` or `/processing` for the result.
+         */
+        post: operations["generate_protocol_endpoint_api_v1_conversations__conversation_id__protocol_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/protocol/sections/{section_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Section Sources Endpoint */
+        get: operations["get_section_sources_endpoint_api_v1_conversations__conversation_id__protocol_sections__section_id__sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/protocol/items/{item_id}/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Item Sources Endpoint */
+        get: operations["get_item_sources_endpoint_api_v1_conversations__conversation_id__protocol_items__item_id__sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3607,6 +3700,8 @@ export interface components {
              */
             updated_at: string;
         };
+        /** GenerateProtocolRequest */
+        GenerateProtocolRequest: Record<string, never>;
         /** GpuMetrics */
         GpuMetrics: {
             /** Cuda Available */
@@ -4685,6 +4780,173 @@ export interface components {
             published_at: string | null;
             /** Retired At */
             retired_at: string | null;
+        };
+        /** ProtocolItemResponse */
+        ProtocolItemResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Protocol Section Id
+             * Format: uuid
+             */
+            protocol_section_id: string;
+            /** Position */
+            position: number;
+            /** Item Type */
+            item_type: string;
+            /** Text */
+            text: string;
+            /** Responsible Label */
+            responsible_label: string | null;
+            /** Due Date */
+            due_date: string | null;
+            /** Completed */
+            completed: boolean | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Manually Edited */
+            manually_edited: boolean;
+        };
+        /** ProtocolResponse */
+        ProtocolResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Current Revision Id */
+            current_revision_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            current_revision?: components["schemas"]["ProtocolRevisionResponse"] | null;
+        };
+        /** ProtocolRevisionResponse */
+        ProtocolRevisionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Protocol Id
+             * Format: uuid
+             */
+            protocol_id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Sections
+             * @default []
+             */
+            sections: components["schemas"]["ProtocolSectionResponse"][];
+        };
+        /**
+         * ProtocolRevisionSummaryResponse
+         * @description The `.../revisions` list endpoint — summaries only, no section/item
+         *     content, matching `app.documents.router`'s equivalent listing (the
+         *     full revision browsing UI is a follow-up PR; this data ships now).
+         */
+        ProtocolRevisionSummaryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revision Number */
+            revision_number: number;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ProtocolSectionResponse */
+        ProtocolSectionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Protocol Revision Id
+             * Format: uuid
+             */
+            protocol_revision_id: string;
+            /** Position */
+            position: number;
+            /** Section Type */
+            section_type: string;
+            /** Title */
+            title: string;
+            /** Summary */
+            summary: string;
+            /** Start Ms */
+            start_ms: number | null;
+            /** End Ms */
+            end_ms: number | null;
+            /** Confidence */
+            confidence: number | null;
+            /** Manually Edited */
+            manually_edited: boolean;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ProtocolItemResponse"][];
+        };
+        /**
+         * ProtocolSourceResponse
+         * @description Mirrors the Fakten tab's evidence response shape (`{id,
+         *     segment_start_ms, segment_text}`) plus a speaker label (a protocol
+         *     source quote reads better attributed) and the real
+         *     `transcript_segment_id`, needed for "Im Transkript öffnen" to target
+         *     the exact segment (`TranscriptPanel`'s existing `focusSegmentId`
+         *     scroll-and-highlight mechanism).
+         */
+        ProtocolSourceResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Transcript Segment Id
+             * Format: uuid
+             */
+            transcript_segment_id: string;
+            /** Segment Start Ms */
+            segment_start_ms: number;
+            /** Segment End Ms */
+            segment_end_ms: number;
+            /** Segment Text */
+            segment_text: string;
+            /** Speaker Label */
+            speaker_label: string | null;
         };
         /**
          * PublicRecapResponse
@@ -11694,6 +11956,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VocabularyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_protocol_endpoint_api_v1_conversations__conversation_id__protocol_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProtocolResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_protocol_revisions_endpoint_api_v1_conversations__conversation_id__protocol_revisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProtocolRevisionSummaryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_protocol_endpoint_api_v1_conversations__conversation_id__protocol_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateProtocolRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_section_sources_endpoint_api_v1_conversations__conversation_id__protocol_sections__section_id__sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProtocolSourceResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_item_sources_endpoint_api_v1_conversations__conversation_id__protocol_items__item_id__sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProtocolSourceResponse"][];
                 };
             };
             /** @description Validation Error */
