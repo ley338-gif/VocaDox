@@ -22,12 +22,17 @@ typecheck / test commands expected to pass before you open a PR.
 
 ## Scope discipline
 
-This project is being built phase by phase (spec: 12 phases total). If
-you're working on Phase N, resist implementing Phase N+1 functionality
+This project is being built phase by phase. If you're working on Phase N,
+resist implementing Phase N+1 functionality
 "while you're in there" — log the idea in
 [`docs/architecture/future-considerations.md`](docs/architecture/future-considerations.md)
 instead. Each phase should end with its own validation report and an
 explicit GO/NO-GO decision before the next one starts.
+
+## Releases
+
+Release preparation, version synchronization, validation, tagging, and
+publication are documented in [`docs/developer/releasing.md`](docs/developer/releasing.md).
 
 ## License policy summary
 

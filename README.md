@@ -2,32 +2,15 @@
 
 **On-premise, evidence-based conversation documentation.**
 
-> **Status: Phase 12 — Hardening / RC (final phase of the 12-phase
-> roadmap, complete).** Local authentication, permission-based RBAC,
-> Valkey-backed sessions, CSRF protection, organizations, and audit
-> logging (Phase 1); conversations, browser/upload audio capture,
-> immutable SHA-256-verified source media, participants/markers/notes,
-> and organization-scoped authorization (Phase 2); real local
-> speech-to-text (faster-whisper) and speaker diarization
-> (pyannote.audio), deterministic transcript alignment, and a reviewable
-> transcript UI (Phase 3, hardened in Phase 3.1); a local LLM provider
-> (Ollama, admin-managed and external — see
-> [ADR-0029](docs/architecture/adr/0029-remove-bundled-ollama.md)) with
-> structured, evidence-linked fact extraction (Phase 4);
-> Review Wizard, document composition, and an immutable approval workflow
-> (Phase 5); versioned Templates and Processing/Model Profiles (Phase 6);
-> a full Admin Portal (users/groups/organizations/models/jobs/storage/
-> retention/audit) (Phase 7); technical/quality analytics and an
-> Evaluation Lab (Phase 8); longitudinal (cross-conversation) comparison
-> and follow-up tasks (Phase 9); Service Accounts, scoped API keys, and
-> webhooks (Phase 10); operational metrics, backup/restore, and retention
-> cleanup (Phase 11); and a final security/privacy/dependency/load/
-> failure-recovery hardening audit with a GA readiness determination
-> (Phase 12) are all implemented. See
-> [`PHASE_12_VALIDATION_REPORT.md`](PHASE_12_VALIDATION_REPORT.md) for the
-> final GA (General Availability) recommendation, and the other
-> `PHASE_*_VALIDATION_REPORT.md` files at the repo root for each phase's
-> own detailed validation record.
+> **Status: version 0.14.0 — Phase 14 production-readiness work in
+> progress.** The application is feature-complete through Phase 13 and
+> later follow-up work, but it has not yet passed the Phase 14 production
+> deployment, security, integration, browser-E2E, backup/restore, and
+> upgrade gates. It must therefore not yet be represented as a supported
+> production release. See
+> [`docs/developer/phase-14-implementation-plan.md`](docs/developer/phase-14-implementation-plan.md)
+> for the current readiness plan and [`CHANGELOG.md`](CHANGELOG.md) for
+> release history.
 
 ## What VocaDox is
 
@@ -38,6 +21,16 @@ actually said (or otherwise recorded) — never silently invented. See
 for the Source → Facts → Document provenance model that makes this
 possible, and `VocaDox - Userinterface.png` / `VocaDox - Architektur.png` /
 `VocaDox - Stylesystem.png` (repo root) for the original design references.
+
+The current code includes local speech-to-text and diarization providers,
+evidence-linked fact extraction, review and immutable approval workflows,
+versioned organization templates and processing profiles, protocol and
+document generation, search and citation-backed Ask VocaDox, live and
+offline-capable recording, voiceprint suggestions, FHIR/GDT exports, recap
+share links, service accounts/API keys/webhooks, administration and audit
+surfaces, and local backup/retention tooling. Phase-by-phase validation
+reports at the repository root record what was actually tested and any
+remaining limitations.
 
 ## Architecture summary
 
@@ -73,14 +66,15 @@ including all [ADRs](docs/architecture/adr/) and the
 - Docker + Docker Compose (recommended path), **or** Python 3.11+ and
   Node.js 20+ for running services directly.
 
-### Run everything with Docker Compose
+### Run the development stack with Docker Compose
 
 ```sh
 cp deploy/.env.example .env
 docker compose up -d
 ```
 
-This runs from the repo root (a root `docker-compose.yml` wraps
+This runs the **development stack** from the repo root (a root
+`docker-compose.yml` wraps
 `deploy/docker-compose.yml` — see that file's header comment) and starts,
 in dependency order: Postgres and Valkey, a one-shot `migrate` service
 (`alembic upgrade head` — deterministic, runs before anything else that
@@ -101,6 +95,12 @@ user" below) and, if you want real speech/diarization instead of the
 deterministic fake providers, install the AI models (see "Installing AI
 models" below) — full walkthrough:
 [`docs/admin/fresh-install.md`](docs/admin/fresh-install.md).
+
+This Compose configuration publishes development ports, permits the
+documented throwaway password, and disables secure cookies for local HTTP.
+It is **not a production deployment definition**. Production deployment
+separation and fail-fast configuration validation are tracked as Phase 14
+P0 work; do not expose this stack to untrusted networks.
 
 **Persistent volumes**: conversation media (`vocadox_backend_data`),
 installed AI models (`vocadox_models_data`), Postgres data
@@ -133,7 +133,7 @@ Checks: `ruff check .`, `mypy app`, `pytest -q`.
 
 ```sh
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -221,8 +221,9 @@ deploy/               docker-compose.yml + .env.example
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch/PR/commit conventions
-and the license policy summary. See [`SECURITY.md`](SECURITY.md) for
-vulnerability reporting.
+and the license policy summary. See [`docs/developer/releasing.md`](docs/developer/releasing.md)
+for the release process. See [`SECURITY.md`](SECURITY.md) for vulnerability
+reporting.
 
 ## License notices
 
