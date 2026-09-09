@@ -4,6 +4,12 @@ For setup, branch/PR workflow, and local lint/typecheck/test commands, see
 the root [README.md](../../README.md) quickstart and
 [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
+Current release/readiness references:
+
+- [Phase 14 implementation plan](phase-14-implementation-plan.md)
+- [Release process](releasing.md)
+- [Changelog](../../CHANGELOG.md)
+
 ## Authentication/authorization (Phase 1)
 
 ### Where things live

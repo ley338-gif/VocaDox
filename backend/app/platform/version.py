@@ -6,4 +6,4 @@ non-web code (workers) can import it without pulling in FastAPI.
 
 from __future__ import annotations
 
-APPLICATION_VERSION = "0.0.1"
+APPLICATION_VERSION = "0.14.0"

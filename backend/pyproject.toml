@@ -1,7 +1,7 @@
 [project]
 name = "vocadox-backend"
-version = "0.0.1"
-description = "VocaDox backend — Evidence-based Conversation Documentation platform (Phase 0 scaffold)"
+version = "0.14.0"
+description = "VocaDox backend — on-premise, evidence-based conversation documentation"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 dependencies = [
