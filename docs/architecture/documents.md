@@ -135,11 +135,27 @@ can compose/correct but not approve. See
 
 ## Export
 
-`GET /conversations/{id}/document/export?format=text|json` — plain text
-or structured JSON of the current revision. PDF/DOCX deliberately
-deferred (see `future-considerations.md`) rather than adding an
-unresearched dependency. Audited (`document.exported`, ids/format only —
-never full content).
+`GET /conversations/{id}/document/export?format=...` — the current
+revision in one of several formats, dispatched from a single shared
+helper (`app.documents.export_service.render_document_export`, used by
+both this human-session route and its Integration API equivalent in
+`app.integrations.router`):
+
+- `text` (default) / `json` — plain text or structured JSON.
+- `docx` / `pdf` — real rendered documents (`app.documents.
+  export_formats`, post-GA P0-2), including letterhead logo insertion
+  when the resolved Template has one.
+- `fhir` — a FHIR R4 `DocumentReference` resource (post-GA P3-1,
+  `app.documents.fhir_export`, ADR-0039).
+- `gdt-pdf` / `gdt-text` — GDT (Gerätedatentransfer) formats for German
+  Praxisverwaltungssysteme (post-GA, `app.documents.gdt_export`,
+  ADR-0041): `gdt-pdf` bundles the PDF with a `.gdt` file referencing it
+  by filename in one ZIP; `gdt-text` embeds the document's text directly
+  in a `.gdt` file, no PDF at all. See ADR-0041 for disclosed field-code
+  and encoding limitations, and `connectors/gdt-bridge/` for a prototype
+  connector that consumes these via the Integration API.
+
+Audited (`document.exported`, ids/format only — never full content).
 
 ## Template-driven presentation (Phase 6)
 

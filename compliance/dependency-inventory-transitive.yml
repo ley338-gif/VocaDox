@@ -595,49 +595,49 @@ dependencies:
   approval_status: approved
 - name: '@vitest/expect'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/mocker'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/pretty-format'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/runner'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/snapshot'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/spy'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
   approval_status: approved
 - name: '@vitest/utils'
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: false
   license: MIT
@@ -1512,7 +1512,7 @@ dependencies:
   approval_status: approved
 - name: js-yaml
   ecosystem: npm
-  version: 4.3.1
+  version: 4.3.2
   scope: dev
   direct: false
   license: MIT
@@ -2380,7 +2380,7 @@ dependencies:
   approval_status: approved
 - name: vitest
   ecosystem: npm
-  version: 4.1.10
+  version: 4.1.11
   scope: dev
   direct: true
   license: MIT
@@ -2766,7 +2766,7 @@ dependencies:
   approval_status: approved
 - name: filelock
   ecosystem: pypi
-  version: 3.32.5
+  version: 3.32.6
   scope: dev
   direct: false
   license: MIT
@@ -3145,7 +3145,7 @@ dependencies:
   approval_status: approved
 - name: platformdirs
   ecosystem: pypi
-  version: 4.11.7
+  version: 4.11.8
   scope: dev
   direct: false
   license: MIT

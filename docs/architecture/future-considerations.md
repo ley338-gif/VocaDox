@@ -428,6 +428,17 @@ to this list rather than building it opportunistically.
   confidence in this environment, rather than the whole FHIR surface
   speculatively (see ADR-0039).
 
+  **`connectors/gdt-bridge/` (ADR-0041) is the first concrete instance of
+  this connector pattern**, for GDT rather than FHIR/HL7 — it differs
+  from the pattern above in one respect worth noting: it is *inbound-
+  initiated* (the connector pushes a new conversation into VocaDox from
+  a locally-dropped GDT file, then polls for approval) rather than
+  purely webhook-push, because a connector expected to run on/near a
+  practice PC typically has no inbound reachability from VocaDox's
+  backend. It still uses only the same two primitives (a scoped Service
+  Account, the REST Integration API) and still never runs inside the
+  VocaDox backend process.
+
 ## Phase 11 additions (Operations)
 
 - **No durable metrics-history/time-series store.** Worker throughput,
