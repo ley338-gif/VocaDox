@@ -1022,11 +1022,10 @@ export interface paths {
         };
         /**
          * Export Document Endpoint
-         * @description Plain text / JSON export of the current revision (spec: "at minimum
-         *     plain text and/or a simple structured format"). See
-         *     docs/architecture/adr's compliance notes / PHASE_5_VALIDATION_REPORT.md
-         *     for why PDF/DOCX generation is deliberately deferred rather than adding
-         *     an unresearched new dependency under time pressure.
+         * @description Exports the current revision. Supported `format` values: `text`
+         *     (default), `json`, `docx`, `pdf`, `fhir` (P3-1, ADR-0039), `gdt-pdf`/
+         *     `gdt-text` (ADR-0041). See `app.documents.export_service.
+         *     render_document_export` for the actual per-format rendering.
          */
         get: operations["export_document_endpoint_api_v1_conversations__conversation_id__document_export_get"];
         put?: never;
@@ -2382,6 +2381,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/api/conversations/{conversation_id}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Api Create Participant
+         * @description No owner attribution required -- unlike conversation/document
+         *     writes, neither `add_participant` nor the human-facing
+         *     `POST /conversations/{id}/participants` route attributes a
+         *     participant to a user; a connector (e.g. the GDT bridge, ADR-0041)
+         *     can add a PATIENT participant purely from data pulled out of an
+         *     inbound file, with no VocaDox user in the loop.
+         */
+        post: operations["api_create_participant_api_v1_integrations_api_conversations__conversation_id__participants_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integrations/api/conversations/{conversation_id}/transcript": {
         parameters: {
             query?: never;
@@ -2408,6 +2432,33 @@ export interface paths {
         };
         /** Api Get Document */
         get: operations["api_get_document_api_v1_integrations_api_conversations__conversation_id__document_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/api/conversations/{conversation_id}/document/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Api Export Document
+         * @description Mirrors `app.documents.router.export_document_endpoint` for
+         *     service-account callers -- the human router has no session cookie a
+         *     connector could present, so this scope-gated equivalent is what a
+         *     connector (e.g. the GDT bridge, ADR-0041) actually calls to download
+         *     export bytes (`pdf`/`gdt-pdf`/`gdt-text`/etc.), not the JSON-metadata-
+         *     only `GET .../document` route above. No `_require_owner()` -- like
+         *     every other read-only route in this file, this doesn't attribute
+         *     anything to a user.
+         */
+        get: operations["api_export_document_api_v1_integrations_api_conversations__conversation_id__document_export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10845,6 +10896,41 @@ export interface operations {
             };
         };
     };
+    api_create_participant_api_v1_integrations_api_conversations__conversation_id__participants_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     api_get_transcript_api_v1_integrations_api_conversations__conversation_id__transcript_get: {
         parameters: {
             query?: never;
@@ -10894,6 +10980,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    api_export_document_api_v1_integrations_api_conversations__conversation_id__document_export_get: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

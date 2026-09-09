@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+gdt_bridge_state.sqlite3
+gdt_import/
+gdt_processed/
+gdt_failed/
+gdt_export/
