@@ -46,3 +46,4 @@ MADR-style (Status / Context / Decision / Consequences), numbered sequentially. 
 - [0042](0042-protokoll.md) — Structured conversation protocol
 - [0043](0043-development-production-deployment-separation.md) — Separate development and production deployments
 - [0044](0044-ci-security-analysis-and-sbom.md) — CodeQL, layered secret scanning, and shipped-image SBOMs
+- [0045](0045-chunked-live-transcript-target.md) — Linear, overlap-window live-transcript target architecture

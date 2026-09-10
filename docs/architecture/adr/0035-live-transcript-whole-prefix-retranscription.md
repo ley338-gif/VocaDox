@@ -1,7 +1,9 @@
 # 0035 — Live transcript: whole-prefix re-transcription, ephemeral cache-only state
 
 ## Status
-Accepted (2026-09-07). Post-GA, roadmap item P2-1.
+Accepted as the current short-recording implementation (2026-09-07).
+Long-recording suitability superseded by ADR-0045 after the Phase 14 scaling
+benchmark (2026-09-10).
 
 ## Context
 

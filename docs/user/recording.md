@@ -68,6 +68,9 @@ reason:
 - The live transcript is re-generated from the recording-so-far each
   update, not perfectly incremental — wording right at the edge of the
   most recent update can shift slightly as more audio is added.
+- This current preview method is intended for shorter recordings. During a
+  long recording it may update increasingly slowly or stop updating; the
+  recording itself continues normally and the final transcript is unaffected.
 - **Neither the live transcript nor the live draft is saved anywhere.**
   Once you upload the recording, both are discarded and replaced by the
   real, reviewable transcript and document your organization's normal
