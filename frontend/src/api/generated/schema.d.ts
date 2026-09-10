@@ -491,6 +491,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organization_id}/member-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Organization Member Users Endpoint
+         * @description Deliberately separate from `/{organization_id}/members` above (which
+         *     requires `organization:manage` and returns bare membership rows, no
+         *     names): this is the narrow, name-and-avatar-only directory a regular
+         *     User/Manager can read to pick a registered colleague as a conversation
+         *     participant (see `app.conversations.router`'s participant endpoints).
+         *     `user:read-directory` gates *that* it can be listed at all; membership
+         *     in `organization_id` (or `system:admin`) gates *which* organization's
+         *     directory a given caller may read -- same posture as every other
+         *     organization-scoped endpoint (`app.conversations.authz`).
+         */
+        get: operations["list_organization_member_users_endpoint_api_v1_organizations__organization_id__member_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}/process/transcript": {
         parameters: {
             query?: never;
@@ -2398,6 +2426,13 @@ export interface paths {
          *     participant to a user; a connector (e.g. the GDT bridge, ADR-0041)
          *     can add a PATIENT participant purely from data pulled out of an
          *     inbound file, with no VocaDox user in the loop.
+         *
+         *     `user_id` (post-GA) is still accepted, though: a connector that DOES
+         *     know which registered VocaDox user a participant corresponds to (e.g.
+         *     a referring staff member) may link it -- validated through the exact
+         *     same `resolve_participant_user` used by the human-facing route, so
+         *     this surface can't bypass the "same org, active, not already linked"
+         *     checks that route enforces.
          */
         post: operations["api_create_participant_api_v1_integrations_api_conversations__conversation_id__participants_post"];
         delete?: never;
@@ -4414,6 +4449,30 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /**
+         * OrganizationMemberUserResponse
+         * @description Deliberately minimal -- backs the conversation-participant "pick a
+         *     registered user" directory (`GET /organizations/{id}/member-users`,
+         *     gated by `user:read-directory`). No e-mail, auth-provider, or group
+         *     data: just enough to show a name + avatar and pass an id back.
+         */
+        OrganizationMemberUserResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Username */
+            username: string;
+            /** Display Name */
+            display_name: string;
+            /** First Name */
+            first_name: string | null;
+            /** Last Name */
+            last_name: string | null;
+            /** Avatar Asset Key */
+            avatar_asset_key: string | null;
+        };
         /** OrganizationMembershipResponse */
         OrganizationMembershipResponse: {
             /**
@@ -4454,7 +4513,7 @@ export interface components {
         /** ParticipantCreateRequest */
         ParticipantCreateRequest: {
             /** Display Name */
-            display_name: string;
+            display_name?: string | null;
             /** @default unknown */
             participant_type: components["schemas"]["ParticipantType"];
             /** External Reference */
@@ -4463,6 +4522,8 @@ export interface components {
             notes?: string | null;
             /** Known Speaker Id */
             known_speaker_id?: string | null;
+            /** User Id */
+            user_id?: string | null;
         };
         /** ParticipantResponse */
         ParticipantResponse: {
@@ -4486,6 +4547,8 @@ export interface components {
             notes: string | null;
             /** Known Speaker Id */
             known_speaker_id: string | null;
+            /** User Id */
+            user_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4508,6 +4571,8 @@ export interface components {
             notes?: string | null;
             /** Known Speaker Id */
             known_speaker_id?: string | null;
+            /** User Id */
+            user_id?: string | null;
         };
         /**
          * PrivacyMode
@@ -7582,6 +7647,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationMembershipResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_organization_member_users_endpoint_api_v1_organizations__organization_id__member_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationMemberUserResponse"][];
                 };
             };
             /** @description Validation Error */
