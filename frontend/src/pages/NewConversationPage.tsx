@@ -17,6 +17,7 @@ import { type CalendarEvent, parseIcs, upcomingEvents } from "../lib/icsParser";
 import styles from "./NewConversationPage.module.css";
 
 type Mode = "record" | "upload";
+const MAX_ICS_FILE_BYTES = 2 * 1024 * 1024;
 
 function formatEventTime(date: Date): string {
   return date.toLocaleString("de-DE", {
@@ -65,6 +66,10 @@ export function NewConversationPage() {
     setCalendarEvents([]);
     setSelectedEventUid(null);
     if (!icsFile) return;
+    if (icsFile.size > MAX_ICS_FILE_BYTES) {
+      setCalendarError("Die Kalenderdatei ist zu groß (maximal 2 MB).");
+      return;
+    }
     icsFile
       .text()
       .then((text) => {

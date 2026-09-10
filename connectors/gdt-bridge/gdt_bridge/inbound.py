@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from gdt_bridge.gdt_codec import GdtCharset, decode_lines, python_codec_name
 
 logger = logging.getLogger("gdt_bridge.inbound")
+DEFAULT_MAX_INBOUND_SIZE_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,13 +90,17 @@ async def process_inbound_file(
     create_conversation: Callable,
     create_participant: Callable,
     record_state: Callable,
+    max_size_bytes: int = DEFAULT_MAX_INBOUND_SIZE_BYTES,
 ) -> None:
     """Orchestrates one inbound file: decode -> extract -> create
     conversation (+ participant, if a display name was found) -> record
     in-flight state. Callbacks are injected (rather than importing
     `api_client`/`state` directly) so this function stays unit-testable
     without a real HTTP client or SQLite file."""
-    raw = path.read_bytes()
+    with path.open("rb") as source:
+        raw = source.read(max_size_bytes + 1)
+    if len(raw) > max_size_bytes:
+        raise ValueError(f"inbound GDT file exceeds {max_size_bytes} bytes")
     fields = decode_gdt_file(raw)
     patient = extract_patient_fields(fields)
 

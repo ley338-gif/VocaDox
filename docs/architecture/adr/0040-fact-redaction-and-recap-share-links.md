@@ -89,6 +89,16 @@ link itself, is at least as consequential as approving it — the same
 person trusted to certify the recap's accuracy is the one trusted to
 decide it should leave the system.
 
+**8. Phase 14 hardening: the bearer token is creation-only and hash-at-rest.**
+The database stores `SHA-256(token)`, while the raw 256-bit value is returned
+exactly once by the create endpoint. Listing and revocation require
+`recap:approve` and list only metadata, so database read access or the management
+API cannot recover a reusable public URL. Public responses use `no-store` and
+`no-referrer`, and the production proxy applies a dedicated per-IP limit. Hashing
+preserves existing links during upgrade because lookup hashes the presented raw
+token; a downgrade cannot reconstruct those raw values and therefore invalidates
+their external usability.
+
 ## Consequences
 
 - No new dependency (both features use only stdlib primitives —
@@ -108,8 +118,6 @@ decide it should leave the system.
   documented inline at the one call site that needed it; every write to
   this table already used `datetime.now(UTC)`, so the normalization is
   provably correct, not a guess.
-- Share links have no rate limiting or abuse-detection on the public
-  endpoint in this release — a disclosed limitation. The token's entropy
-  makes brute-forcing infeasible in practice, but a determined actor
-  could still hammer a single known token with requests; add rate
-  limiting if real deployment shows this matters.
+- Rate limiting is implemented at the production reverse proxy. Operators that
+  expose the backend without that topology do not receive this control and are
+  outside the supported production deployment model.

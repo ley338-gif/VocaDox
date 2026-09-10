@@ -8,6 +8,9 @@ call here is a real HTTP request through the real FastAPI app.
 
 from __future__ import annotations
 
+import uuid
+
+from app.templates.models import Template
 from httpx import AsyncClient
 
 from tests.conversations.conftest import login
@@ -238,3 +241,42 @@ async def test_non_admin_cannot_manage_service_accounts(client, seeded):
         headers=user_headers,
     )
     assert resp.status_code == 403
+
+
+async def test_template_scope_never_lists_another_organizations_template(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    admin_headers = await login(client, "carol", "yet another strong pw 789")
+    created = await _create_service_account(
+        client,
+        admin_headers,
+        organization_id=seeded["org_a"],
+        scopes=["template:read"],
+        owner_user_id=seeded["alice_id"],
+    )
+    _app, sessionmaker, _queue, _storage = processing_env
+    async with sessionmaker() as session:
+        session.add_all(
+            [
+                Template(
+                    key="org-a-private",
+                    name="Org A",
+                    organization_id=uuid.UUID(seeded["org_a"]),
+                ),
+                Template(
+                    key="org-b-private",
+                    name="Org B",
+                    organization_id=uuid.UUID(seeded["org_b"]),
+                ),
+            ]
+        )
+        await session.commit()
+
+    response = await client.get(
+        "/api/v1/integrations/api/templates",
+        headers={"Authorization": f"Bearer {created['api_key']}"},
+    )
+    assert response.status_code == 200, response.text
+    keys = {template["key"] for template in response.json()}
+    assert "org-a-private" in keys
+    assert "org-b-private" not in keys

@@ -34,6 +34,10 @@ class SessionData:
     expires_at: str
     ip_address: str | None
     user_agent: str | None
+    # Version of the user's credentials/account state at login time. Kept
+    # last with a default so sessions written by an older rolling-deploy
+    # instance deserialize safely; generation 0 is the migration default.
+    session_generation: int = 0
 
     def is_expired(self, *, now: datetime | None = None) -> bool:
         now = now or datetime.now(UTC)
@@ -58,6 +62,7 @@ class SessionStore:
         username: str,
         ip_address: str | None,
         user_agent: str | None,
+        session_generation: int = 0,
     ) -> SessionData:
         session_id = secrets.token_urlsafe(32)
         now = datetime.now(UTC)
@@ -70,6 +75,7 @@ class SessionStore:
             expires_at=(now + timedelta(seconds=self._ttl_seconds)).isoformat(),
             ip_address=ip_address,
             user_agent=user_agent,
+            session_generation=session_generation,
         )
         await self._cache.set(
             _SESSION_KEY_PREFIX + session_id,

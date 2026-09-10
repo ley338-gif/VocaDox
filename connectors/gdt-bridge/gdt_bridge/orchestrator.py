@@ -37,6 +37,12 @@ class _InboundHandler(FileSystemEventHandler):
         asyncio.run_coroutine_threadsafe(self._handle(Path(event.src_path)), self._loop)
 
     async def _handle(self, path: Path) -> None:
+        try:
+            if path.resolve().parent != self._config.import_dir.resolve() or not path.is_file():
+                raise ValueError("inbound path is not a regular file inside import_dir")
+        except (OSError, RuntimeError, ValueError):
+            logger.exception("rejected unsafe inbound path %s", path)
+            return
         if not await asyncio.to_thread(wait_until_stable, path):
             logger.warning("inbound file disappeared before it stabilized: %s", path)
             return
@@ -48,6 +54,7 @@ class _InboundHandler(FileSystemEventHandler):
                     cid, **kw
                 ),
                 record_state=lambda **kw: self._store.record_conversation_created(**kw),
+                max_size_bytes=self._config.max_inbound_size_bytes,
             )
             self._config.processed_dir.mkdir(parents=True, exist_ok=True)
             path.rename(self._config.processed_dir / path.name)

@@ -18,7 +18,8 @@ same domain/platform boundary from ADR-0002, enforced by
 `tests/test_architecture_boundaries.py`).
 
 Each session is a JSON blob (`session_id`, `user_id`, `username`,
-`csrf_token`, `created_at`, `expires_at`, `ip_address`, `user_agent`)
+`csrf_token`, `created_at`, `expires_at`, `ip_address`, `user_agent`,
+`session_generation`)
 stored under `identity:session:<token>`, with Valkey's native `EX` TTL set
 to `session_ttl_seconds` (`VOCADOX_SESSION_TTL_SECONDS`, default 12h) on
 every `SET`. Expiry is therefore enforced two ways: Valkey drops the key
@@ -26,6 +27,17 @@ itself, and `SessionStore.get` also checks the embedded `expires_at`
 defensively (so a TTL misconfiguration can't silently extend a session).
 Logout calls `DELETE` on the key directly — immediate, no polling/reaping
 needed.
+
+### Phase 14 security addendum (2026-09-10)
+
+Password reset and account deactivation must revoke every already-issued
+session, not only prevent the next login. The `users` row therefore owns a
+monotonic `session_generation`. Login copies its current value into the Valkey
+session and every authenticated request compares both values after loading the
+user. An administrator-initiated password reset or active-to-inactive transition
+increments the database value, invalidating all older sessions without scanning
+opaque Valkey keys or adding a second session index. Sessions created before the
+migration deserialize with generation zero, matching the migrated user default.
 
 The session token itself is `secrets.token_urlsafe(32)`: opaque and
 server-generated, carrying no encoded user data, so a leaked token alone
@@ -58,7 +70,7 @@ verification).
 - Session data is lost if Valkey's volume is wiped without a snapshot —
   acceptable (sessions are meant to be ephemeral; the worst case is every
   user having to log in again).
-- Listing/revoking a specific user's sessions from an admin UI (a
-  reasonable Phase 6/7 admin-portal feature) isn't supported by the
-  current key scheme (`identity:session:<opaque token>`, no per-user
-  index) and would need a small additive change, not a redesign.
+- Listing or revoking one selected session from an admin UI is not supported by
+  the current key scheme (`identity:session:<opaque token>`, no per-user index).
+  Security-driven bulk revocation is supported through `session_generation`;
+  per-session administration would still need a small additive index.
