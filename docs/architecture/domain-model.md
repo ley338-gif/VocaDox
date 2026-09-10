@@ -215,3 +215,34 @@ grouping key or parallel fact type was invented:
   back to the originating fact; `USER_CREATED` rows are added directly by
   a human, `source_fact_id` is NULL. No notification/reminder/email system
   exists here (Phase 10 territory).
+
+## Post-GA: three distinct "who" identities around a conversation
+
+Three separate entities can all answer "who is this?" for a person
+associated with a `Conversation`, at three different levels of
+confidence and scope — they are never merged into one, and a given
+person may legitimately have all three, some, or none at once:
+
+- **`ConversationParticipant.user_id`** → `app.identity.models.User`: the
+  registered VocaDox account of someone who was actually present (most
+  often a staff member). Optional, independent of the other two links
+  below, `ondelete="SET NULL"` so deactivating/removing a user never
+  alters an existing (possibly already-shared) conversation's
+  participant row. This is *system* identity — "which account", not a
+  clinical or biometric claim.
+- **`ConversationParticipant.known_speaker_id`** → `app.people.models
+  .KnownSpeaker`: an organization-wide, *external* identity a human
+  explicitly created and linked (e.g. a recurring patient or an outside
+  colleague with no VocaDox account) — see that model's docstring. Never
+  auto-created from voice analysis.
+- **`app.diarization.models.DetectedSpeaker`**: a per-conversation
+  diarization *cluster* ("Speaker 1", "Speaker 2", ...) produced by the
+  diarization provider. It is linked to a `ConversationParticipant` only
+  through a human review/assignment action (`speaker:assign`) — never
+  automatically, and never itself a claim of identity beyond "these
+  segments sound like the same voice in this recording."
+
+A `ConversationParticipant.display_name` is the one field that's always
+present and never required to be a real name — it renders the same way
+in every view regardless of which (if any) of the three links above are
+set.

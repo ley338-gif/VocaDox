@@ -10,6 +10,19 @@ Target version: `0.14.0` (first coordinated pre-1.0 release). It will receive
 a release date and Git tag only if the Phase 14 validation report recommends
 release.
 
+### Added
+
+- Conversation participants can now be added from the organization's
+  registered-user directory, not just as free-text names or existing Known
+  Speakers. The link (`conversation_participants.user_id`) is persisted
+  independently of the existing `known_speaker_id` link, enabling future
+  "I was there" attribution/avatar display, while `display_name` remains a
+  free-text label that is never required to be a real name. New endpoint:
+  `GET /organizations/{id}/member-users`, gated by a new `user:read-directory`
+  permission (granted to the Manager and User roles). Upgrading an existing
+  installation requires `alembic upgrade head` followed by
+  `python -m app.identity.seed` — see `docs/admin/admin-portal.md`.
+
 ### Changed
 
 - Began Phase 14 production-readiness work.

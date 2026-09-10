@@ -60,6 +60,36 @@ have since shipped — see the table below.
 | Webhooks | `webhook:read`/`:write` | `app.integrations.router` (Phase 10) | Create/update/rotate-secret/delete admin-configured HTTP delivery targets + a per-webhook Delivery Log viewer. See `docs/admin/integrations.md`. |
 | About & Licenses | `system:admin` | `GET /admin/about` | App version + a license-compliance summary + a `THIRD_PARTY_NOTICES.md` excerpt. **The production container image does not ship `compliance/`/`THIRD_PARTY_NOTICES.md`** (outside `backend/Dockerfile`'s build context) — a real deployment shows an honest "not shipped in this deployment" for the license section rather than fabricated data. |
 
+## A permission with no dedicated admin page: `user:read-directory`
+
+Post-GA: `GET /api/v1/organizations/{id}/member-users` (in
+`app.organizations.router`, not `app.identity.router`) lets a caller list
+the active users of an organization by name/avatar — no e-mail, no
+auth-provider, no admin data — so the conversation detail page's
+"Teilnehmer" ("Participants") card can offer "add a registered colleague
+as a participant" (see `docs/user/conversation-notes.md`). It is
+deliberately gated by its own new permission, `user:read-directory`,
+rather than the existing `user:manage` above: reading a name/avatar
+directory to pick a participant is a completely different trust level
+than the Users admin page's create/deactivate/assign-groups authority,
+and every Manager/User already needs the former for their day-to-day
+work without needing the latter.
+
+`user:read-directory` is granted (in `app.identity.seed.ROLES`) to the
+**Manager** and **User** roles — the same two roles that already carry
+`conversation:manage-participants` — and, like every permission, to
+**System Admin** automatically via `list(PERMISSIONS.keys())`. Reviewer,
+Auditor, and Template Manager do not get it: those roles don't manage
+conversation participants.
+
+**Upgrading an existing installation**: after pulling in this change,
+run `alembic upgrade head` (adds `conversation_participants.user_id`)
+followed by `python -m app.identity.seed` (idempotently inserts the new
+`user:read-directory` permission row and grants it to the Manager/User
+roles) — the same two-step upgrade path every phase that added
+permissions or roles has documented since Phase 2 (see
+`app.identity.seed._reseed_cli`'s docstring).
+
 ## What "real data, not a mockup" means here
 
 Every number/status above comes from a live query or a live provider
