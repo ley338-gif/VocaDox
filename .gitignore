@@ -14,6 +14,8 @@ backend/build/
 node_modules/
 dist/
 frontend/.vite/
+frontend/playwright-report/
+frontend/test-results/
 coverage/
 
 # --- Env / secrets ---
