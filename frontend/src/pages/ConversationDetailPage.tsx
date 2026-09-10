@@ -8,6 +8,7 @@ import {
   FileText,
   Gauge,
   History,
+  IdCard,
   Link2,
   RefreshCw,
   SlidersHorizontal,
@@ -42,6 +43,7 @@ import {
 import { getCompleteness } from "../api/completeness";
 import { getDocument } from "../api/documents";
 import { getExternalReferenceTimeline, listConversationTasks } from "../api/longitudinal";
+import { listOrganizationMemberUsers } from "../api/organizations";
 import { createKnownSpeaker, listKnownSpeakers } from "../api/people";
 import {
   acceptSpeakerSuggestion,
@@ -54,6 +56,7 @@ import {
 } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { AudioPlayer, type AudioPlayerHandle } from "../components/AudioPlayer";
+import { AvatarThumb } from "../components/AvatarThumb";
 import { CompletenessPanel } from "../components/CompletenessPanel";
 import { DocumentContent } from "../components/DocumentContent";
 import { DocumentPanel } from "../components/DocumentPanel";
@@ -235,9 +238,14 @@ export function ConversationDetailPage() {
     enabled: Boolean(externalReference && organizationId),
   });
 
+  // "Quelle" for the "Teilnehmer hinzufügen" disclosure: pick an existing
+  // registered user, an existing KnownSpeaker, or type a brand-new
+  // free-text name. Default "new" matches the pre-existing behavior.
+  const [participantSource, setParticipantSource] = useState<"user" | "known" | "new">("new");
   const [participantName, setParticipantName] = useState("");
   const [participantType, setParticipantType] = useState("unknown");
   const [selectedKnownSpeakerId, setSelectedKnownSpeakerId] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [markerLabel, setMarkerLabel] = useState("");
 
@@ -247,20 +255,43 @@ export function ConversationDetailPage() {
     enabled: Boolean(organizationId) && hasPermission("known-speaker:read"),
   });
 
+  const orgUsersQuery = useQuery({
+    queryKey: ["organization-member-users", organizationId],
+    queryFn: () => listOrganizationMemberUsers(organizationId ?? ""),
+    enabled: Boolean(organizationId) && hasPermission("user:read-directory"),
+  });
+
+  // Registered users already linked to a participant here must not be
+  // offered again in the picker.
+  const linkedUserIds = new Set(
+    (participantsQuery.data ?? [])
+      .map((p) => p.user_id)
+      .filter((id): id is string => Boolean(id))
+  );
+  const availableOrgUsers = (orgUsersQuery.data ?? []).filter((u) => !linkedUserIds.has(u.id));
+  const canPickRegisteredUser = hasPermission("user:read-directory") && (orgUsersQuery.data?.length ?? 0) > 0;
+
+  const resetParticipantForm = () => {
+    setParticipantName("");
+    setSelectedKnownSpeakerId("");
+    setSelectedUserId("");
+    setParticipantSource("new");
+  };
+
   const addParticipantMutation = useMutation({
     mutationFn: () =>
       addParticipant(
         conversationId,
         {
-          display_name: participantName,
+          display_name: participantName || undefined,
           participant_type: participantType as never,
           known_speaker_id: selectedKnownSpeakerId || null,
+          user_id: selectedUserId || null,
         },
         csrfToken ?? ""
       ),
     onSuccess: () => {
-      setParticipantName("");
-      setSelectedKnownSpeakerId("");
+      resetParticipantForm();
       void queryClient.invalidateQueries({ queryKey: ["conversation-participants", conversationId] });
     },
   });
@@ -976,51 +1007,108 @@ export function ConversationDetailPage() {
               <p className={styles.sidebarEmpty}>Noch keine Teilnehmer</p>
             )}
             <ul className={styles.list}>
-              {participantsQuery.data?.map((participant) => (
-                <li key={participant.id} className={styles.listItem}>
-                  <span>
-                    {participant.display_name} ({participant.participant_type})
-                    {participant.known_speaker_id && (
-                      <span className={styles.knownSpeakerBadge} title="Bekannte Person">
-                        {" "}
-                        ★
-                      </span>
-                    )}
-                  </span>
-                  <span className={styles.listItemActions}>
-                    {!participant.known_speaker_id &&
-                      hasPermission("known-speaker:manage") &&
-                      hasPermission("conversation:manage-participants") && (
+              {participantsQuery.data?.map((participant) => {
+                const linkedUser = participant.user_id
+                  ? orgUsersQuery.data?.find((u) => u.id === participant.user_id)
+                  : undefined;
+                return (
+                  <li key={participant.id} className={styles.listItem}>
+                    <span>
+                      {participant.display_name} ({participant.participant_type})
+                      {participant.known_speaker_id && (
+                        <span className={styles.knownSpeakerBadge} title="Bekannte Person">
+                          {" "}
+                          ★
+                        </span>
+                      )}
+                      {participant.user_id && (
+                        <span className={styles.userBadge} title="Registrierte:r Benutzer:in">
+                          {" "}
+                          <IdCard size={14} aria-hidden="true" />
+                          {linkedUser && (
+                            <AvatarThumb
+                              assetKey={linkedUser.avatar_asset_key}
+                              label={linkedUser.display_name}
+                              size={16}
+                            />
+                          )}
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.listItemActions}>
+                      {!participant.known_speaker_id &&
+                        hasPermission("known-speaker:manage") &&
+                        hasPermission("conversation:manage-participants") && (
+                          <Button
+                            variant="tertiary"
+                            type="button"
+                            aria-label={`${participant.display_name} als bekannte Person merken`}
+                            title="Als bekannte Person merken"
+                            disabled={rememberParticipantMutation.isPending}
+                            onClick={() => rememberParticipantMutation.mutate(participant)}
+                          >
+                            <UserCheck size={16} aria-hidden="true" />
+                          </Button>
+                        )}
+                      {hasPermission("conversation:manage-participants") && (
                         <Button
                           variant="tertiary"
                           type="button"
-                          aria-label={`${participant.display_name} als bekannte Person merken`}
-                          title="Als bekannte Person merken"
-                          disabled={rememberParticipantMutation.isPending}
-                          onClick={() => rememberParticipantMutation.mutate(participant)}
+                          aria-label={`${participant.display_name} entfernen`}
+                          onClick={() => removeParticipantMutation.mutate(participant.id)}
                         >
-                          <UserCheck size={16} aria-hidden="true" />
+                          <Trash2 size={16} aria-hidden="true" />
                         </Button>
                       )}
-                    {hasPermission("conversation:manage-participants") && (
-                      <Button
-                        variant="tertiary"
-                        type="button"
-                        aria-label={`${participant.display_name} entfernen`}
-                        onClick={() => removeParticipantMutation.mutate(participant.id)}
-                      >
-                        <Trash2 size={16} aria-hidden="true" />
-                      </Button>
-                    )}
-                  </span>
-                </li>
-              ))}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
             {hasPermission("conversation:manage-participants") && (
               <details className={styles.sidebarDisclosure}>
                 <summary>Teilnehmer hinzufügen</summary>
                 <div className={styles.addRowStacked}>
-                {(knownSpeakersQuery.data ?? []).length > 0 && (
+                {canPickRegisteredUser && (
+                  <Select
+                    aria-label="Quelle"
+                    value={participantSource}
+                    onChange={(event) => {
+                      const value = event.target.value as "user" | "known" | "new";
+                      setParticipantSource(value);
+                      setParticipantName("");
+                      setSelectedKnownSpeakerId("");
+                      setSelectedUserId("");
+                    }}
+                  >
+                    <option value="user">Registrierte Person</option>
+                    <option value="known">Bekannte Person</option>
+                    <option value="new">Neue Person</option>
+                  </Select>
+                )}
+                {participantSource === "user" && canPickRegisteredUser && (
+                  <Select
+                    aria-label="Registrierte Person auswählen"
+                    value={selectedUserId}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setSelectedUserId(value);
+                      const picked = availableOrgUsers.find((u) => u.id === value);
+                      if (picked) {
+                        setParticipantName(picked.display_name);
+                        setParticipantType("staff");
+                      }
+                    }}
+                  >
+                    <option value="">— Bitte wählen —</option>
+                    {availableOrgUsers.map((orgUser) => (
+                      <option key={orgUser.id} value={orgUser.id}>
+                        {orgUser.display_name} (@{orgUser.username})
+                      </option>
+                    ))}
+                  </Select>
+                )}
+                {participantSource === "known" && (knownSpeakersQuery.data ?? []).length > 0 && (
                   <Select
                     aria-label="Bekannte Person auswählen"
                     value={selectedKnownSpeakerId}
@@ -1031,7 +1119,7 @@ export function ConversationDetailPage() {
                       if (known) setParticipantName(known.display_name);
                     }}
                   >
-                    <option value="">— Neue Person —</option>
+                    <option value="">— Bitte wählen —</option>
                     {knownSpeakersQuery.data?.map((known) => (
                       <option key={known.id} value={known.id}>
                         {known.display_name}
@@ -1043,10 +1131,7 @@ export function ConversationDetailPage() {
                   placeholder="Person A"
                   aria-label="Teilnehmername"
                   value={participantName}
-                  onChange={(event) => {
-                    setParticipantName(event.target.value);
-                    setSelectedKnownSpeakerId("");
-                  }}
+                  onChange={(event) => setParticipantName(event.target.value)}
                 />
                 <div className={styles.addRow}>
                   <Select
@@ -1064,12 +1149,20 @@ export function ConversationDetailPage() {
                   <Button
                     variant="secondary"
                     type="button"
-                    disabled={!participantName.trim()}
+                    disabled={!participantName.trim() && !selectedUserId}
                     onClick={() => addParticipantMutation.mutate()}
                   >
                     Hinzufügen
                   </Button>
                 </div>
+                {addParticipantMutation.isError && (
+                  <p role="alert" className={styles.formError}>
+                    Teilnehmer konnte nicht hinzugefügt werden:{" "}
+                    {addParticipantMutation.error instanceof Error
+                      ? addParticipantMutation.error.message
+                      : "Unbekannter Fehler"}
+                  </p>
+                )}
                 </div>
               </details>
             )}
