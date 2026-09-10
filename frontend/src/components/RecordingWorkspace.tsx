@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ApiError } from "../api/client";
 import { addMarker, finalizeRecording } from "../api/conversations";
 import { Button } from "../design-system/Button";
+import { useAuth } from "../auth/useAuth";
 import { enqueueRecording, isOfflineQueueSupported } from "../recording/offlineQueue";
 import { useLiveTranscript } from "../recording/useLiveTranscript";
 import {
@@ -37,6 +38,7 @@ export function RecordingWorkspace({
   csrfToken: string;
   onFinalized: () => void;
 }) {
+  const { user } = useAuth();
   const [consentGiven, setConsentGiven] = useState(false);
   const [audioSource, setAudioSource] = useState<AudioSource>("microphone");
   const [idempotencyKey] = useState(() => crypto.randomUUID());
@@ -140,10 +142,11 @@ export function RecordingWorkspace({
       // before there's a response to build one from. That's exactly the
       // case worth queuing for automatic retry rather than making the
       // user remember to manually retry once back online.
-      if (!(error instanceof ApiError) && isOfflineQueueSupported()) {
+      if (!(error instanceof ApiError) && isOfflineQueueSupported() && user) {
         try {
           await enqueueRecording({
             conversationId,
+            ownerUserId: user.userId,
             idempotencyKey,
             blob: recorder.blob,
             markers: recorder.markers,

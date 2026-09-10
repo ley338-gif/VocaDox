@@ -52,7 +52,6 @@ class CreateShareLinkRequest(BaseModel):
 class ShareLinkResponse(BaseModel):
     id: uuid.UUID
     conversation_id: uuid.UUID
-    token: str
     expires_at: datetime
     revoked_at: datetime | None
     created_by_user_id: uuid.UUID | None
@@ -61,6 +60,13 @@ class ShareLinkResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ShareLinkCreatedResponse(ShareLinkResponse):
+    """Creation-only response. The bearer token is never persisted in
+    recoverable form and never appears in subsequent list responses."""
+
+    token: str
 
 
 class PublicRecapResponse(BaseModel):

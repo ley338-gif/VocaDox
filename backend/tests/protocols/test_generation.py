@@ -12,6 +12,7 @@ import json
 import uuid
 from typing import Any
 
+import pytest
 from app.platform.version import APPLICATION_VERSION
 from app.processing.models import ProcessingRun, RunStatus, RunType
 from app.profiles.models import ModelProfilePurpose
@@ -23,7 +24,7 @@ from app.protocols.models import (
     ProtocolSection,
     ProtocolSource,
 )
-from app.protocols.service import run_protocol_generation
+from app.protocols.service import ProtocolGenerationValidationError, run_protocol_generation
 from app.providers.llm import LLMProvider, LLMResponse
 from app.transcription.models import Transcript
 from sqlalchemy import select
@@ -105,8 +106,7 @@ async def test_generation_persists_sections_items_and_resolves_real_sources(
 
     # The fake speech provider always produces exactly segments 0 and 1
     # (see app.providers.speech_to_text.FakeSpeechProvider) -- both real,
-    # cited here alongside a nonexistent sequence 99 to prove the
-    # fabrication guard.
+    # cited here with real sequences only.
     payload = {
         "sections": [
             {
@@ -126,10 +126,10 @@ async def test_generation_persists_sections_items_and_resolves_real_sources(
                         "text": "Bericht fertigstellen",
                         "responsible_label": "Dr. Müller",
                         "due_date": "nächste Woche",
-                        "source_segment_sequences": [1, 99],
+                        "source_segment_sequences": [1],
                     }
                 ],
-                "source_segment_sequences": [1, 99],
+                "source_segment_sequences": [1],
             },
         ]
     }
@@ -170,9 +170,7 @@ async def test_generation_persists_sections_items_and_resolves_real_sources(
         assert len(list(intro_sources.scalars().all())) == 1
         assert sections[0].start_ms is not None
 
-        # The action_items section cited [1, 99] -- only segment 1 is
-        # real, so exactly one ProtocolSource, never two, never one for
-        # the nonexistent sequence 99.
+        # The action_items section cites the real segment 1.
         action_sources = await session.execute(
             select(ProtocolSource).where(ProtocolSource.protocol_section_id == sections[1].id)
         )
@@ -186,12 +184,40 @@ async def test_generation_persists_sections_items_and_resolves_real_sources(
         assert items[0].responsible_label == "Dr. Müller"
         assert items[0].due_date == "nächste Woche"
 
-        # Same fabrication guard at the item level: [1, 99] -> exactly one
-        # real ProtocolSource, sequence 99 silently dropped.
+        # Same grounding requirement at the item level.
         item_sources = await session.execute(
             select(ProtocolSource).where(ProtocolSource.protocol_item_id == items[0].id)
         )
         assert len(list(item_sources.scalars().all())) == 1
+
+
+async def test_generation_rejects_nonexistent_or_empty_citations(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    headers = await login(client, "alice", "a very strong password 123")
+    conversation_id = await make_ready_conversation_with_transcript(
+        client, headers, seeded["org_a"], processing_env
+    )
+    _, sessionmaker, _queue, _storage = processing_env
+    payload = {
+        "sections": [
+            {
+                "section_type": "facts",
+                "title": "Unbelegt",
+                "summary": "Vom Modell erfunden.",
+                "items": [],
+                "source_segment_sequences": [99],
+            }
+        ]
+    }
+    with pytest.raises(ProtocolGenerationValidationError, match="nonexistent"):
+        async with sessionmaker() as session:
+            await _run_generation(session, uuid.UUID(conversation_id), payload)
+
+    payload["sections"][0]["source_segment_sequences"] = []
+    with pytest.raises(ProtocolGenerationValidationError, match="schema validation"):
+        async with sessionmaker() as session:
+            await _run_generation(session, uuid.UUID(conversation_id), payload)
 
 
 async def test_regeneration_creates_new_revision_never_mutates_prior(

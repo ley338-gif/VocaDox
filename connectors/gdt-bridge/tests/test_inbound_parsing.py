@@ -4,8 +4,15 @@ per ADR-0041) request-side Satzart number, and must degrade gracefully
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from gdt_bridge.gdt_codec import GdtCharset, decode_lines, encode_record
-from gdt_bridge.inbound import decode_gdt_file, extract_patient_fields
+from gdt_bridge.inbound import (
+    decode_gdt_file,
+    extract_patient_fields,
+    process_inbound_file,
+)
 
 
 def test_extract_patient_fields_from_a_full_record() -> None:
@@ -46,3 +53,20 @@ def test_decode_gdt_file_reads_declared_charset() -> None:
     record = encode_record("6301", [("3101", "Muller")], charset=GdtCharset.ISO8859_1)
     fields = decode_gdt_file(record.encode("cp1252"))
     assert dict(fields)["3101"] == "Muller"
+
+
+async def test_process_inbound_rejects_oversized_file_before_callbacks(tmp_path: Path) -> None:
+    path = tmp_path / "oversized.gdt"
+    path.write_bytes(b"x" * 17)
+
+    async def must_not_run(**kwargs):
+        raise AssertionError(f"callback unexpectedly called: {kwargs}")
+
+    with pytest.raises(ValueError, match="exceeds 16 bytes"):
+        await process_inbound_file(
+            path,
+            create_conversation=must_not_run,
+            create_participant=must_not_run,
+            record_state=must_not_run,
+            max_size_bytes=16,
+        )

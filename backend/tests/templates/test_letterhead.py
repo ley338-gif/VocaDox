@@ -36,7 +36,17 @@ async def test_upload_letterhead_logo_accepts_png_and_round_trips(client, seeded
     )
     assert get_resp.status_code == 200, get_resp.text
     assert get_resp.headers["content-type"].startswith("image/png")
-    assert get_resp.content == _TINY_PNG
+    assert get_resp.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+async def test_upload_rejects_truncated_image_with_valid_magic(client, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "carol", "yet another strong pw 789")
+    resp = await client.post(
+        "/api/v1/templates/letterhead-logo",
+        files={"file": ("broken.png", b"\x89PNG\r\n\x1a\ntruncated", "image/png")},
+        headers=headers,
+    )
+    assert resp.status_code == 422
 
 
 async def test_upload_letterhead_logo_rejects_non_image_content(client, seeded) -> None:  # noqa: ANN001
@@ -68,6 +78,16 @@ async def test_get_unknown_letterhead_logo_asset_key_is_404(client, seeded) -> N
         "/api/v1/templates/letterhead-logo/templates/letterhead/does-not-exist.png",
         headers=headers,
     )
+    assert resp.status_code == 404
+
+
+async def test_letterhead_endpoint_rejects_other_storage_namespaces(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    headers = await login(client, "carol", "yet another strong pw 789")
+    _app, _sessionmaker, _queue, storage = processing_env
+    avatar_key = await storage.save(_TINY_PNG, suffix=".png", namespace="identity/avatars")
+    resp = await client.get(f"/api/v1/templates/letterhead-logo/{avatar_key}", headers=headers)
     assert resp.status_code == 404
 
 

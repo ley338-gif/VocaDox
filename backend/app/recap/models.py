@@ -129,11 +129,13 @@ def _forbid_mutating_approved_recap_revision(
 class RecapShareLink(Base):
     """Post-GA P3-2: a time-limited, unauthenticated-access token for one
     conversation's currently-approved recap — e.g. to send to a patient
-    or referring practice without giving them a VocaDox login. `token` is
-    a cryptographically random, unguessable string
+    or referring practice without giving them a VocaDox login. The bearer
+    `token` is a cryptographically random, unguessable string
     (`secrets.token_urlsafe`, see app.recap.service.create_share_link) —
     never derived from or containing any identifying data, same posture
-    as `app.identity.sessions.SessionData`'s own session tokens.
+    as `app.identity.sessions.SessionData`'s own session tokens. Only its
+    SHA-256 digest is stored, so database/API-list access cannot recover a
+    reusable public URL; the raw token is returned exactly once on create.
 
     Access is validated purely by (token exists, not expired, not
     revoked) at request time — the recap CONTENT served is always the
@@ -147,7 +149,7 @@ class RecapShareLink(Base):
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -30,6 +30,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -132,6 +133,7 @@ _SAFE_PAYLOAD_KEYS = frozenset(
 
 DEFAULT_BACKOFF_SCHEDULE: tuple[float, ...] = (2.0, 10.0, 60.0, 300.0)
 DELIVERY_TIMEOUT_SECONDS = 10.0
+MAX_WEBHOOK_RESPONSE_BYTES = 64 * 1024
 
 # (url, body, headers) -> (status_code, response_text) -- the seam
 # `attempt_delivery`'s `http_post` param and `_default_http_post` share, so
@@ -446,9 +448,26 @@ async def attempt_delivery(
 async def _default_http_post(url: str, body: bytes, headers: dict[str, str]) -> tuple[int, str]:
     import httpx
 
-    async with httpx.AsyncClient(timeout=DELIVERY_TIMEOUT_SECONDS) as client:
-        response = await client.post(url, content=body, headers=headers)
-        return response.status_code, response.text
+    # Re-resolve immediately before every attempt. This narrows the gap
+    # between the admin-time check and delivery and catches targets whose
+    # DNS record later changed to an internal address. Redirect following
+    # remains disabled, and environment proxy settings are deliberately
+    # ignored so delivery cannot be rerouted through an ambient proxy.
+    # HTTP targets cannot be created through the API at all; the branch is
+    # retained solely for the existing local loopback integration harness.
+    if urlsplit(url).scheme == "https":
+        validate_webhook_url(url)
+    async with httpx.AsyncClient(
+        timeout=DELIVERY_TIMEOUT_SECONDS, follow_redirects=False, trust_env=False
+    ) as client:
+        async with client.stream("POST", url, content=body, headers=headers) as response:
+            captured = bytearray()
+            async for chunk in response.aiter_bytes():
+                remaining = MAX_WEBHOOK_RESPONSE_BYTES - len(captured)
+                if remaining <= 0:
+                    break
+                captured.extend(chunk[:remaining])
+            return response.status_code, captured.decode("utf-8", errors="replace")
 
 
 async def dispatch_with_retry(

@@ -55,6 +55,14 @@ IndexedDB surface; this feature needs exactly one object store with
 put/getAll/delete, which a ~40-line wrapper (`app/recording/
 offlineQueue.ts`) covers without a new dependency.
 
+**Phase 14 security addendum: each queued recording is bound to the immutable
+authenticated user ID at enqueue time.** Listing and automatic upload require an
+exact match with the current login. Records written by an older application
+version without an owner are quarantined instead of being attributed to whoever
+logs in next on the same browser profile. This is an authorization boundary, not
+encryption: managed-device storage encryption and separate OS/browser profiles
+remain required for sensitive offline recordings.
+
 **4. PWA icons are generated with Pillow, an existing backend
 dependency, not a new frontend one.** No image-editing tool exists in
 this environment and no icon design asset was supplied; a two-line
@@ -82,3 +90,6 @@ assets exist, requiring no code change (just replacing the PNG files).
   binary blobs (audio recordings) — IndexedDB, not `localStorage`
   (which has a much smaller quota and is synchronous/string-only), was
   the only viable native storage choice for this.
+- A legacy unowned record is intentionally not uploaded or displayed. Phase 14
+  does not silently delete it because an interrupted recording may be the only
+  remaining copy; explicit recovery/retention handling remains follow-up scope.

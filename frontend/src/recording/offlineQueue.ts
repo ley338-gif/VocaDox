@@ -24,6 +24,7 @@ export interface QueuedMarker {
 export interface QueuedRecording {
   id: string;
   conversationId: string;
+  ownerUserId: string;
   idempotencyKey: string;
   blob: Blob;
   markers: QueuedMarker[];
@@ -64,7 +65,7 @@ export async function enqueueRecording(
   return id;
 }
 
-export async function listQueuedRecordings(): Promise<QueuedRecording[]> {
+export async function listQueuedRecordings(ownerUserId: string): Promise<QueuedRecording[]> {
   const db = await openDb();
   const result = await new Promise<QueuedRecording[]>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readonly");
@@ -73,7 +74,16 @@ export async function listQueuedRecordings(): Promise<QueuedRecording[]> {
     request.onerror = () => reject(request.error);
   });
   db.close();
-  return result;
+  // Records created before owner binding intentionally remain quarantined
+  // instead of being exposed or uploaded under whoever logs in next.
+  return filterQueuedRecordingsForOwner(result, ownerUserId);
+}
+
+export function filterQueuedRecordingsForOwner(
+  entries: QueuedRecording[],
+  ownerUserId: string
+): QueuedRecording[] {
+  return entries.filter((entry) => entry.ownerUserId === ownerUserId);
 }
 
 export async function removeQueuedRecording(id: string): Promise<void> {
