@@ -111,3 +111,14 @@ the existing "no external services needed at test time" convention. The
 Alembic migration itself (`0002_identity_rbac.py`) is verified separately
 against a real Postgres — see `PHASE_1_VALIDATION_REPORT.md`'s
 Reproducibility section for the exact commands.
+
+### Real-infrastructure golden path
+
+CI also runs `tests/integration_real/test_golden_path.py` in a separate job
+against PostgreSQL 17.6 and Valkey 8.0. It uses deterministic local providers,
+but the application database, server-side login session, transactional outbox,
+queues and workers are real. The test covers conversation creation, synthetic
+media ingest, transcript processing, evidence-linked fact and protocol
+generation, deterministic document composition, approval and export. It is
+opt-in (`VOCADOX_REAL_INFRA_TESTS=1`) so the ordinary fast suite still requires
+no external services.

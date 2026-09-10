@@ -95,6 +95,62 @@ jobs:
       - name: alembic upgrade head again (proves the up/down/up cycle is clean)
         run: uv run --locked --extra dev alembic upgrade head
 
+  real-infrastructure-golden-path:
+    name: Golden path (real PostgreSQL + Valkey)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine3.22@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        env:
+          POSTGRES_USER: vocadox
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: vocadox
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vocadox"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      valkey:
+        image: valkey/valkey:8.0.2-alpine@sha256:752ba000a58bc8925d11ee863a39b5225617cd2cb3dbc9ec8ac65268b65ebb6d
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      VOCADOX_REAL_INFRA_TESTS: "1"
+      VOCADOX_DATABASE_URL: postgresql+asyncpg://vocadox:changeme@localhost:5432/vocadox
+      VOCADOX_VALKEY_URL: valkey://localhost:6379/0
+      VOCADOX_MEDIA_STORAGE_ROOT: /tmp/vocadox-golden-path-media
+      VOCADOX_UPLOAD_TEMP_DIR: /tmp/vocadox-golden-path-uploads
+      VOCADOX_SPEECH_PROVIDER: fake
+      VOCADOX_DIARIZATION_PROVIDER: fake
+      VOCADOX_LLM_PROVIDER: fake
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install locked dependencies
+        run: |
+          pip install "uv==$UV_VERSION"
+          uv sync --locked --extra dev
+
+      - name: Migrate real database
+        run: uv run --locked --extra dev alembic upgrade head
+
+      - name: Run evidence-chain golden path
+        run: uv run --locked --extra dev pytest -q tests/integration_real/test_golden_path.py
+
   gdt-bridge:
     name: GDT bridge (locked install / test)
     runs-on: ubuntu-latest
