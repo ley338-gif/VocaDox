@@ -4,6 +4,15 @@ participants/markers/notes, deletion, and audit events."""
 
 from __future__ import annotations
 
+from app.identity.service import (
+    add_user_to_group,
+    assign_role_to_group,
+    create_local_user,
+    get_or_create_group,
+    get_role_by_name,
+    update_user,
+)
+from app.organizations.models import OrganizationMembership
 from httpx import AsyncClient
 
 from tests.conversations.conftest import login, make_wav_bytes
@@ -554,3 +563,241 @@ async def test_conversation_stats_reflects_real_counts_scoped_to_own_org(
     bob_stats = await client.get("/api/v1/conversations/stats", headers=bob_headers)
     assert bob_stats.status_code == 200
     assert bob_stats.json()["counts"]["created"] == 1
+
+
+# -- Participants linked to a registered user (post-GA) --------------------
+
+
+async def _create_org_a_user(
+    app_env, *, username: str, display_name: str, is_active: bool = True
+) -> str:
+    """Creates a real, active-by-default `User` who is a member of org_a
+    (the same organization `seeded`'s alice belongs to) with the `User`
+    role -- the "another registered colleague" fixture every test below
+    needs, factored out so each test states only what's different about
+    it (e.g. `is_active=False`)."""
+    from app.organizations.models import Organization
+    from sqlalchemy import select
+
+    _, sessionmaker = app_env
+    async with sessionmaker() as session:
+        user_role = await get_role_by_name(session, "User")
+        assert user_role is not None
+        new_user = await create_local_user(
+            session, username=username, password="a fifth very strong pw 222",
+            display_name=display_name,
+        )
+        org_a = (
+            await session.execute(select(Organization).where(Organization.slug == "org-a"))
+        ).scalar_one()
+        group = await get_or_create_group(session, name=f"Org A Clinicians ({username})")
+        await assign_role_to_group(session, group_id=group.id, role_id=user_role.id)
+        await add_user_to_group(session, user_id=new_user.id, group_id=group.id)
+        session.add(OrganizationMembership(user_id=new_user.id, organization_id=org_a.id))
+        if not is_active:
+            await update_user(session, new_user, is_active=False)
+        await session.commit()
+        return str(new_user.id)
+
+
+async def test_add_participant_with_user_id_prefills_display_name(
+    client: AsyncClient, seeded: dict, app_env
+) -> None:
+    dana_id = await _create_org_a_user(app_env, username="dana", display_name="Dana")
+
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+
+    response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"user_id": dana_id, "participant_type": "staff"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["user_id"] == dana_id
+    assert body["display_name"] == "Dana"  # fell back to the linked user's own name
+
+
+async def test_add_participant_explicit_display_name_overrides_user_name(
+    client: AsyncClient, seeded: dict, app_env
+) -> None:
+    dana_id = await _create_org_a_user(app_env, username="dana2", display_name="Dana")
+
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+
+    response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"user_id": dana_id, "display_name": "Person A"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    # An explicit display_name always wins — real names are never required,
+    # even when a registered user is linked.
+    assert response.json()["display_name"] == "Person A"
+
+
+async def test_add_participant_user_from_other_organization_rejected(
+    client: AsyncClient, seeded: dict
+) -> None:
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+
+    # bob is a real, active user -- just a member of org_b, not org_a.
+    response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"user_id": seeded["bob_id"], "display_name": "Bob"},
+        headers=headers,
+    )
+    assert response.status_code == 422, response.text
+
+
+async def test_add_participant_nonexistent_user_rejected(
+    client: AsyncClient, seeded: dict
+) -> None:
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+
+    response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"user_id": "00000000-0000-0000-0000-000000000000", "display_name": "Ghost"},
+        headers=headers,
+    )
+    assert response.status_code == 404, response.text
+
+
+async def test_add_participant_inactive_user_rejected(
+    client: AsyncClient, seeded: dict, app_env
+) -> None:
+    eve_id = await _create_org_a_user(
+        app_env, username="eve", display_name="Eve", is_active=False
+    )
+
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+
+    response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"user_id": eve_id, "display_name": "Eve"},
+        headers=headers,
+    )
+    assert response.status_code == 404, response.text
+
+
+async def test_add_participant_same_user_twice_conflicts(
+    client: AsyncClient, seeded: dict, app_env
+) -> None:
+    dana_id = await _create_org_a_user(app_env, username="dana3", display_name="Dana")
+
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+
+    first = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"user_id": dana_id},
+        headers=headers,
+    )
+    assert first.status_code == 201, first.text
+
+    second = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"user_id": dana_id, "display_name": "Dana again"},
+        headers=headers,
+    )
+    assert second.status_code == 409, second.text
+
+
+async def test_add_participant_without_display_name_or_user_id_is_422(
+    client: AsyncClient, seeded: dict
+) -> None:
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+
+    response = await client.post(
+        f"/api/v1/conversations/{conv['id']}/participants",
+        json={"participant_type": "staff"},
+        headers=headers,
+    )
+    assert response.status_code == 422, response.text
+
+
+async def test_patch_participant_set_and_clear_user_id(
+    client: AsyncClient, seeded: dict, app_env
+) -> None:
+    dana_id = await _create_org_a_user(app_env, username="dana4", display_name="Dana")
+
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+    participant = (
+        await client.post(
+            f"/api/v1/conversations/{conv['id']}/participants",
+            json={"display_name": "Person A"},
+            headers=headers,
+        )
+    ).json()
+
+    set_response = await client.patch(
+        f"/api/v1/conversations/{conv['id']}/participants/{participant['id']}",
+        json={"user_id": dana_id},
+        headers=headers,
+    )
+    assert set_response.status_code == 200, set_response.text
+    assert set_response.json()["user_id"] == dana_id
+    # display_name was NOT overwritten by the PATCH-time link -- that
+    # auto-fill only happens on creation.
+    assert set_response.json()["display_name"] == "Person A"
+
+    clear_response = await client.patch(
+        f"/api/v1/conversations/{conv['id']}/participants/{participant['id']}",
+        json={"user_id": None},
+        headers=headers,
+    )
+    assert clear_response.status_code == 200, clear_response.text
+    assert clear_response.json()["user_id"] is None
+    assert clear_response.json()["display_name"] == "Person A"
+
+
+async def test_participant_survives_linked_user_removal_with_display_name_intact(
+    client: AsyncClient, seeded: dict, app_env
+) -> None:
+    """No user hard-delete endpoint exists anywhere in this codebase (users
+    are only ever deactivated -- see app.identity.router) so this
+    simulates the `ondelete="SET NULL"` FK behavior directly at the DB
+    layer, the same outcome a real Postgres deployment gives for free."""
+    import uuid as uuid_module
+
+    from app.conversations.models import ConversationParticipant
+    from app.identity.models import User
+
+    dana_id = await _create_org_a_user(app_env, username="dana5", display_name="Dana")
+
+    headers = await login(client, "alice", "a very strong password 123")
+    conv = await _create_conversation(client, headers, seeded["org_a"])
+    participant = (
+        await client.post(
+            f"/api/v1/conversations/{conv['id']}/participants",
+            json={"user_id": dana_id},
+            headers=headers,
+        )
+    ).json()
+    assert participant["display_name"] == "Dana"
+
+    _, sessionmaker = app_env
+    async with sessionmaker() as session:
+        db_user = await session.get(User, uuid_module.UUID(dana_id))
+        assert db_user is not None
+        await session.delete(db_user)
+        db_participant = await session.get(
+            ConversationParticipant, uuid_module.UUID(participant["id"])
+        )
+        assert db_participant is not None
+        db_participant.user_id = None  # what ondelete="SET NULL" does on real Postgres
+        await session.commit()
+
+    get_response = await client.get(
+        f"/api/v1/conversations/{conv['id']}/participants", headers=headers
+    )
+    refreshed = next(p for p in get_response.json() if p["id"] == participant["id"])
+    assert refreshed["user_id"] is None
+    assert refreshed["display_name"] == "Dana"  # historical value preserved
