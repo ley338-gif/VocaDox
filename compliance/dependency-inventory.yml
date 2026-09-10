@@ -445,6 +445,18 @@ dependencies:
     approval_status: approved
     notes: "license = MIT (npm registry, version 16.3.2). Dev/test-only dependency."
 
+  - name: "@playwright/test"
+    ecosystem: npm
+    version_constraint: "1.63.0"
+    license: Apache-2.0
+    license_source_url: https://registry.npmjs.org/@playwright/test/1.63.0
+    approval_status: approved
+    notes: >
+      license = Apache-2.0 (npm registry and bundled LICENSE, version
+      1.63.0). Dev/test-only dependency used for the focused Phase 14
+      Chromium golden path; neither the package nor browser binaries ship
+      in VocaDox runtime images.
+
   - name: openapi-typescript
     ecosystem: npm
     version_constraint: "^7.13.0"
