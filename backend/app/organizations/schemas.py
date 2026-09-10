@@ -35,3 +35,19 @@ class OrganizationMembershipResponse(BaseModel):
 
 class AddMemberRequest(BaseModel):
     user_id: uuid.UUID
+
+
+class OrganizationMemberUserResponse(BaseModel):
+    """Deliberately minimal -- backs the conversation-participant "pick a
+    registered user" directory (`GET /organizations/{id}/member-users`,
+    gated by `user:read-directory`). No e-mail, auth-provider, or group
+    data: just enough to show a name + avatar and pass an id back."""
+
+    id: uuid.UUID
+    username: str
+    display_name: str
+    first_name: str | None
+    last_name: str | None
+    avatar_asset_key: str | None
+
+    model_config = {"from_attributes": True}

@@ -31,6 +31,7 @@ from app.conversations.models import Conversation
 from app.identity.models import User, UserGroupMembership
 from app.identity.rbac import get_user_permissions
 from app.organizations.models import OrganizationMembership
+from app.organizations.service import user_can_access_organization
 
 CROSS_TEAM_PERMISSION = "conversation:read-cross-team"
 
@@ -117,11 +118,13 @@ async def authorize_conversation_access(
 async def assert_organization_member_or_admin(
     session: AsyncSession, *, user: User, organization_id: uuid.UUID
 ) -> None:
-    permissions = await get_user_permissions(session, user.id)
-    if "system:admin" in permissions:
-        return
-    org_ids = await _user_organization_ids(session, user.id)
-    if organization_id not in org_ids:
+    """Delegates to `app.organizations.service.user_can_access_organization`
+    (member-or-system:admin) rather than re-implementing the same check —
+    see that function's docstring for why the dependency runs this
+    direction and not the other."""
+    if not await user_can_access_organization(
+        session, user_id=user.id, organization_id=organization_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="not a member of the target organization",

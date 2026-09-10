@@ -31,7 +31,15 @@ from app.conversations.schemas import (
     ParticipantCreateRequest,
     ParticipantResponse,
 )
-from app.conversations.service import add_participant, create_conversation, list_conversations
+from app.conversations.service import (
+    ParticipantUserAlreadyLinkedError,
+    ParticipantUserNotFoundError,
+    ParticipantUserNotInOrganizationError,
+    add_participant,
+    create_conversation,
+    list_conversations,
+    resolve_participant_user,
+)
 from app.core.storage import get_storage_provider
 from app.documents.api_schemas import ComposeRequest, DocumentResponse, DocumentRevisionResponse
 from app.documents.export_service import render_document_export
@@ -492,26 +500,60 @@ async def api_create_participant(
     `POST /conversations/{id}/participants` route attributes a
     participant to a user; a connector (e.g. the GDT bridge, ADR-0041)
     can add a PATIENT participant purely from data pulled out of an
-    inbound file, with no VocaDox user in the loop."""
-    await _get_scoped_conversation(db, account, conversation_id)
+    inbound file, with no VocaDox user in the loop.
+
+    `user_id` (post-GA) is still accepted, though: a connector that DOES
+    know which registered VocaDox user a participant corresponds to (e.g.
+    a referring staff member) may link it -- validated through the exact
+    same `resolve_participant_user` used by the human-facing route, so
+    this surface can't bypass the "same org, active, not already linked"
+    checks that route enforces."""
+    conversation = await _get_scoped_conversation(db, account, conversation_id)
+    linked_user = None
+    if payload.user_id is not None:
+        try:
+            linked_user = await resolve_participant_user(
+                db, conversation=conversation, user_id=payload.user_id
+            )
+        except ParticipantUserNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="user not found"
+            ) from exc
+        except ParticipantUserNotInOrganizationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="user is not a member of the conversation's organization",
+            ) from exc
+        except ParticipantUserAlreadyLinkedError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="user is already a participant"
+            ) from exc
+    display_name = payload.display_name
+    if display_name is None:
+        assert linked_user is not None
+        display_name = linked_user.display_name or linked_user.username
     participant = await add_participant(
         db,
         conversation_id=conversation_id,
-        display_name=payload.display_name,
+        display_name=display_name,
         participant_type=ParticipantType(payload.participant_type),
         external_reference=payload.external_reference,
         notes=payload.notes,
         known_speaker_id=payload.known_speaker_id,
+        user_id=payload.user_id,
     )
+    event_metadata: dict[str, object] = {
+        "conversation_id": str(conversation_id),
+        "participant_id": str(participant.id),
+        "via": "service_account",
+    }
+    if payload.user_id is not None:
+        event_metadata["linked_user_id"] = str(payload.user_id)
     await record_event(
         db,
         event_type="conversation.participant_added",
         user_id=account.owner_user_id,
-        event_metadata={
-            "conversation_id": str(conversation_id),
-            "participant_id": str(participant.id),
-            "via": "service_account",
-        },
+        event_metadata=event_metadata,
     )
     await db.commit()
     return ParticipantResponse.model_validate(participant)

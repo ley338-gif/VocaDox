@@ -22,6 +22,7 @@ from app.conversations.authz import (
     user_group_ids,
 )
 from app.conversations.models import (
+    Conversation,
     ConversationMarker,
     ConversationNote,
     ConversationParticipant,
@@ -45,6 +46,9 @@ from app.conversations.schemas import (
     ParticipantUpdateRequest,
 )
 from app.conversations.service import (
+    ParticipantUserAlreadyLinkedError,
+    ParticipantUserNotFoundError,
+    ParticipantUserNotInOrganizationError,
     add_marker,
     add_note,
     add_participant,
@@ -52,6 +56,7 @@ from app.conversations.service import (
     conversation_status_counts,
     create_conversation,
     list_conversations,
+    resolve_participant_user,
     soft_delete_conversation,
 )
 from app.conversations.state_machine import InvalidTransitionError
@@ -702,6 +707,39 @@ async def list_participants_endpoint(
     return [ParticipantResponse.model_validate(p) for p in result.scalars().all()]
 
 
+async def _resolve_participant_user(
+    db: AsyncSession,
+    *,
+    conversation: Conversation,
+    user_id: uuid.UUID,
+    exclude_participant_id: uuid.UUID | None = None,
+) -> User:
+    """Thin HTTPException wrapper around
+    `app.conversations.service.resolve_participant_user` -- shared by the
+    POST and PATCH participant endpoints below so they validate an
+    incoming `user_id` identically."""
+    try:
+        return await resolve_participant_user(
+            db,
+            conversation=conversation,
+            user_id=user_id,
+            exclude_participant_id=exclude_participant_id,
+        )
+    except ParticipantUserNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="user not found"
+        ) from exc
+    except ParticipantUserNotInOrganizationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="user is not a member of the conversation's organization",
+        ) from exc
+    except ParticipantUserAlreadyLinkedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="user is already a participant"
+        ) from exc
+
+
 @router.post(
     "/{conversation_id}/participants",
     response_model=ParticipantResponse,
@@ -714,30 +752,49 @@ async def create_participant_endpoint(
     db: AsyncSession = Depends(get_session),
     _csrf: None = Depends(require_csrf),
 ) -> ParticipantResponse:
-    await authorize_conversation_access(
+    conversation = await authorize_conversation_access(
         db,
         user=user,
         conversation_id=conversation_id,
         permission_code="conversation:manage-participants",
     )
+    linked_user: User | None = None
+    if payload.user_id is not None:
+        linked_user = await _resolve_participant_user(
+            db, conversation=conversation, user_id=payload.user_id
+        )
+    # display_name is optional on the request (see ParticipantCreateRequest's
+    # model_validator, which guarantees user_id is set whenever it's None)
+    # but never optional on the row -- fall back to the linked user's own
+    # name. An explicitly-supplied display_name always wins, so "Person A"
+    # style free-text names stay possible even with a linked user (spec:
+    # real names are never required).
+    display_name = payload.display_name
+    if display_name is None:
+        assert linked_user is not None
+        display_name = linked_user.display_name or linked_user.username
     participant = await add_participant(
         db,
         conversation_id=conversation_id,
-        display_name=payload.display_name,
+        display_name=display_name,
         participant_type=payload.participant_type,
         external_reference=payload.external_reference,
         notes=payload.notes,
         known_speaker_id=payload.known_speaker_id,
+        user_id=payload.user_id,
     )
+    event_metadata: dict[str, object] = {
+        "conversation_id": str(conversation_id),
+        "participant_id": str(participant.id),
+    }
+    if payload.user_id is not None:
+        event_metadata["linked_user_id"] = str(payload.user_id)
     await record_event(
         db,
         event_type="conversation.participant_added",
         user_id=user.id,
         username=user.username,
-        event_metadata={
-            "conversation_id": str(conversation_id),
-            "participant_id": str(participant.id),
-        },
+        event_metadata=event_metadata,
     )
     await db.commit()
     return ParticipantResponse.model_validate(participant)
@@ -769,7 +826,7 @@ async def update_participant_endpoint(
     db: AsyncSession = Depends(get_session),
     _csrf: None = Depends(require_csrf),
 ) -> ParticipantResponse:
-    await authorize_conversation_access(
+    conversation = await authorize_conversation_access(
         db,
         user=user,
         conversation_id=conversation_id,
@@ -777,20 +834,30 @@ async def update_participant_endpoint(
     )
     participant = await _get_participant_or_404(db, conversation_id, participant_id)
     changed = payload.model_dump(exclude_unset=True)
+    if "user_id" in changed and changed["user_id"] is not None:
+        await _resolve_participant_user(
+            db,
+            conversation=conversation,
+            user_id=changed["user_id"],
+            exclude_participant_id=participant_id,
+        )
     for field, value in changed.items():
         if hasattr(value, "value"):
             value = value.value
         setattr(participant, field, value)
     await db.flush()
+    event_metadata: dict[str, object] = {
+        "conversation_id": str(conversation_id),
+        "participant_id": str(participant_id),
+    }
+    if "user_id" in changed and changed["user_id"] is not None:
+        event_metadata["linked_user_id"] = str(changed["user_id"])
     await record_event(
         db,
         event_type="conversation.participant_updated",
         user_id=user.id,
         username=user.username,
-        event_metadata={
-            "conversation_id": str(conversation_id),
-            "participant_id": str(participant_id),
-        },
+        event_metadata=event_metadata,
     )
     await db.commit()
     await db.refresh(participant)
