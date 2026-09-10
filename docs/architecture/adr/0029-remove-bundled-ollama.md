@@ -8,7 +8,7 @@ Accepted (2026-09-05). Amends
 
 [ADR-0024](0024-llm-provider-selection.md) chose Ollama as VocaDox's LLM
 runtime for fact extraction and shipped it as a bundled `ollama` service
-in `deploy/docker-compose.yml`, pinned to `ollama/ollama:0.33.2`. A Trivy
+in `deploy/compose.dev.yml`, pinned to `ollama/ollama:0.33.2`. A Trivy
 scan at the time found one CRITICAL vulnerability in that image,
 **CVE-2026-56854** (an SSH-auth-bypass in `golang.org/x/crypto/ssh`, a Go
 crypto library vendored into the Ollama binary). `ollama serve` never
@@ -47,7 +47,7 @@ GA:
 ## Decision
 
 **Option 2.** The product owner chose to drop the bundled `ollama`
-Compose service from `deploy/docker-compose.yml` entirely, removing the
+Compose service from `deploy/compose.dev.yml` entirely, removing the
 vulnerable component from VocaDox's own shipped container footprint
 rather than continuing to accept risk on it. VocaDox now always talks to
 an Ollama instance the deploying admin runs and manages themselves,
@@ -65,7 +65,7 @@ diarization model.
 
 Concretely, this change:
 - Removes the `ollama` service and `vocadox_ollama_data` volume from
-  `deploy/docker-compose.yml`.
+  `deploy/compose.dev.yml`.
 - Removes the `ollama/ollama` entry from
   `compliance/container-inventory.yml` (it is no longer part of VocaDox's
   own shipped container set — nothing left to track or accept risk on).

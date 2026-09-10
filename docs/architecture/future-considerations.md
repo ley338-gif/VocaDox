@@ -497,7 +497,7 @@ to this list rather than building it opportunistically.
 
 - **Postgres bumped 16.6 -> 17.6 mid-phase** after a real
   backup/restore test surfaced a pg_dump/pg_restore client/server
-  version mismatch (see `deploy/docker-compose.yml`'s comment and
+  version mismatch (see `deploy/compose.dev.yml`'s comment and
   `compliance/container-inventory.yml`). The chosen fix (match the
   server to what the base image's `postgresql-client` package already
   provides) is simple but couples the server version to Debian trixie's

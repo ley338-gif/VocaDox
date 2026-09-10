@@ -305,7 +305,7 @@ theoretical): the first media upload against the freshly built image
 backend container runs as a non-root user (`vocadox`) but `/app` (built
 as root) had no writable `data/` directory. Fixed in `backend/Dockerfile`
 (pre-create + chown the directory before `USER vocadox`) and
-`deploy/docker-compose.yml` (added a named `vocadox_backend_data` volume
+`deploy/compose.dev.yml` (added a named `vocadox_backend_data` volume
 so media survives container recreation, not just in-place restart).
 Re-verified after the fix: full flow above passed clean on a rebuilt
 image.

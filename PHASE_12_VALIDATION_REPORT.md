@@ -30,7 +30,7 @@ The single blocking item originally identified was **CVE-2026-56854** (a
 CRITICAL-severity, `golang.org/x/crypto/ssh` source-address-restriction-
 bypass finding), present in the vendored, statically-linked
 `ollama/ollama:0.33.2` container image that Phase 4 added to
-`deploy/docker-compose.yml`. This finding was disclosed (not hidden) and
+`deploy/compose.dev.yml`. This finding was disclosed (not hidden) and
 **accepted by the product owner on 2026-08-18** during Phase 4, and every
 phase since (5 through 11) carried it forward unchanged as an open,
 accepted risk rather than a blocker to that phase's own narrower merge
@@ -57,7 +57,7 @@ re-validated end-to-end, and merged — see
 `docs/architecture/adr/0029-remove-bundled-ollama.md` for the full
 decision record. Concretely:
 
-- `deploy/docker-compose.yml`'s `ollama` service and `vocadox_ollama_data`
+- `deploy/compose.dev.yml`'s `ollama` service and `vocadox_ollama_data`
   volume are removed. VocaDox's own Compose stack no longer builds,
   starts, or ships this container at all.
 - `compliance/container-inventory.yml`'s `ollama/ollama` entry is removed
@@ -303,7 +303,7 @@ claimed.
 `app.cli.retention_cleanup` / `POST /admin/retention-cleanup/run` /
 `docker compose run --rm retention-cleanup` correctly *enforce* active
 `RetentionPolicy` rows when invoked — this is real, tested code, not a
-stub. But **nothing in `deploy/docker-compose.yml` or anywhere else in
+stub. But **nothing in `deploy/compose.dev.yml` or anywhere else in
 this codebase schedules that invocation automatically**. Grepped the
 entire repo for `cron`/`scheduler`/`APScheduler`/`celery beat` — the only
 hits are prose explicitly stating the "externally scheduled" design
@@ -607,7 +607,7 @@ leg against a real external Ollama instance**, since that is exactly the
 part of the pipeline this GA-blocker fix changes:
 
 1. Brought up the full VocaDox stack fresh from the now-Ollama-less
-   `deploy/docker-compose.yml`: `docker compose down -v` → `docker
+   `deploy/compose.dev.yml`: `docker compose down -v` → `docker
    compose build --no-cache` → `docker compose up -d`. Confirmed no
    `ollama` service/container/volume exists anywhere in the running
    stack (`docker compose config -q` and `docker ps` both confirm).
@@ -846,7 +846,7 @@ resolving the question unilaterally:
 **The product owner chose option 2.** This has now been implemented,
 tested end-to-end, and merged:
 
-- `deploy/docker-compose.yml`'s `ollama` service and its
+- `deploy/compose.dev.yml`'s `ollama` service and its
   `vocadox_ollama_data` volume are removed.
 - `compliance/container-inventory.yml`'s `ollama/ollama` entry is
   removed — the vulnerable image is no longer part of VocaDox's own

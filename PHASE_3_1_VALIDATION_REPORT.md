@@ -27,7 +27,7 @@ was gathered instead.
 
 ## Architecture Changes
 
-1. **One-shot `migrate` Compose service** (`deploy/docker-compose.yml`):
+1. **One-shot `migrate` Compose service** (`deploy/compose.dev.yml`):
    runs `alembic upgrade head` once per `docker compose up`, before
    `backend`/`worker-speech`/`worker-diarization` start
    (`condition: service_completed_successfully`). Replaces "an admin

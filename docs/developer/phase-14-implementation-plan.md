@@ -15,7 +15,7 @@ merely because they appear in this plan.
 - Product documentation and package metadata still described Phase 12 or the
   Phase 0 scaffold and used version `0.0.1`, despite substantial Phase 13+
   work. No release tags exist.
-- The root Compose file includes `deploy/docker-compose.yml`, which is
+- The root Compose file includes `deploy/compose.dev.yml`, which is
   explicitly a development stack. PostgreSQL, Valkey, backend, and the Vite
   frontend publish host ports; the documented default database password and
   insecure development cookie setting make it unsuitable for production.
