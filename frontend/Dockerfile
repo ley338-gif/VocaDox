@@ -31,7 +31,7 @@ RUN npm install -g "npm@${NPM_VERSION}" && npm cache clean --force
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# --- dev target: used ONLY by deploy/docker-compose.yml for local development.
+# --- dev target: used ONLY by deploy/compose.dev.yml for local development.
 # Runs the Vite dev server. Never used as the production runtime. ---
 FROM base AS dev
 COPY . .

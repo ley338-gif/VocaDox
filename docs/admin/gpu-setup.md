@@ -11,7 +11,7 @@ usable CPU-only.
 
 1. Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
    on the Docker host.
-2. In `deploy/docker-compose.yml`, uncomment the `deploy.resources.reservations.devices`
+2. In `deploy/compose.dev.yml`, uncomment the `deploy.resources.reservations.devices`
    block under `worker-speech` and/or `worker-diarization`:
    ```yaml
    deploy:

@@ -9,7 +9,7 @@ extraction model — see
 provider/model evaluation.
 
 VocaDox does **not** bundle an `ollama` container in
-`deploy/docker-compose.yml`. Point it at your own **admin-managed,
+`deploy/compose.dev.yml`. Point it at your own **admin-managed,
 external Ollama instance** instead — anywhere reachable from the
 `worker-extraction` service (the same host, another host on your network,
 or a container you run and manage yourself outside VocaDox's Compose

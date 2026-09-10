@@ -18,7 +18,7 @@ Postgres (healthy) -> migrate (alembic upgrade head, one-shot) -> backend/worker
 
 Every step after "Postgres healthy" is enforced by `depends_on:
 condition: service_completed_successfully` in
-`deploy/docker-compose.yml` — `backend`/`worker-speech`/
+`deploy/compose.dev.yml` — `backend`/`worker-speech`/
 `worker-diarization` cannot start until `migrate` has exited 0. You do
 not need to remember to run migrations yourself; you do still need to run
 `bootstrap_admin` yourself (creating the first admin is a deliberate,

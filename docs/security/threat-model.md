@@ -102,7 +102,7 @@ Phase 0 is now the actual state:
   `::test_logout_with_wrong_csrf_token_is_rejected`).
 - **Session cookie**: `httponly`, `SameSite=Lax`, and `Secure` by default
   (`VOCADOX_SESSION_COOKIE_SECURE`, disabled only in the plain-HTTP local
-  dev compose stack — see `deploy/docker-compose.yml`'s comment on that
+  dev compose stack — see `deploy/compose.dev.yml`'s comment on that
   variable). Session tokens are opaque (`secrets.token_urlsafe(32)`),
   carry no user data, and are invalidated server-side immediately on
   logout (`SessionStore.delete`) — verified end-to-end

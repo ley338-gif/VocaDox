@@ -75,7 +75,7 @@ docker compose up -d
 
 This runs the **development stack** from the repo root (a root
 `docker-compose.yml` wraps
-`deploy/docker-compose.yml` — see that file's header comment) and starts,
+`deploy/compose.dev.yml` — see that file's header comment) and starts,
 in dependency order: Postgres and Valkey, a one-shot `migrate` service
 (`alembic upgrade head` — deterministic, runs before anything else that
 touches the schema; see
@@ -89,6 +89,11 @@ frontend dev server (Vite on `:5173`). Verify:
 curl http://localhost:8000/health/live
 curl http://localhost:8000/health/ready
 ```
+
+For an on-premise production deployment, do not reuse this development stack.
+Use the TLS-only public topology, mandatory secret/path checks, and fail-closed
+application validation documented in
+[`docs/operations/production-deployment.md`](docs/operations/production-deployment.md).
 
 Then create the first administrator (see "Bootstrapping the first admin
 user" below) and, if you want real speech/diarization instead of the
@@ -216,7 +221,7 @@ backend/            FastAPI app, one package per domain under app/
 frontend/            React + Vite app, design system under src/design-system/
 compliance/           License policy + dependency/container/model inventories
 docs/                 Architecture, security, licenses, and other documentation
-deploy/               docker-compose.yml + .env.example
+deploy/               separate development/production Compose + env templates
 .github/workflows/    CI
 ```
 

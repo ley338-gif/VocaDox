@@ -1,5 +1,5 @@
 """Worker process entrypoint: `python -m app.workers.runner --role speech`
-or `--role diarization`. This is what `deploy/docker-compose.yml`'s
+or `--role diarization`. This is what `deploy/compose.dev.yml`'s
 `worker-speech`/`worker-diarization` containers run.
 """
 

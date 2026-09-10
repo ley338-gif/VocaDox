@@ -436,7 +436,7 @@ compliance regenerations above):
 Validated for real against `docker compose` (excluding `ollama`/
 `model-manager`, matching Phase 4/5's own fresh-install validation scope —
 extraction/speech/diarization default to `fake` providers per
-`deploy/docker-compose.yml`'s `VOCADOX_*_PROVIDER:-fake` defaults):
+`deploy/compose.dev.yml`'s `VOCADOX_*_PROVIDER:-fake` defaults):
 
 - `docker compose down -v` (clean slate) → `docker compose build migrate
   backend worker-speech worker-diarization worker-extraction frontend` →

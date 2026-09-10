@@ -1,6 +1,6 @@
 """`python -m app.cli.model_manager` — the single administrator-facing
 entrypoint for installing AI model profiles, exposed as the `model-manager`
-Compose service (see deploy/docker-compose.yml).
+Compose service (see deploy/compose.dev.yml).
 
 Phase 3.1 fix: the documented Phase-3 command (`docker compose run --rm
 -e VOCADOX_HUGGINGFACE_TOKEN=... worker-diarization python -m
@@ -15,7 +15,7 @@ with "the following arguments are required: --role". Administrators
 should never need to know Docker ENTRYPOINT semantics to install a model.
 
 This module is the `model-manager` service's own `entrypoint:` (see
-deploy/docker-compose.yml), so `docker compose run --rm model-manager
+deploy/compose.dev.yml), so `docker compose run --rm model-manager
 <args>` passes `<args>` straight to this parser — no entrypoint override,
 no worker-runner argument collision:
 

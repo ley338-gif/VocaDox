@@ -3,7 +3,7 @@ corresponding pipeline stage (see app.processing.orchestrator), applies
 the retry policy on failure, and chains the next stage on success. Never
 runs inside an HTTP request — this is what `python -m
 app.workers.runner` starts as its own process/container (see
-deploy/docker-compose.yml's `worker-speech`/`worker-diarization`
+deploy/compose.dev.yml's `worker-speech`/`worker-diarization`
 services).
 
 Concurrency: this loop processes exactly one job at a time per process

@@ -26,7 +26,7 @@ additional worker *containers*, not raising this number.
 ## Scaling
 
 Add more `worker-speech`/`worker-diarization` replicas in
-`deploy/docker-compose.yml` (or your orchestrator) to increase throughput
+`deploy/compose.dev.yml` (or your orchestrator) to increase throughput
 — jobs are claimed via `dequeue_next` against the shared Valkey queues, so
 multiple worker processes safely compete for work without double-processing
 (each job is claimed by exactly one worker via its `QUEUED -> RUNNING`

@@ -23,7 +23,7 @@ runtime network dependency beyond the compose network itself.
    images — a running deployment does not re-run these), and download AI
    model weights.
 2. **Runtime** (after install, needs no internet at all): every
-   container in `deploy/docker-compose.yml` communicates only with other
+   container in `deploy/compose.dev.yml` communicates only with other
    containers on the compose network (`postgres`, `valkey`) or, for the
    `frontend`/`backend` services, with browsers/clients reaching them
    over whatever network the operator exposes — none of them make
