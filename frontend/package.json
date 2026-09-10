@@ -2,6 +2,11 @@
   "name": "vocadox-frontend",
   "private": true,
   "version": "0.14.0",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=22.0.0 <25.0.0",
+    "npm": ">=11.0.0 <12.0.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -34,6 +39,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.12",
     "jsdom": "^25.0.1",
+    "license-checker": "25.0.1",
     "openapi-typescript": "^7.4.1",
     "typescript": "^5.6.3",
     "vite": "^7.3.2",

@@ -27,11 +27,11 @@ usable CPU-only.
    `app/providers/device.py` and fall back to CPU if none is found).
 4. `backend/worker.Dockerfile` installs **CPU-only** torch wheels by
    default (smaller image, no CUDA runtime baked in). For real GPU
-   inference, rebuild with CUDA-enabled torch — swap the
-   `--extra-index-url` in the Dockerfile's `pip install ... ".[ai]"` step
-   to the matching CUDA wheel index (e.g.
-   `https://download.pytorch.org/whl/cu121`) for your driver/CUDA
-   version, or install it separately after the base image build.
+   inference, create a reviewed CUDA worker variant: change the
+   `pytorch-cpu` source in `backend/pyproject.toml` to the matching official
+   CUDA wheel index for your driver, regenerate `backend/uv.lock`, and build
+   the worker from that committed pair. Do not replace packages ad hoc after
+   the build; that would bypass the reproducible lock and compliance checks.
 
 ## Verifying GPU is actually used
 

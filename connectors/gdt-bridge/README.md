@@ -44,10 +44,10 @@ The Service Account needs, at minimum, the `conversation:create` and
 ## Running
 
 ```bash
-pip install -e .
-python -m gdt_bridge.cli validate-config --config gdt_bridge.toml
-python -m gdt_bridge.cli test-connection --config gdt_bridge.toml
-python -m gdt_bridge.cli run --config gdt_bridge.toml
+uv sync --locked
+uv run --locked python -m gdt_bridge.cli validate-config --config gdt_bridge.toml
+uv run --locked python -m gdt_bridge.cli test-connection --config gdt_bridge.toml
+uv run --locked python -m gdt_bridge.cli run --config gdt_bridge.toml
 ```
 
 Or via Docker: `docker build -t gdt-bridge . && docker run --env-file .env -v ./gdt_import:/app/gdt_import -v ./gdt_export:/app/gdt_export gdt-bridge`.
@@ -55,8 +55,8 @@ Or via Docker: `docker build -t gdt-bridge . && docker run --env-file .env -v ./
 ## Tests
 
 ```bash
-pip install -e ".[dev]"
-pytest tests/
+uv sync --locked --extra dev
+uv run --locked --extra dev pytest tests/
 ```
 
 No live VocaDox instance is required — the codec and inbound-parsing

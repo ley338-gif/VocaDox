@@ -193,7 +193,7 @@ def install(profile: ModelProfile, *, model_volume_root: Path, token: str | None
     except ImportError:
         print(
             "ERROR: huggingface_hub is not installed in this environment "
-            "(install the backend's [ai] extra: pip install -e 'backend/[ai]').",
+            "(install the backend's [ai] extra: uv sync --locked --extra ai).",
             file=sys.stderr,
         )
         return 1

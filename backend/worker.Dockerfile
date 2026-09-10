@@ -15,6 +15,11 @@
 FROM python:3.11-slim-trixie@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7
 
 WORKDIR /app
+ENV PATH="/app/.venv/bin:${PATH}"
+ARG PIP_VERSION=26.2.1
+ARG SETUPTOOLS_VERSION=84.0.0
+ARG WHEEL_VERSION=0.46.3
+ARG UV_VERSION=0.12.12
 
 RUN apt-get update \
     && apt-get upgrade -y \
@@ -101,21 +106,21 @@ RUN curl -sL -o /tmp/ffmpeg-shared.tar.xz "$FFMPEG_SHARED_URL" \
     && apt-get purge -y xz-utils \
     && apt-get autoremove -y
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+RUN pip install --no-cache-dir \
+      "pip==${PIP_VERSION}" "setuptools==${SETUPTOOLS_VERSION}" "wheel==${WHEEL_VERSION}" \
     && rm -rf /usr/local/lib/python3.11/ensurepip/_bundled
 
-COPY pyproject.toml ./
+COPY pyproject.toml uv.lock ./
 COPY app ./app
 COPY alembic.ini ./
 COPY alembic ./alembic
 
-# CPU-only torch/torchaudio wheels by default (smaller image, no CUDA
-# runtime baked in) — an NVIDIA GPU still works at runtime via the host's
-# NVIDIA Container Toolkit + a CUDA-enabled torch install; see
-# docs/operations/gpu-runtime.md for the explicit swap-in instructions.
-# This keeps the default worker image usable on CPU-only hosts too (spec:
-# "CPU fallback where practical").
-RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu ".[ai]"
+# CPU-only PyTorch sources are part of pyproject.toml and uv.lock, so local,
+# CI, compliance, and image installs consume the same hashed artifacts.
+RUN pip install --no-cache-dir "uv==${UV_VERSION}" \
+    && uv sync --locked --no-dev --extra ai --no-editable \
+    && pip uninstall -y uv \
+    && rm -rf /root/.cache/uv
 
 RUN useradd --create-home --uid 10001 vocadox
 RUN mkdir -p /app/data/models /app/data/media /app/data/tmp-uploads \
