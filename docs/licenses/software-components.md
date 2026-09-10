@@ -92,6 +92,8 @@ image decisions this table reflects.
 | pip-audit | Apache-2.0 | Python vulnerability scanning |
 | license-checker | BSD-3-Clause | Node license inventory generation |
 | Trivy (aquasec/trivy image) | Apache-2.0 | Container SBOM + vulnerability scanning |
+| GitHub CodeQL Action *(CI only)* | MIT | Python and JavaScript/TypeScript static security analysis |
+| actions/upload-artifact *(CI only)* | MIT | Retention of generated CycloneDX SBOM evidence |
 
 ## AI models
 
