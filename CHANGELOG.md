@@ -15,6 +15,11 @@ release.
 - Began Phase 14 production-readiness work.
 - Reconciled visible project status and version metadata with the current
   repository state.
+- Added committed Python lockfiles for the backend and GDT bridge, made CI
+  and container builds consume locked dependency trees, and removed npm's
+  permissive install fallbacks.
+- Pinned the frontend build-tool versions and applied current Alpine security
+  package revisions in both frontend image stages.
 
 ### Security
 

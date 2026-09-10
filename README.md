@@ -122,12 +122,14 @@ docker build --target runtime -t vocadox-frontend-prod ./frontend
 
 ```sh
 cd backend
-python -m venv .venv && source .venv/Scripts/activate   # or .venv/bin/activate on macOS/Linux
-pip install -e ".[dev]"
-uvicorn app.main:app --reload
+uv sync --locked --extra dev
+uv run --locked --extra dev uvicorn app.main:app --reload
 ```
 
-Checks: `ruff check .`, `mypy app`, `pytest -q`.
+Checks: `uv run --locked --extra dev ruff check .`, `uv run --locked --extra dev mypy app`, `uv run --locked --extra dev pytest -q`.
+
+See [`docs/developer/dependencies.md`](docs/developer/dependencies.md) for
+intentional dependency and lockfile updates.
 
 ### Run the frontend directly
 

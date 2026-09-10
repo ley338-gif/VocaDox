@@ -1,5 +1,9 @@
 name: CI
 
+env:
+  NPM_VERSION: "11.19.1"
+  UV_VERSION: "0.12.12"
+
 on:
   push:
     branches: [main, "phase-*"]
@@ -14,26 +18,28 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install "uv==$UV_VERSION"
+          uv sync --locked --extra dev
 
       - name: ruff
-        run: ruff check .
+        run: uv run --locked --extra dev ruff check .
 
       - name: mypy
-        run: mypy app
+        run: uv run --locked --extra dev mypy app
 
       - name: pytest
-        run: pytest -q
+        run: uv run --locked --extra dev pytest -q
 
       - name: pip-audit (Python dependency vulnerabilities)
-        run: pip-audit
+        run: uv run --locked --extra dev pip-audit
 
   migration:
     name: Alembic migration (real Postgres)
@@ -69,23 +75,46 @@ jobs:
     env:
       VOCADOX_DATABASE_URL: postgresql+asyncpg://vocadox:changeme@localhost:5432/vocadox
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          pip install "uv==$UV_VERSION"
+          uv sync --locked --extra dev
 
       - name: alembic upgrade head (from empty database)
-        run: alembic upgrade head
+        run: uv run --locked --extra dev alembic upgrade head
 
       - name: alembic downgrade to base (proves downgrade() is not silently broken)
-        run: alembic downgrade base
+        run: uv run --locked --extra dev alembic downgrade base
 
       - name: alembic upgrade head again (proves the up/down/up cycle is clean)
-        run: alembic upgrade head
+        run: uv run --locked --extra dev alembic upgrade head
+
+  gdt-bridge:
+    name: GDT bridge (locked install / test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: connectors/gdt-bridge
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install locked dependencies
+        run: |
+          pip install "uv==$UV_VERSION"
+          uv sync --locked --extra dev
+
+      - name: pytest
+        run: uv run --locked --extra dev pytest -q
 
   frontend:
     name: Frontend (lint / typecheck / test / build)
@@ -94,16 +123,18 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: |
+          npm install -g "npm@$NPM_VERSION"
+          npm ci
 
       - name: eslint
         run: npm run lint
@@ -142,26 +173,30 @@ jobs:
     name: OpenAPI TS client drift check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install backend
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: |
+          pip install "uv==$UV_VERSION"
+          uv sync --locked --extra dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Install frontend
         working-directory: frontend
-        run: npm ci || npm install
+        run: |
+          npm install -g "npm@$NPM_VERSION"
+          npm ci
 
       - name: Start backend
         working-directory: backend
         run: |
-          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
+          nohup uv run --locked --extra dev uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
           for i in $(seq 1 20); do
             curl -sf http://127.0.0.1:8000/health/live && break
             sleep 1
@@ -184,10 +219,10 @@ jobs:
           fi
 
   docker-build:
-    name: Docker build (backend + frontend + AI worker)
+    name: Docker build (backend + frontend + AI worker + GDT bridge)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build backend image
         run: docker build -t vocadox-backend:ci ./backend
@@ -202,6 +237,9 @@ jobs:
       - name: Build AI worker image
         run: docker build -f backend/worker.Dockerfile -t vocadox-worker:ci ./backend
 
+      - name: Build GDT bridge image
+        run: docker build -t vocadox-gdt-bridge:ci ./connectors/gdt-bridge
+
       - name: Validate compose config
         run: docker compose -f deploy/docker-compose.yml config --quiet
 
@@ -209,34 +247,31 @@ jobs:
     name: License compliance (direct + full transitive tree)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
 
-      - name: Install PyYAML (for the compliance scripts themselves)
-        run: pip install pyyaml
+      - name: Install uv
+        run: pip install "uv==$UV_VERSION"
 
       # Regenerate the transitive inventory from the ACTUAL resolved
       # trees on every run — never trust a possibly-stale committed copy.
       # Production-only Python tree (what backend/Dockerfile ships):
       - name: Resolve production Python dependency tree
         run: |
-          python -m venv /tmp/prod_venv
-          /tmp/prod_venv/bin/pip install -e backend/
-          /tmp/prod_venv/bin/pip install pip-licenses
-          /tmp/prod_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_prod_licenses.json
+          UV_PROJECT_ENVIRONMENT=/tmp/prod_venv uv sync --project backend --locked --no-dev --no-editable
 
       # Full dev Python tree (adds ruff/mypy/pytest/pip-audit/pip-licenses):
       - name: Resolve full Python dev dependency tree
-        working-directory: backend
         run: |
-          pip install -e ".[dev]"
-          pip-licenses --format=json --with-urls > ../compliance/_raw_pip_licenses.json
+          UV_PROJECT_ENVIRONMENT=/tmp/dev_venv uv sync --project backend --locked --extra dev
+          /tmp/dev_venv/bin/pip-licenses --python /tmp/prod_venv/bin/python --format=json --with-urls > compliance/_raw_pip_prod_licenses.json
+          /tmp/dev_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_licenses.json
 
       # Phase 3 [ai] extra: the worker-speech/worker-diarization image's
       # package set (faster-whisper, pyannote.audio, torch, ...) — CPU-only
@@ -245,23 +280,21 @@ jobs:
       # packages ship only in the AI worker images.
       - name: Resolve AI worker Python dependency tree
         run: |
-          python -m venv /tmp/ai_venv
-          /tmp/ai_venv/bin/pip install -e "backend/[ai]" --extra-index-url https://download.pytorch.org/whl/cpu
-          /tmp/ai_venv/bin/pip install pip-licenses
-          /tmp/ai_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_ai_licenses.json
+          UV_PROJECT_ENVIRONMENT=/tmp/ai_venv uv sync --project backend --locked --no-dev --extra ai --no-editable
+          /tmp/dev_venv/bin/pip-licenses --python /tmp/ai_venv/bin/python --format=json --with-urls > compliance/_raw_pip_ai_licenses.json
 
       # Node trees (production-only and full dev+prod):
       - name: Resolve Node dependency trees
         working-directory: frontend
         run: |
-          npm ci || npm install
-          npm install --no-save -D license-checker
-          npx license-checker --production --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_prod.json
-          npx license-checker --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_all.json
+          npm install -g "npm@$NPM_VERSION"
+          npm ci
+          npx --no-install license-checker --production --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_prod.json
+          npx --no-install license-checker --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_all.json
 
       - name: Regenerate dependency-inventory-transitive.yml
         run: |
-          python compliance/generate_transitive_inventory.py \
+          /tmp/dev_venv/bin/python compliance/generate_transitive_inventory.py \
             --pip-prod compliance/_raw_pip_prod_licenses.json \
             --pip-dev compliance/_raw_pip_licenses.json \
             --pip-ai compliance/_raw_pip_ai_licenses.json \
@@ -277,13 +310,13 @@ jobs:
           fi
 
       - name: Run license compliance check (direct + transitive + containers + models)
-        run: python compliance/check_licenses.py
+        run: /tmp/dev_venv/bin/python compliance/check_licenses.py
 
   container-vulnerability-scan:
-    name: Container vulnerability scan (Trivy — backend/frontend/AI-worker runtime + frontend build/dev images)
+    name: Container vulnerability scan (all shipped images + frontend build/dev)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build backend image (shipped)
         run: docker build -t vocadox-backend:ci ./backend
@@ -299,6 +332,9 @@ jobs:
       # AI worker images)".
       - name: Build AI worker image (shipped)
         run: docker build -f backend/worker.Dockerfile -t vocadox-worker:ci ./backend
+
+      - name: Build GDT bridge image (shipped connector)
+        run: docker build -t vocadox-gdt-bridge:ci ./connectors/gdt-bridge
 
       # Trivy itself: Apache-2.0, license-checked (see
       # compliance/container-inventory.yml), pinned image, never installed
@@ -327,6 +363,12 @@ jobs:
             aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
             image --exit-code 1 --severity CRITICAL vocadox-worker:ci
 
+      - name: Scan GDT bridge image — fail on any unresolved CRITICAL
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --exit-code 1 --severity CRITICAL vocadox-gdt-bridge:ci
+
       - name: Report HIGH/MEDIUM/LOW findings (non-blocking, for visibility)
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
@@ -341,3 +383,6 @@ jobs:
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
             aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
             image --severity HIGH,MEDIUM,LOW vocadox-worker:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --severity HIGH,MEDIUM,LOW vocadox-gdt-bridge:ci

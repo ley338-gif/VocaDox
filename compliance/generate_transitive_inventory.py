@@ -16,28 +16,30 @@ resolved package, not just the ones we happened to list by hand.
 INPUTS (raw JSON, produced by the *actual* license-scanning tools below —
 never hand-typed):
 
-  Python, production install only (`pip install .`, no [dev] extra — this
+  Python, production install only (`uv sync --locked`, no dev extra — this
   is exactly what ships in backend/Dockerfile's image):
-      python -m venv /tmp/prod_venv && source /tmp/prod_venv/*/activate
-      pip install -e backend/
-      pip install pip-licenses   # MIT license — see this file's own entry
-      pip-licenses --format=json --with-urls > pip_prod_licenses.json
+      UV_PROJECT_ENVIRONMENT=/tmp/prod_venv uv sync --project backend \
+          --locked --no-dev --no-editable
 
   Python, full dev environment (adds ruff/mypy/pytest/pip-licenses/
   pip-audit and their own transitive deps — NOT shipped in the Docker
   image, but still worth knowing about since it runs in CI/dev machines):
-      pip install -e "backend/[dev]"
-      pip-licenses --format=json --with-urls > pip_dev_licenses.json
+      UV_PROJECT_ENVIRONMENT=/tmp/dev_venv uv sync --project backend \
+          --locked --extra dev
+      /tmp/dev_venv/bin/pip-licenses --python /tmp/prod_venv/bin/python \
+          --format=json --with-urls > pip_prod_licenses.json
+      /tmp/dev_venv/bin/pip-licenses --format=json --with-urls \
+          > pip_dev_licenses.json
 
   Node, production dependencies only (`npm ls --production` scope — what
   ends up in the Vite build output / frontend/Dockerfile `runtime` stage):
-      npx license-checker --production --json --excludePrivatePackages \
+      npx --no-install license-checker --production --json --excludePrivatePackages \
           > npm_prod_licenses.json
 
   Node, full tree (prod + dev — includes eslint/vite/vitest/testing-library
   and their transitive deps; NOT shipped, but scanned anyway since a
   compromised/mislicensed build-tool dependency is still a real risk):
-      npx license-checker --json --excludePrivatePackages \
+      npx --no-install license-checker --json --excludePrivatePackages \
           > npm_all_licenses.json
 
 Tool licenses (checked before use, per compliance policy):
@@ -65,21 +67,9 @@ if you generate the raw JSON inputs above on a different OS/arch:
     OS/arch (e.g. `win32-x64` locally vs `linux-x64` on CI's runners)
 To get byte-identical output, run the raw-JSON-producing commands above
 inside containers matching CI's images instead of directly on your host,
-e.g.:
-    docker run --rm -v "$PWD/backend:/work/backend" \
-        -v "$PWD/compliance:/work/compliance" -w /work python:3.11 bash -c '
-      python -m venv /tmp/prod_venv && /tmp/prod_venv/bin/pip install -e backend/ -q &&
-      /tmp/prod_venv/bin/pip install pip-licenses -q &&
-      /tmp/prod_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_prod_licenses.json &&
-      python -m venv /tmp/dev_venv && /tmp/dev_venv/bin/pip install -e "backend/[dev]" -q &&
-      /tmp/dev_venv/bin/pip-licenses --format=json --with-urls > compliance/_raw_pip_licenses.json'
-    docker run --rm -v "$PWD/frontend:/work/frontend" \
-        -v "$PWD/compliance:/work/compliance" -w /work/frontend node:20 bash -c '
-      npm ci && npm install --no-save -D license-checker &&
-      npx license-checker --production --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_prod.json &&
-      npx license-checker --json --excludePrivatePackages > ../compliance/_raw_npm_licenses_all.json'
-Then run this script (plain Python, platform-independent) against those
-Linux-resolved JSON files as usual.
+The authoritative Linux commands live in the compliance job in
+`.github/workflows/ci.yml`; use the same pinned uv/npm versions and locked
+commands when regenerating locally in Linux containers.
 """
 
 from __future__ import annotations
@@ -339,7 +329,7 @@ def main() -> int:
         "--pip-ai",
         type=Path,
         default=None,
-        help="pip-licenses JSON for `pip install -e backend/[ai]` — the AI worker image's "
+        help="pip-licenses JSON for `uv sync --locked --extra ai` — the AI worker image's "
         "package set (Phase 3+, worker-speech/worker-diarization only, never the api/frontend "
         "images). Tagged scope='worker'. Optional so this script stays runnable without it.",
     )
@@ -406,13 +396,13 @@ def main() -> int:
         "_note": (
             "Full resolved dependency tree (direct + transitive) for both "
             "ecosystems. 'scope: runtime' means the package appears in a "
-            "production-only install (backend: `pip install .` with no "
+            "production-only install (backend: `uv sync --locked` with no "
             "[dev] extra; frontend: `npm ls --production`) and therefore "
             "ships in the actual Docker runtime image / built bundle. "
             "'scope: dev' means it was only found in the full dev/build "
             "tree (lint/test/build tooling) and is never shipped. "
             "'scope: worker' (Phase 3+) means the package appears only in "
-            "`pip install -e backend/[ai]` — it ships in the worker-speech/"
+            "`uv sync --locked --extra ai` — it ships in the worker-speech/"
             "worker-diarization images only, never in the api/frontend "
             "images (see backend/worker.Dockerfile)."
         ),

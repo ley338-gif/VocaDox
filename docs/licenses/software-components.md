@@ -2,13 +2,13 @@
 
 Human-readable rendering of `compliance/dependency-inventory.yml` (direct
 dependencies) and `compliance/dependency-inventory-transitive.yml` (full
-resolved tree, 421 packages — regenerable via
+resolved tree, 502 packages — regenerable via
 `compliance/generate_transitive_inventory.py`, never hand-maintained).
 Licenses were looked up live against the PyPI JSON API, the npm registry
 JSON API, and (for the transitive tier) `pip-licenses`/`license-checker`
 output against the actual installed dependency trees. Status is computed
-against `compliance/license-policy.yml`. Last updated 2026-08-18 (Phase 0
-remediation pass — see `PHASE_0_VALIDATION_REPORT.md` for the full story).
+against `compliance/license-policy.yml`. Last updated 2026-09-09 (Phase 14
+dependency reproducibility pass).
 
 ## Python (PyPI) — direct
 
@@ -31,6 +31,10 @@ remediation pass — see `PHASE_0_VALIDATION_REPORT.md` for the full story).
 | httpx | 0.28.1 | BSD-3-Clause | approved | |
 | pip-licenses | 5.5.5 | MIT | approved | compliance-tool-only, never shipped |
 | pip-audit | 2.10.1 | Apache-2.0 | approved | compliance-tool-only, never shipped |
+| uv | 0.12.12 | MIT OR Apache-2.0 | approved | pinned lock/install tool, removed from runtime images |
+| torch | 2.14.0+cpu | permissive compound SPDX expression | approved | AI-worker-only, official CPU index |
+| torchaudio | 2.11.0+cpu | BSD-2-Clause | approved | AI-worker-only, official CPU index |
+| torchcodec | 0.16.0+cpu | BSD-3-Clause | approved | AI-worker-only, official CPU index |
 
 ## Node (npm) — direct
 
@@ -50,14 +54,14 @@ remediation pass — see `PHASE_0_VALIDATION_REPORT.md` for the full story).
 | openapi-typescript | 7.13.0 | MIT | approved | dev/codegen-only |
 | lucide-react | 0.451.0 | ISC | approved | |
 | @fontsource/inter | 5.3.0 | OFL-1.1 | approved | see `docs/licenses/fonts-assets.md` |
-| license-checker | 25.0.1 | BSD-3-Clause | approved | compliance-tool-only, `--no-save`, never in package.json |
+| license-checker | 25.0.1 | BSD-3-Clause | approved | compliance-tool-only, exact devDependency |
 
 ## Transitive tree (both ecosystems combined)
 
 | Status | Count |
 |---|---|
-| Approved | 419 |
-| Review required | 2 (`certifi`, `pathspec` — both MPL-2.0, dev-tooling-only, see `compliance/exceptions.yml`) |
+| Approved | 499 |
+| Review required | 3 (`certifi`, `pathspec`, `tqdm` — MPL-2.0-containing licenses, documented in `compliance/exceptions.yml`) |
 | Blocked | 0 |
 | Unknown | 0 |
 
@@ -97,7 +101,7 @@ None bundled in Phase 0 — `compliance/model-inventory.yml` is empty. See
 ## Result
 
 **0 blocked, 0 unknown** across direct dependencies (32), the transitive
-tree (421), and containers (6). Run `python compliance/check_licenses.py`
+tree (502), and containers (6). Run `python compliance/check_licenses.py`
 to re-verify this at any time — it regenerates nothing itself but gates
 on whatever's currently in the `.yml` files; regenerate the transitive
 file first with `compliance/generate_transitive_inventory.py` if the

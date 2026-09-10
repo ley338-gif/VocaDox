@@ -1,4 +1,4 @@
-# 0008 — Node build/dev image: Alpine over Debian, plus npm self-update
+# 0008 — Node build/dev image: Alpine, security upgrades, and pinned npm
 
 ## Status
 Accepted
@@ -24,13 +24,14 @@ Evaluated every currently-supported official Node 22 LTS image variant:
 | `node:22-alpine3.21` / `3.22` / `3.24` | 5 | **Not perl** — Alpine doesn't ship perl at all. All 5 were npm's own vendored copies of `tar`/`brace-expansion`/`ip-address`/etc., bundled inside the Node.js Alpine image's pre-installed npm. |
 
 Alpine's findings, unlike Debian's, were all things we could actually fix:
-running `npm install -g npm@latest && npm cache clean --force` as the
+running `npm install -g npm@11.19.1 && npm cache clean --force` as the
 first step in `frontend/Dockerfile`'s `base` stage replaces npm's
-vendored dependency copies with current ones. Verified this drops the
-image to **0 CRITICAL, 3 HIGH** (residual: `brace-expansion` and
-`ip-address`, still vendored inside npm's own dependency tree even at
-`npm@latest` — see `container-inventory.yml` for the accepted-risk
-writeup).
+vendored dependency copies with current ones. Phase 14 additionally runs
+`apk upgrade --no-cache` in both the Node build/dev stage and the nginx
+runtime stage. This is necessary because Alpine can publish fixed package
+revisions before the official image tag/digest is refreshed. A fresh Trivy
+0.56.2 scan on 2026-09-10 verified **0 CRITICAL / 0 HIGH** in both final
+stages.
 
 Switched `frontend/Dockerfile` to `node:22-alpine3.24` (pinned by tag +
 digest) with the npm self-update step. Verified end-to-end after the
@@ -50,13 +51,10 @@ had to change to make this work.
   tooling, standard npm packages) has no native-binary incompatibility
   with it — verified by actually running the full build/lint/typecheck/
   test suite inside the image, not assumed.
-- The `npm install -g npm@latest` step adds a small amount of build time
-  and a step to keep an eye on (a future npm major version bump happens
-  "for free" on every rebuild) — acceptable given it directly resolves
-  the image's CRITICAL findings and self-heals as npm ships further
-  patches upstream.
-- 3 residual HIGH findings (npm's own vendored `brace-expansion`,
-  `ip-address`) remain, with no further fix available from us short of
-  patching npm's internals — documented as an accepted risk, same
-  treatment as the backend image's accepted pip-internal `msgpack`
-  finding (ADR context: `container-inventory.yml`).
+- The pinned npm upgrade and Alpine security upgrade add a small amount of
+  build time. Application and npm dependency resolution remains locked;
+  Alpine security package revisions intentionally follow the supported
+  repository so published OS fixes are not deferred until a base-image
+  digest refresh. The resulting images remain subject to the CI Trivy gate.
+- No HIGH or CRITICAL findings remain in the Node build/dev or nginx runtime
+  stages as of the 2026-09-10 validation snapshot.

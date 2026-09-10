@@ -180,8 +180,8 @@ dependencies:
     notes: >
       PEP 517 build-backend requirement, not a runtime dependency (not
       imported by the app; only used at package-build time, both for
-      local dev installs and inside backend/Dockerfile's `pip install .`
-      build step). Pinned >=83.0 during Phase 0 remediation (2026-08-17)
+      local dev installs and inside the backend's locked `uv sync` build
+      step). Pinned >=83.0 during Phase 0 remediation (2026-08-17)
       to fix PYSEC-2026-3447 / GHSA-h35f-9h28-mq5c (Unicode-normalization
       MANIFEST.in exclude-pattern bypass on macOS APFS/HFS+ — irrelevant
       to our Linux Docker build in practice, but patched anyway since
@@ -197,8 +197,8 @@ dependencies:
       Build/compliance-tooling-only dependency, added during Phase 0
       remediation to generate compliance/dependency-inventory-transitive.yml
       from the real resolved dependency tree. Never imported by
-      application code, never shipped in the backend Docker image
-      (backend/Dockerfile installs `pip install .`, not `.[dev]`).
+      application code, never shipped in the backend Docker image (the
+      Dockerfile performs a locked production sync without the dev extra).
       info.license_expression = MIT (PyPI JSON).
 
   - name: pip-audit
@@ -214,20 +214,30 @@ dependencies:
       shipped in the backend Docker image. Apache Software License
       classifier confirmed via PyPI JSON.
 
+  - name: uv
+    ecosystem: pypi
+    version_constraint: "==0.12.12"
+    license: MIT OR Apache-2.0
+    license_source_url: https://github.com/astral-sh/uv
+    approval_status: approved
+    notes: >
+      Locking/install tooling only. The executable is removed from runtime
+      container layers after creating the application environment. The
+      upstream repository offers MIT or Apache-2.0 at the user's option;
+      both are approved by this policy.
+
   - name: license-checker
     ecosystem: npm
-    version_constraint: "not persisted in package.json (installed on demand via `npm install --no-save -D license-checker`, pinned in CI to the version below)"
+    version_constraint: "25.0.1"
     license: BSD-3-Clause
-    license_source_url: https://registry.npmjs.org/license-checker/latest
+    license_source_url: https://registry.npmjs.org/license-checker/25.0.1
     approval_status: approved
     notes: >
       Build/compliance-tooling-only dependency, added during Phase 0
       remediation to generate the npm side of
-      dependency-inventory-transitive.yml. Deliberately installed with
-      `--no-save` (not added to package.json/package-lock.json) since it's
-      a one-shot compliance-report-generation tool, not a build
-      dependency the frontend needs to build/test/run — see
-      generate_transitive_inventory.py's docstring for the exact command.
+      dependency-inventory-transitive.yml. It is pinned in package.json and
+      package-lock.json so the compliance tree itself is reproducible, but
+      remains a development-only tool and is invoked with `npx --no-install`.
       Never shipped in the frontend build output. license = BSD-3-Clause
       per npm registry.
 
@@ -495,3 +505,30 @@ dependencies:
       torchcodec, scipy, pandas, ...)
       is recorded in dependency-inventory-transitive.yml with
       scope: worker.
+
+  - name: torch
+    ecosystem: pypi
+    version_constraint: ">=2.11,<3.0"
+    license: Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT
+    license_source_url: https://github.com/pytorch/pytorch/blob/main/pyproject.toml
+    approval_status: approved
+    notes: >
+      Worker-only direct declaration used to bind uv to PyTorch's official
+      CPU wheel index. Every component of the upstream SPDX expression is
+      permissive and already approved in license-policy.yml.
+
+  - name: torchaudio
+    ecosystem: pypi
+    version_constraint: ">=2.11,<3.0"
+    license: BSD-2-Clause
+    license_source_url: https://github.com/pytorch/audio
+    approval_status: approved
+    notes: "Worker-only; official CPU wheel index. Upstream repository license verified."
+
+  - name: torchcodec
+    ecosystem: pypi
+    version_constraint: ">=0.16,<1.0"
+    license: BSD-3-Clause
+    license_source_url: https://github.com/meta-pytorch/torchcodec/blob/main/LICENSE
+    approval_status: approved
+    notes: "Worker-only; official CPU wheel index. Upstream LICENSE verified."

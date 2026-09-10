@@ -2,7 +2,7 @@
 name = "vocadox-backend"
 version = "0.14.0"
 description = "VocaDox backend — on-premise, evidence-based conversation documentation"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 license = { text = "Proprietary" }
 dependencies = [
     "fastapi>=0.115,<1.0",
@@ -73,6 +73,12 @@ ai = [
     # empirical finding, including the pin change). MIT (verified:
     # https://raw.githubusercontent.com/pyannote/pyannote-audio/develop/LICENSE).
     "pyannote.audio>=4.0,<5.0",
+    # Declared directly so uv can bind every worker install to the official
+    # CPU wheel index below. These are runtime requirements of pyannote's
+    # audio stack, not dependencies of the API image.
+    "torch>=2.11,<3.0",
+    "torchaudio>=2.11,<3.0",
+    "torchcodec>=0.16,<1.0",
 ]
 dev = [
     "ruff>=0.6,<1.0",
@@ -93,7 +99,7 @@ dev = [
     # setuptools (independent of [build-system].requires, which only
     # governs the isolated build env) that pip-audit flags — see
     # PYSEC-2026-3447/GHSA-h35f-9h28-mq5c. Pin it as a real dependency too
-    # so `pip install -e .[dev]` actually upgrades what's on PATH.
+    # so the locked dev environment actually upgrades what's on PATH.
     "setuptools>=83.0",
 ]
 
@@ -105,6 +111,22 @@ dev = [
 # macOS-filesystem-specific), but pinned above the fix anyway.
 requires = ["setuptools>=83.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.uv]
+# Keep developer machines, CI, and container builds on the same lockfile
+# semantics. Update this together with uv.lock in a dedicated dependency PR.
+required-version = "==0.12.12"
+
+[[tool.uv.index]]
+# The default worker image is deliberately CPU-only.
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
+torchcodec = { index = "pytorch-cpu" }
 
 [tool.setuptools.packages.find]
 include = ["app*"]
