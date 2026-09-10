@@ -1,6 +1,6 @@
 # Container image inventory (spec §10/§12 policy extended to base images).
 #
-# Every image used anywhere in the Phase 0 stack (deploy/docker-compose.yml,
+# Every image used anywhere in the Phase 0 stack (deploy/compose.dev.yml,
 # root docker-compose.yml, backend/Dockerfile, frontend/Dockerfile) is
 # listed here with a pinned version tag AND digest — `latest` is never used.
 # All digests below were captured by actually pulling and inspecting the
@@ -192,7 +192,7 @@ containers:
   # all — it is never built, started, or scanned by this project — so its
   # entry is removed here rather than kept as "accepted": there is nothing
   # left for VocaDox to accept risk on. See
-  # deploy/docker-compose.yml (service removed) and
+  # deploy/compose.dev.yml (service removed) and
   # backend/app/platform/config.py (`llm_base_url` no longer defaults to
   # the now-nonexistent bundled host).
 

@@ -341,7 +341,7 @@ Phase 3.1's `install_models`/`model_manager` lay out installed model
 profiles) with a real recursive byte size for each, plus a total. Never
 mixed with `media_storage_root` (ADR-0018's "don't mix model files with
 Conversation media" principle, now applied a third time to backups too
-— see `deploy/docker-compose.yml`'s comment on the dedicated
+— see `deploy/compose.dev.yml`'s comment on the dedicated
 `vocadox_backups_data` volume).
 
 ## Offline Installation
@@ -628,7 +628,7 @@ infrastructure, not by code review:
    the Postgres **server** at 16.6; `pg_dump` 17.x emits a `SET
    transaction_timeout = 0;` GUC (introduced in Postgres 17) that a
    16.x server's `pg_restore` rejects outright. Fixed by bumping the
-   pinned Postgres image (`deploy/docker-compose.yml` and
+   pinned Postgres image (`deploy/compose.dev.yml` and
    `.github/workflows/ci.yml`) to `17.6-alpine3.22`, matching the
    client version trixie already ships, rather than adding a
    third-party apt repository or copying cross-distro binaries just to

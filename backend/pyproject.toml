@@ -47,7 +47,7 @@ dependencies = [
 [project.optional-dependencies]
 # Phase 3 real speech/diarization providers — installed ONLY in the
 # worker-speech/worker-diarization container images (see
-# deploy/docker-compose.yml, deploy/worker.Dockerfile), never in the api/
+# deploy/compose.dev.yml, deploy/worker.Dockerfile), never in the api/
 # frontend images and never required by the mandatory (fake-provider) test
 # suite. See docs/architecture/adr/0014-speech-provider-selection.md and
 # 0015-diarization-provider-selection.md for the full license evaluation;

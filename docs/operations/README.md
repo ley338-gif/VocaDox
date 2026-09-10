@@ -1,13 +1,16 @@
 # Operations docs
 
-Deployment topology: `deploy/docker-compose.yml` (see root README's
-"Running locally" section).
+Deployment topologies: `deploy/compose.dev.yml` for local development and
+`deploy/compose.prod.yml` for a guarded single-host production deployment.
 
 - [`disaster-recovery.md`](disaster-recovery.md) — backup/restore
   (`app.operations.backup_service`, `app.cli.backup`) and the Retention
   Cleanup Worker (`app.operations.retention_service`, `app.cli.
   retention_cleanup`): what is/isn't backed up, how to restore, real
   RPO/RTO, and an operator setup checklist (Phase 11).
+- [`production-deployment.md`](production-deployment.md) — TLS termination,
+  required secrets/paths, production validation, startup, and operational
+  boundaries for the hardened Compose topology.
 - [`offline-model-installation.md`](offline-model-installation.md) — the
   AI-model install/runtime offline story (Phase 3.1): what needs network
   access at install time vs. never at runtime, and the real

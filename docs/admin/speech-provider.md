@@ -17,7 +17,7 @@ Phase 7's Model Management work):
 | Model volume root | `VOCADOX_MODEL_VOLUME_ROOT` | `/app/data/models` |
 
 Set `VOCADOX_SPEECH_PROVIDER=faster_whisper` on the `worker-speech`
-service (see `deploy/docker-compose.yml`) only **after** installing the
+service (see `deploy/compose.dev.yml`) only **after** installing the
 model (`docs/admin/model-installation.md`) — the provider status endpoint
 will otherwise honestly report "not installed" rather than silently
 falling back or crashing.

@@ -52,7 +52,7 @@ jobs:
     # that proof, separate from `backend` so a Postgres-specific failure
     # here is never confused with an application-logic test failure.
     services:
-      # Phase 11: kept in sync with deploy/docker-compose.yml's postgres
+      # Phase 11: kept in sync with deploy/compose.dev.yml's postgres
       # version (17.6) — see that file's comment for why (a real
       # backup/restore test surfaced a pg_dump/pg_restore client/server
       # major-version mismatch against 16.x).
@@ -240,8 +240,28 @@ jobs:
       - name: Build GDT bridge image
         run: docker build -t vocadox-gdt-bridge:ci ./connectors/gdt-bridge
 
-      - name: Validate compose config
-        run: docker compose -f deploy/docker-compose.yml config --quiet
+      - name: Validate development compose config
+        run: docker compose -f deploy/compose.dev.yml config --quiet
+
+      - name: Validate production compose config
+        env:
+          POSTGRES_PASSWORD: 4af15f8e69d34aaf9d12f6074b812e21
+          VOCADOX_BACKUP_PATH: /tmp/vocadox-backups
+          VOCADOX_TLS_CERTIFICATE_PATH: /tmp/vocadox-tls/tls.crt
+          VOCADOX_TLS_PRIVATE_KEY_PATH: /tmp/vocadox-tls/tls.key
+        run: |
+          docker compose -f deploy/compose.prod.yml config --format json > /tmp/vocadox-prod-compose.json
+          jq -e '
+            . as $doc
+            | ([.services | to_entries[] | select(((.value.ports // []) | length) > 0) | .key]
+                == ["reverse-proxy"])
+            and (.networks.data.internal == true)
+            and (.services.backend.environment.VOCADOX_ENVIRONMENT == "production")
+            and (.services.backend.environment.VOCADOX_SESSION_COOKIE_SECURE == "true")
+            and (.services.backend.environment.VOCADOX_DATABASE_ECHO == "false")
+            and (["postgres", "valkey", "backend", "frontend"]
+                | all(. as $name | (($doc.services[$name].ports // []) | length == 0)))
+          ' /tmp/vocadox-prod-compose.json
 
   compliance:
     name: License compliance (direct + full transitive tree)

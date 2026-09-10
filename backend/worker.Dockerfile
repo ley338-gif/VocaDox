@@ -4,7 +4,7 @@
 # pyannote.audio, torch, torchaudio, httpx, ...) and a real FFmpeg binary,
 # both multi-hundred-MB. The api/frontend images never get GPU device
 # access or these packages (spec: "GPU isolation" — see
-# deploy/docker-compose.yml). Phase 4's worker-extraction role reuses this
+# deploy/compose.dev.yml). Phase 4's worker-extraction role reuses this
 # same image (it only needs httpx to call the separate `ollama` container
 # over HTTP — no local model weights or GPU access of its own) rather than
 # introducing a fourth, near-identical image.
@@ -128,7 +128,7 @@ RUN mkdir -p /app/data/models /app/data/media /app/data/tmp-uploads \
 
 USER vocadox
 
-# Overridden per-service in deploy/docker-compose.yml (--role speech |
+# Overridden per-service in deploy/compose.dev.yml (--role speech |
 # diarization).
 ENTRYPOINT ["python", "-m", "app.workers.runner"]
 CMD ["--role", "speech"]
