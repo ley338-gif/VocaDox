@@ -107,6 +107,9 @@ export interface Participant {
   external_reference: string | null;
   notes: string | null;
   known_speaker_id: string | null;
+  // Post-GA: optional link to a registered system user (independent of
+  // known_speaker_id) -- see backend ConversationParticipant's docstring.
+  user_id: string | null;
   created_at: string;
 }
 
@@ -288,10 +291,14 @@ export function listParticipants(conversationId: string): Promise<Participant[]>
 export function addParticipant(
   conversationId: string,
   payload: {
-    display_name: string;
+    // Optional: falls back to the linked user's own display name when
+    // `user_id` is set and this is omitted (see ParticipantCreateRequest's
+    // backend validator, which still requires at least one of the two).
+    display_name?: string;
     participant_type?: ParticipantType;
     notes?: string;
     known_speaker_id?: string | null;
+    user_id?: string | null;
   },
   csrfToken: string
 ): Promise<Participant> {
@@ -301,7 +308,7 @@ export function addParticipant(
 export function updateParticipant(
   conversationId: string,
   participantId: string,
-  payload: { display_name?: string; known_speaker_id?: string | null },
+  payload: { display_name?: string; known_speaker_id?: string | null; user_id?: string | null },
   csrfToken: string
 ): Promise<Participant> {
   return request(

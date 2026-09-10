@@ -24,8 +24,10 @@ from app.conversations.models import (
     PrivacyMode,
 )
 from app.conversations.state_machine import transition
+from app.identity.models import User
 from app.longitudinal.models import FollowUpTask
 from app.media.models import MediaAsset
+from app.organizations.service import user_can_access_organization
 from app.profiles.service import get_processing_profile_by_key
 from app.providers.storage import StorageProvider
 from app.search.service import delete_search_entries_for_conversation
@@ -218,6 +220,62 @@ async def soft_delete_conversation(
 # -- Participants -------------------------------------------------------
 
 
+class ParticipantUserNotFoundError(Exception):
+    """`user_id` does not reference an active `User`."""
+
+
+class ParticipantUserNotInOrganizationError(Exception):
+    """`user_id` resolves to a user outside the conversation's
+    organization (and without `system:admin`)."""
+
+
+class ParticipantUserAlreadyLinkedError(Exception):
+    """`user_id` is already linked to another participant of this same
+    conversation."""
+
+
+async def resolve_participant_user(
+    session: AsyncSession,
+    *,
+    conversation: Conversation,
+    user_id: uuid.UUID,
+    exclude_participant_id: uuid.UUID | None = None,
+) -> User:
+    """Shared validation for linking a registered user to a conversation
+    participant -- used by both `app.conversations.router` (POST/PATCH
+    `/conversations/{id}/participants`) and `app.integrations.router`
+    (the equivalent service-account API), so the two surfaces can never
+    drift apart on what counts as a valid link. Raises one of the three
+    domain errors above (never HTTPException -- this is a service-layer
+    function, translating to the right HTTP status is each router's job)
+    on the first failing check; returns the resolved, active `User`
+    otherwise. Deliberately does NOT touch `display_name` -- the
+    "fall back to the user's name when none was supplied" rule only
+    applies on participant *creation* and is each router's job, not
+    this shared validator's.
+    """
+    user = await session.get(User, user_id)
+    if user is None or not user.is_active:
+        raise ParticipantUserNotFoundError(str(user_id))
+
+    if not await user_can_access_organization(
+        session, user_id=user.id, organization_id=conversation.organization_id
+    ):
+        raise ParticipantUserNotInOrganizationError(str(user_id))
+
+    stmt = select(ConversationParticipant).where(
+        ConversationParticipant.conversation_id == conversation.id,
+        ConversationParticipant.user_id == user_id,
+    )
+    if exclude_participant_id is not None:
+        stmt = stmt.where(ConversationParticipant.id != exclude_participant_id)
+    existing = (await session.execute(stmt)).scalar_one_or_none()
+    if existing is not None:
+        raise ParticipantUserAlreadyLinkedError(str(user_id))
+
+    return user
+
+
 async def add_participant(
     session: AsyncSession,
     *,
@@ -227,6 +285,7 @@ async def add_participant(
     external_reference: str | None = None,
     notes: str | None = None,
     known_speaker_id: uuid.UUID | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> ConversationParticipant:
     participant = ConversationParticipant(
         conversation_id=conversation_id,
@@ -235,6 +294,7 @@ async def add_participant(
         external_reference=external_reference,
         notes=notes,
         known_speaker_id=known_speaker_id,
+        user_id=user_id,
     )
     session.add(participant)
     await session.flush()

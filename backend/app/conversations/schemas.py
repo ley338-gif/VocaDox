@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.conversations.models import ConversationType, ParticipantType, PrivacyMode
 
@@ -107,11 +107,30 @@ class MediaAssetResponse(BaseModel):
 
 
 class ParticipantCreateRequest(BaseModel):
-    display_name: str = Field(min_length=1, max_length=255)
+    # Optional (was required pre-user-link): a participant created from
+    # the registered-user directory can rely entirely on `user_id`, with
+    # `display_name` auto-filled from the linked user's name (see
+    # app.conversations.router.create_participant_endpoint) -- the
+    # model_validator below still requires at least one of the two, so
+    # the product rule "a display_name always ends up on the row" holds.
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
     participant_type: ParticipantType = ParticipantType.UNKNOWN
     external_reference: str | None = Field(default=None, max_length=255)
     notes: str | None = None
     known_speaker_id: uuid.UUID | None = None
+    # Post-GA: optional link to a registered `app.identity.models.User` in
+    # the conversation's organization -- independent of known_speaker_id,
+    # see ConversationParticipant's docstring. Validated (exists, active,
+    # same org, not already linked in this conversation) by
+    # app.conversations.service.resolve_participant_user, called from the
+    # router, never here (this schema has no DB session).
+    user_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _display_name_or_user_required(self) -> ParticipantCreateRequest:
+        if self.display_name is None and self.user_id is None:
+            raise ValueError("at least one of display_name or user_id must be set")
+        return self
 
 
 class ParticipantUpdateRequest(BaseModel):
@@ -120,6 +139,11 @@ class ParticipantUpdateRequest(BaseModel):
     external_reference: str | None = Field(default=None, max_length=255)
     notes: str | None = None
     known_speaker_id: uuid.UUID | None = None
+    # None here is ambiguous between "not provided" and "explicitly clear
+    # the link" -- like known_speaker_id above, the router distinguishes
+    # the two via `model_dump(exclude_unset=True)`, never by checking
+    # `is None` on this field directly.
+    user_id: uuid.UUID | None = None
 
 
 class ParticipantResponse(BaseModel):
@@ -130,6 +154,7 @@ class ParticipantResponse(BaseModel):
     external_reference: str | None
     notes: str | None
     known_speaker_id: uuid.UUID | None
+    user_id: uuid.UUID | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

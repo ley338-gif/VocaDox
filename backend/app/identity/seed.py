@@ -165,6 +165,16 @@ PERMISSIONS: dict[str, str] = {
         "Ask a natural-language question answered only from already-extracted, "
         "evidence-linked facts (Ask VocaDox) -- never a raw-transcript summary."
     ),
+    # Post-GA: lets a caller add a registered system user (not just a
+    # KnownSpeaker or free-text name) as a conversation participant --
+    # see app.organizations.router's `/organizations/{id}/member-users`
+    # directory endpoint. Deliberately narrow: name + avatar only, no
+    # e-mail/auth-provider/group data, so it is safe to grant broadly to
+    # the same roles that already manage participants.
+    "user:read-directory": (
+        "List the active users of an organization by name/avatar, e.g. to add "
+        "them as a conversation participant (no e-mail, no admin data)."
+    ),
 }
 
 # role name -> (description, is_system, [permission codes])
@@ -189,6 +199,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "conversation:manage-participants",
             "conversation:manage-notes",
             "conversation:manage-markers",
+            "user:read-directory",
             "media:read",
             "media:delete",
             "document:review",
@@ -295,6 +306,7 @@ ROLES: dict[str, tuple[str, bool, list[str]]] = {
             "conversation:manage-notes",
             "conversation:manage-markers",
             "conversation:delete",
+            "user:read-directory",
             "media:read",
             "media:upload",
             "media:delete",

@@ -9,6 +9,8 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.identity.models import User
+from app.identity.rbac import get_user_permissions
 from app.organizations.models import Organization, OrganizationMembership
 
 
@@ -75,6 +77,47 @@ async def remove_member(
     if membership is not None:
         await session.delete(membership)
         await session.flush()
+
+
+async def user_can_access_organization(
+    session: AsyncSession, *, user_id: uuid.UUID, organization_id: uuid.UUID
+) -> bool:
+    """True if `user_id` is a member of `organization_id`, or holds
+    `system:admin` (the standing bypass every organization-scoped check in
+    this codebase already grants that permission). Small, dependency-light
+    helper -- deliberately lives here rather than in
+    `app.conversations.authz` (whose `assert_organization_member_or_admin`
+    delegates to this exact logic) because that module already imports
+    `app.organizations.models`; importing the other direction would risk a
+    circular import the moment `app.organizations` needs anything from
+    `app.conversations`. Used both by that delegation and by the
+    `GET /organizations/{id}/member-users` directory endpoint."""
+    permissions = await get_user_permissions(session, user_id)
+    if "system:admin" in permissions:
+        return True
+    org_ids = await list_organization_ids_for_user(session, user_id)
+    return organization_id in org_ids
+
+
+async def list_member_users(
+    session: AsyncSession, *, organization_id: uuid.UUID
+) -> list[User]:
+    """Active users belonging to `organization_id`, sorted by
+    `display_name` -- backs the participant-picker directory endpoint
+    (`GET /organizations/{id}/member-users`). Deliberately returns full
+    `User` rows; the router's `OrganizationMemberUserResponse` schema is
+    what narrows this to the minimal, non-admin field set actually
+    exposed over HTTP."""
+    result = await session.execute(
+        select(User)
+        .join(OrganizationMembership, OrganizationMembership.user_id == User.id)
+        .where(
+            OrganizationMembership.organization_id == organization_id,
+            User.is_active.is_(True),
+        )
+        .order_by(User.display_name)
+    )
+    return list(result.scalars().all())
 
 
 async def set_user_organizations(

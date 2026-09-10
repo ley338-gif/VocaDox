@@ -93,6 +93,20 @@
   color: var(--accent);
 }
 
+.userBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  vertical-align: middle;
+}
+
+.formError {
+  color: var(--color-danger);
+  font-size: var(--font-caption-size);
+  margin: var(--space-1) 0 0;
+}
+
 .addRow {
   display: flex;
   gap: var(--space-2);

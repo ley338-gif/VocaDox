@@ -23,19 +23,23 @@ from app.organizations.schemas import (
     AddMemberRequest,
     OrganizationCreateRequest,
     OrganizationMembershipResponse,
+    OrganizationMemberUserResponse,
     OrganizationResponse,
 )
 from app.organizations.service import (
     add_member,
     create_organization,
     get_organization_by_slug,
+    list_member_users,
     list_members,
+    user_can_access_organization,
 )
 from app.platform.db.session import get_session
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 _require_org_manage = require_permission("organization:manage")
+_require_read_directory = require_permission("user:read-directory")
 
 
 @router.get("", response_model=list[OrganizationResponse])
@@ -88,6 +92,34 @@ async def list_organization_members_endpoint(
 ) -> list[OrganizationMembershipResponse]:
     memberships = await list_members(db, organization_id=organization_id)
     return [OrganizationMembershipResponse.model_validate(m) for m in memberships]
+
+
+@router.get(
+    "/{organization_id}/member-users", response_model=list[OrganizationMemberUserResponse]
+)
+async def list_organization_member_users_endpoint(
+    organization_id: uuid.UUID,
+    user: User = Depends(_require_read_directory),
+    db: AsyncSession = Depends(get_session),
+) -> list[OrganizationMemberUserResponse]:
+    """Deliberately separate from `/{organization_id}/members` above (which
+    requires `organization:manage` and returns bare membership rows, no
+    names): this is the narrow, name-and-avatar-only directory a regular
+    User/Manager can read to pick a registered colleague as a conversation
+    participant (see `app.conversations.router`'s participant endpoints).
+    `user:read-directory` gates *that* it can be listed at all; membership
+    in `organization_id` (or `system:admin`) gates *which* organization's
+    directory a given caller may read -- same posture as every other
+    organization-scoped endpoint (`app.conversations.authz`)."""
+    if not await user_can_access_organization(
+        db, user_id=user.id, organization_id=organization_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="not a member of the target organization",
+        )
+    users = await list_member_users(db, organization_id=organization_id)
+    return [OrganizationMemberUserResponse.model_validate(u) for u in users]
 
 
 @router.post(

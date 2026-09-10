@@ -183,7 +183,17 @@ class ConversationParticipant(Base):
     via `app.diarization.models.DetectedSpeaker.participant_id` (human-
     reviewed, never automatic). `known_speaker_id` (post-GA) is the
     separate, optional cross-conversation identity link — see
-    app.people.models.KnownSpeaker's docstring."""
+    app.people.models.KnownSpeaker's docstring.
+
+    `user_id` (post-GA) is a second, independent optional link: to a
+    registered system user (`app.identity.models.User`), the same-org
+    person who actually used VocaDox — e.g. "I was there" attribution or
+    avatar display, distinct from KnownSpeaker's org-wide *external*
+    identity bookkeeping. Both may be set at once (a staff member can be
+    both a KnownSpeaker and a User), or neither. `ondelete="SET NULL"`
+    mirrors `known_speaker_id`: deleting a user must not alter an existing
+    (possibly already shared) conversation's participant record — only the
+    link is cleared, `display_name` remains as the historical value."""
 
     __tablename__ = "conversation_participants"
 
@@ -199,6 +209,9 @@ class ConversationParticipant(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     known_speaker_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("known_speakers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
