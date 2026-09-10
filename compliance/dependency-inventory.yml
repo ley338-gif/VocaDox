@@ -286,6 +286,20 @@ dependencies:
       (app/documents/export_formats.py). Pure-Python core, no native
       dependency, no network calls.
 
+  - name: pillow
+    ecosystem: pypi
+    version_constraint: ">=12.3,<13.0"
+    license: MIT-CMU
+    license_source_url: https://pypi.org/pypi/pillow/json
+    approval_status: approved
+    notes: >
+      info.license_expression = MIT-CMU (PyPI JSON, version 12.3.0).
+      Production-readiness security hardening: fully decodes and normalizes
+      avatar/letterhead PNG and JPEG uploads before browser serving or
+      document rendering, enforcing pixel limits and stripping EXIF/GPS
+      metadata. Pillow was already an approved transitive runtime dependency
+      of reportlab; this records its new direct use explicitly.
+
   # Phase 4 note: Ollama itself (the local LLM inference server) was never
   # a Python dependency — it was a separate bundled container image (see
   # docs/architecture/adr/0024-llm-provider-selection.md for the original

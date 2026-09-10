@@ -40,7 +40,10 @@ function matchesNarrowViewport(): boolean {
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, csrfToken, hasPermission, logout } = useAuth();
-  const { pendingCount: pendingOfflineRecordings } = useOfflineQueueSync(csrfToken);
+  const { pendingCount: pendingOfflineRecordings } = useOfflineQueueSync(
+    csrfToken,
+    user?.userId ?? null
+  );
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);

@@ -1,248 +1,201 @@
-# Threat model (Phase 0 skeleton)
+# VocaDox threat model
 
-**Status:** initial skeleton per spec §35, §59–62. Auth itself is out of
-scope for Phase 0 (spec: identity/auth land Phase 1) — this document
-records the boundary now so Phase 1 implements against an agreed threat
-model rather than inventing one ad hoc.
+**Status:** Production Readiness 2.0 review, 2026-09-10
 
-## 1. Upload handling
+**Scope:** current application through Phase 14, including post-GA features
 
-Media uploads (audio/video of conversations) are the primary untrusted
-input surface.
+**Method:** trust-boundary review plus targeted abuse cases for authentication,
+authorization, uploads, exports/connectors, LLM output, browser storage and operations.
 
-- **MIME/format/size/duration validation**: uploads must be validated
-  server-side against an explicit allow-list of formats before any
-  processing touches them — never trust the client-supplied
-  `Content-Type` header alone. Size and duration caps must be enforced
-  before the file is fully buffered into memory (streaming validation),
-  to prevent trivial resource-exhaustion DoS.
-- **ffmpeg isolation**: any ffmpeg (or similar) invocation for
-  transcoding/inspection must run as a subprocess with an argument list
-  built from a fixed template — **never** shell string concatenation of
-  user-controlled filenames or metadata into a command string (classic
-  shell-injection vector). Use `subprocess.run([...])` with a list of
-  arguments, never `shell=True` with interpolated input. This applies to
-  every future domain that shells out (`media`, `transcription`,
-  `diarization`).
-- **No shell string concatenation from user input**, full stop — applies
-  to any subprocess invocation anywhere in the codebase, not just media
-  processing.
+VocaDox processes conversation audio, transcripts, inferred facts, documents and
+possibly health-related identifiers. All of these are sensitive. An on-premise
+deployment reduces third-party exposure, but does not make authenticated users,
+browsers, imported files, configured providers or the local network trusted.
 
-## 2. Path traversal prevention
+## 1. Trust boundaries and assets
 
-- All persisted media/blobs use **server-generated UUID storage keys**,
-  never a caller-supplied filename or path, so a malicious filename
-  (`../../etc/passwd`, embedded null bytes, etc.) can never influence where
-  a file is read from or written to.
-- Implemented in Phase 0 by `LocalFilesystemStorage`
-  (`backend/app/providers/storage.py`): `save()` always mints a fresh
-  `uuid4()`-derived key; `load()`/`delete()`/`exists()` reject any key
-  containing `/`, `\`, or `..`, and additionally verify the resolved path
-  stays inside the storage root before touching the filesystem. Covered by
-  `backend/tests/test_providers.py::test_local_filesystem_storage_rejects_path_traversal`.
-- Any future `StorageProvider` implementation (e.g. object storage) must
-  preserve this invariant: the caller never controls the storage key.
+| Boundary | Untrusted input | Primary controls |
+|---|---|---|
+| Browser → reverse proxy/API | Cookies, JSON, uploads, path/query values | TLS, rate limits, schema/size validation, server-side sessions, CSRF |
+| User/service account → organization data | UUIDs, organization/team IDs, scopes | permission checks plus organization/team filtering; indistinguishable 404 across boundaries |
+| Public recipient → recap | bearer token in URL | random one-time token, hash at rest, approval, expiry/revocation, no-store, rate limit |
+| File → storage/renderers | audio, PNG/JPEG, GDT, ICS | streaming byte caps, magic/decode checks, pixel/ZIP limits, server-generated keys |
+| Transcript/facts → LLM | prompt-injection text and provider output | bounded context, structured schemas, evidence resolution, human approval where required |
+| VocaDox → webhook/LLM endpoint | administrator-supplied URL | HTTPS, public-IP validation, no redirects/proxy inheritance, time/response limits, network policy |
+| Browser → IndexedDB | raw offline recording | per-user ownership binding; browser-profile/device protections remain required |
+| Runtime → backup/storage | database, media, embeddings, secrets | explicit host paths, least access, operator encryption/retention and restore procedures |
 
-## 3. Secrets management
+Highest-value assets are raw audio, transcript and fact content; approved documents
+and recaps; patient/external references; voice embeddings; account credentials,
+sessions, API keys and webhook secrets; audit and backup data.
 
-- No secret (DB password, API key, signing key) is ever hardcoded in
-  source or committed to the repo. `deploy/.env.example` documents every
-  required variable with placeholder/non-functional values only; the real
-  `.env` is gitignored.
-- `app.platform.logging.JsonFormatter` defensively redacts a fixed list of
-  sensitive field names (`password`, `secret`, `token`, `api_key`,
-  `authorization`, plus content fields — see §4) if they're ever
-  accidentally passed to a log call, as a defense-in-depth backstop; the
-  primary control is simply never logging them in the first place.
-- Phase 1+ auth implementation must source signing keys / credential
-  material from environment variables or a secrets manager, never from a
-  config file checked into git.
+## 2. Authentication and authorization
 
-## 4. Sensitive content in logs (spec §63)
+- Local passwords use Argon2id. Login gives the same response for an unknown user,
+  a wrong password and an inactive account.
+- Sessions are opaque, absolute-expiry, server-side Valkey records. Cookies are
+  `HttpOnly`, `SameSite=Lax` and `Secure` in production. Every state-changing
+  human-session route requires the session-bound `X-CSRF-Token`.
+- Each session captures `users.session_generation`. Password reset and account
+  deactivation increment it; every protected request compares it with the current
+  database value. Thus all prior sessions fail immediately without a cache scan.
+- RBAC checks permission codes, never role names. Conversation access combines the
+  permission with organization membership and, where applicable, team scope.
+- Service-account keys are `{prefix}.{secret}`. Only the prefix and Argon2id hash
+  are stored. Rotation overwrites both and revocation is checked on every request.
+  Integration routes additionally enforce a per-route scope and the account's one
+  organization. Template enumeration returns only global templates plus that
+  organization's templates.
+- Production Nginx applies per-IP request limits to the general API and tighter
+  limits to login and public recap access. Only Nginx publishes host ports in the
+  production Compose topology.
 
-Transcript text, raw audio bytes, LLM prompts/completions, and secrets must
-never appear in logs. Enforced today by:
-- Convention: call sites must not pass this content as log fields.
-- Backstop: `JsonFormatter` redacts a fixed sensitive-key list (see
-  `backend/app/platform/logging.py`).
-- Test: `backend/tests/test_logging.py::test_sensitive_extra_fields_are_redacted`
-  asserts the redaction actually happens.
+## 3. Public recap boundary
 
-This same rule extends to future observability additions (metrics,
-tracing) — a span attribute or metric label is just as much a leak vector
-as a log line.
+The only intentionally unauthenticated product-data route is
+`GET /api/v1/public/recap/{token}`.
 
-## 5. Auth boundaries (implemented in Phase 1)
+- Creating, listing and revoking share links requires `recap:approve` plus normal
+  conversation organization/team authorization.
+- The 256-bit random bearer token is returned only in the create response. The
+  database stores only its SHA-256 digest; later list responses expose metadata,
+  never a reusable URL.
+- Links expire after at most 30 days, can be revoked immediately, and resolve only
+  the current approved recap revision. Missing, expired, revoked and unapproved
+  states all return the same 404.
+- Responses set `Cache-Control: no-store, private`, `Pragma: no-cache` and
+  `Referrer-Policy: no-referrer`. Production Nginx rate-limits the route.
 
-Authentication/authorization are now real, not deferred. Local
-username/password auth, server-side sessions (Valkey-backed — see
-[ADR-0009](../architecture/adr/0009-session-storage.md)), CSRF protection,
-and genuine permission-based RBAC (`app.identity.rbac`) are implemented in
-`backend/app/identity/`. What was recorded here as a Phase 1 requirement in
-Phase 0 is now the actual state:
+Possession of a valid URL still grants access by design. Recipients can copy or
+photograph content after delivery; no technical control can revoke such copies.
 
-- All routers registered under `app.platform.health` remain intentionally
-  unauthenticated (liveness/readiness probes must not require credentials)
-  — verified: `RequestIdMiddleware`/CORS wrap them but no auth dependency
-  does, and `tests/identity/test_api_auth.py` covers the auth endpoints
-  without touching `/health/*`.
-- `POST /api/v1/auth/login` and `POST /api/v1/auth/logout` and `GET
-  /api/v1/auth/me` are the only identity endpoints; every *future* domain
-  router must depend on `app.identity.deps.get_current_user` (or
-  `require_permission(code)`) by default — "public by default" remains the
-  wrong default and needs an explicit, reviewed opt-in per route.
-- **CSRF**: a synchronizer token (`SessionData.csrf_token`), generated
-  server-side at login and handed to the client once in the login response
-  body (never as a separately readable cookie), must be echoed in the
-  `X-CSRF-Token` header on state-changing requests
-  (`app.identity.deps.require_csrf`). Verified with an integration test
-  that a request carrying only the (httponly) session cookie and no/wrong
-  CSRF header is rejected with 403
-  (`tests/identity/test_api_auth.py::test_logout_without_csrf_header_is_rejected`,
-  `::test_logout_with_wrong_csrf_token_is_rejected`).
-- **Session cookie**: `httponly`, `SameSite=Lax`, and `Secure` by default
-  (`VOCADOX_SESSION_COOKIE_SECURE`, disabled only in the plain-HTTP local
-  dev compose stack — see `deploy/compose.dev.yml`'s comment on that
-  variable). Session tokens are opaque (`secrets.token_urlsafe(32)`),
-  carry no user data, and are invalidated server-side immediately on
-  logout (`SessionStore.delete`) — verified end-to-end
-  (`test_logout_invalidates_session`).
-- **No username enumeration**: `POST /auth/login` returns an identical
-  generic 401 body for "unknown username" and "wrong password" — verified
-  (`test_login_rejects_inactive_user_and_does_not_leak_reason`).
-- **Passwords**: Argon2id via `argon2-cffi` (see
-  [ADR-0010](../architecture/adr/0010-argon2-password-hashing.md)), never
-  logged, never returned by any endpoint or included in any audit event.
-- **RBAC is permission-based, not role-string comparison**: every
-  authorization check resolves a caller's actual permission set
-  (`app.identity.rbac.get_user_permissions`, walking
-  User → Group → Role → Permission) and checks for a specific code (e.g.
-  `system:admin`) — there is no `if role == "admin"` anywhere in the
-  codebase, and `tests/identity/test_rbac.py` exercises the resolution
-  chain directly (union across multiple groups, removal of a membership
-  removing the permission, etc.).
-- Organization-scoped data (spec's `organizations`/`organization_memberships`)
-  still needs query-layer filtering by the caller's organization
-  membership once domains that own org-scoped data exist — Phase 1 only
-  ships the `organizations`/`organization_memberships` foundation tables
-  and basic CRUD, so this requirement carries forward unchanged to
-  whichever phase adds the first org-scoped domain data.
-- **Known gap, tracked, not blocking**: there is no server-side registry
-  of a user's active sessions, so there is no "revoke this user's other
-  sessions" admin action yet (see ADR-0009's Consequences) — acceptable
-  for Phase 1 since the admin portal that would host that action doesn't
-  exist until Phase 7.
+## 4. Upload, storage and export handling
 
-## 6. Privacy-zone ("Nicht dokumentieren") handling
+- Audio ingestion streams into a controlled temporary file, hashing and enforcing
+  the configured maximum before permanent storage. Format detection uses bytes,
+  not the supplied MIME type. Original filenames never form storage paths and are
+  sanitized before display/header use.
+- Avatar and letterhead inputs are capped, fully decoded as PNG/JPEG, bounded to
+  10 million pixels and 10,000 pixels per side, orientation-normalized and
+  re-encoded. This rejects truncated/polyglot/decompression-bomb inputs and strips
+  EXIF/GPS and other metadata. Serving re-checks both the fixed storage namespace
+  and image magic, preventing a media key from being read through an avatar/logo
+  endpoint.
+- `LocalFilesystemStorage` mints UUID filenames, sanitizes namespace segments,
+  rejects traversal/absolute forms and verifies the resolved path remains below
+  its configured root.
+- Document/recap filenames are server-generated UUID/revision values. Text sent to
+  ReportLab's markup parser is XML-escaped. GDT field lengths are encoded and
+  checked by the line codec.
+- The GDT bridge caps inbound files before parsing, rejects symlink/resolved paths
+  outside its import directory, requires HTTPS for remote API endpoints, and
+  accepts only bare `.gdt`/`.pdf` output names. ZIP bundles must contain exactly
+  one of each, with compressed/uncompressed size and ratio limits; archive names
+  never become paths without validation.
+- ICS import is local to the browser, limited to 2 MiB, bounded by line length and
+  event count, and sends only the user-selected conversation title through the
+  ordinary create route.
 
-The product must support marking portions of a conversation as "do not
-document" (privacy zones called out in the UI as "Nicht dokumentieren").
-Requirements to carry into Phase 1+ implementation:
+## 5. LLM and evidence boundary
 
-- Content inside a privacy zone must be excluded from `extracted_facts`
-  generation entirely — not merely hidden in the UI after extraction. If
-  extraction already ran before a zone is marked, the resulting facts must
-  be deletable, not just flagged.
-- Whether privacy-zone audio/transcript itself is retained at all (vs.
-  redacted at the source) is a policy decision to be made explicit in a
-  future ADR before Phase 1 conversation-processing ships — flagged here so
-  it isn't decided implicitly by whatever the pipeline happens to do first.
-- Privacy-zone boundaries themselves (timestamps) are still audit-relevant
-  metadata (someone marked this zone, when) and should be captured in
-  `audit_events` even though the zone's *content* is excluded from
-  processing.
+Transcript and document content is adversarial data, not an instruction channel.
+Prompts tell providers to use only supplied material, but prompt wording is not the
+security boundary; server-side validation is.
 
-## 7. Conversation/media handling (implemented in Phase 2)
+- Extraction accepts structured output and resolves claimed evidence only against
+  real segments from the active transcript. Document composition is deterministic
+  from reviewed facts and uses the centralized redaction-aware renderer.
+- Ask retrieves only already-authorized facts. Every statement must cite one or
+  more IDs, and all IDs must be in the exact candidate set supplied to the model;
+  malformed, uncited or fabricated-ID statements are dropped.
+- Protocol output is schema-bound, count/text bounded, restricted to known section
+  and item types, and rejected as a whole if any section or item has an empty or
+  nonexistent transcript citation. Model-created responsible/due-date wording is
+  still human-reviewable output, not an authoritative task assignment.
+- Recaps are explicitly labeled AI-generated and cannot be exported or shared until
+  a user with `recap:approve` approves the current revision.
+- Live drafts are short, provisional, ephemeral and never feed the authoritative
+  extraction/document pipeline.
+- Prompts, completions, transcript text and raw audio are excluded from logs. The
+  JSON formatter redacts sensitive keys as defense in depth.
 
-Section 1's Phase 0 skeleton predicted this correctly; here is what
-Phase 2 actually implemented, plus threats specific to conversation
-capture that weren't anticipated in the skeleton.
+Citation existence proves provenance, not semantic entailment. Ask/protocol users
+must inspect the linked source for consequential decisions; automated semantic
+verification remains an open research/quality problem.
 
-- **MIME/format/size validation, streaming.** `app.media.service.
-  spool_upload` streams the request body to a controlled temp file
-  (`Settings.upload_temp_dir`), hashing and enforcing
-  `Settings.max_upload_size_bytes` as bytes arrive — never buffers the
-  full payload before checking the size cap. `app.media.validation.
-  sniff_audio_format` inspects magic bytes against a small allow-list
-  (WebM/Opus, WAV, MP3, M4A); the client-supplied `Content-Type` is never
-  trusted alone. Empty files and unrecognized formats are rejected with
-  `422`, verified in `tests/media/test_service.py` and
-  `tests/conversations/test_api.py::test_upload_empty_file_is_rejected` /
-  `::test_upload_non_audio_file_is_rejected`.
-- **No transcoding tool is invoked in Phase 2** (see
-  [ADR-0014](../architecture/adr/0014-media-normalization-and-metadata.md)),
-  so the ffmpeg-subprocess-injection risk flagged in section 1 has no
-  active code path yet — it remains a requirement for whichever future
-  phase actually adopts a transcoding tool.
-- **Path traversal / malicious filenames.** Confirmed still true under
-  Phase 2's namespaced storage keys (see
-  [ADR-0013](../architecture/adr/0013-media-storage-layout.md)):
-  `original_filename` is metadata only, sanitized on both display
-  (`sanitize_display_filename`) and `Content-Disposition`
-  (`content_disposition_filename`, tested against CRLF-injection and
-  quote-breaking payloads in `tests/media/test_validation.py` and
-  end-to-end in `tests/conversations/test_api.py::
-  test_malicious_filename_does_not_leak_into_storage_or_headers`).
-- **Cross-organization IDOR.** The hard security property for Phase 2:
-  every conversation/media/participant/marker/note endpoint resolves
-  access through `app.conversations.authz.authorize_conversation_access`
-  (Permission + Organization Membership + Conversation's Organization),
-  and returns `404` — never `403` — when the resource exists but belongs
-  to an organization the caller isn't a member of, so UUID-guessing can't
-  even distinguish "doesn't exist" from "exists, not yours." Verified by
-  `tests/conversations/test_api.py::
-  test_cross_organization_uuid_guessing_is_denied` and
-  `::test_media_access_denied_across_organizations`.
-- **Unauthorized/anonymous media access.** The storage directory is never
-  exposed as a static file server; every byte returned by `GET .../media/
-  {id}/content` passes through `authorize_conversation_access` first.
-  There is no unauthenticated path to any media content.
-- **Storage exhaustion / resource bombs.** `max_upload_size_bytes` bounds
-  any single object; there is currently no per-organization or
-  per-user aggregate storage quota — flagged as a residual risk in
-  `PHASE_2_VALIDATION_REPORT.md` (Known Limitations), acceptable for a
-  single-tenant on-prem deployment where the operator controls who has
-  upload permission at all, but a real gap if that assumption ever
-  changes.
-- **Abandoned/incomplete uploads and temp-file leakage.** `spool_upload`
-  writes to `Settings.upload_temp_dir` with an unpredictable
-  `tempfile.mkstemp`-derived name (never the client's filename) and
-  `0o600` permissions where the platform supports it; the temp file is
-  deleted on any validation failure (empty file, oversize, unrecognized
-  format) and on ingestion failure after the DB row is flushed but before
-  the atomic move into permanent storage. What is **not** yet
-  implemented: a scheduled sweep of `upload_temp_dir` for orphans left by
-  a hard process crash mid-upload (the OS-level temp dir is not
-  auto-cleared) — see `docs/operations/media-cleanup.md` for the interim
-  manual/cron-based mitigation.
-- **Source tampering / hash mismatch.** SHA-256 is computed once, during
-  ingestion, from the exact bytes that get moved into permanent storage
-  (`app.media.service.ingest_media`) — there is no code path that
-  recomputes or overwrites `media_assets.sha256` afterward. The Phase 2
-  validation report records a live before/after/restart hash comparison
-  (see "Source Integrity Validation" there) as the operational proof this
-  holds in practice, not just in code review.
-- **Deletion failures.** `soft_delete_conversation` calls
-  `StorageProvider.delete` for each `MediaAsset` inside the same request/
-  transaction as the DB soft-delete; if the filesystem delete throws, the
-  whole request fails (the DB transaction is not committed), so a
-  conversation can't end up "marked deleted" while its media survives on
-  disk due to a partial failure. A storage-layer delete that silently
-  no-ops on a missing file (already-gone) does not raise, matching
-  idempotent-delete semantics.
-- **Recording without consent / browser mic misuse.** The frontend never
-  calls `getUserMedia` until the user explicitly clicks past the consent
-  notice AND clicks "Start recording" a second time via
-  `useRecorder.requestPermission()` — there is no auto-start anywhere
-  (`frontend/src/recording/recordingMachine.test.ts`, "never auto-starts
-  recording"). The consent notice
-  text itself is explicit that confirming it does **not** make the
-  recording legally compliant — that responsibility stays with the
-  deploying organization, documented in
-  `docs/security/recording-privacy.md`.
+## 6. Privacy, retention and deletion
 
-## Out of scope for this document
+- Privacy-zone transcript segments are excluded before extraction. Redaction is a
+  fact state consumed by one renderer used by documents, search, Ask and recap
+  input, reducing inconsistent downstream masking.
+- Offline recordings remain only in IndexedDB until upload succeeds. Each entry is
+  bound to the immutable VocaDox user ID; another login on the same browser neither
+  counts nor uploads it. Legacy unowned entries are quarantined.
+- Voice embeddings are organization-scoped, not returned by APIs, enrolled only by
+  an explicit authorized action and used only for suggestions that require human
+  confirmation. Deleting the known-speaker record deletes its embedding.
+- Conversation retention cleanup and deletion cover database-owned artifacts and
+  stored media. Public share links cascade with their conversation. Audit events
+  record identifiers/actions rather than conversation content.
+- Backups necessarily contain sensitive database/media state. Production requires
+  an explicit host backup path; encryption, access control, off-host copying and
+  deletion are operator responsibilities documented in operations guidance.
 
-Full STRIDE-style analysis per domain, and anything specific to
-authentication mechanisms (SSO, MFA, session handling) — those belong to
-the `identity` domain's own design doc once Phase 1 begins.
+## 7. Outbound integrations and operational abuse
+
+- Webhook creation/update requires `webhook:write`. Targets must use HTTPS and all
+  resolved addresses must be public. The address is revalidated immediately before
+  each HTTPS attempt; redirects and environment proxy inheritance are disabled.
+  Attempts have a 10-second timeout, capture at most 64 KiB of response text, retry
+  on a finite schedule and emit only an allow-list of metadata fields. Payloads are
+  HMAC-SHA256 signed with timestamp, event and delivery IDs.
+- The production network makes Postgres and Valkey internal-only. Speech,
+  diarization and extraction workers receive outbound egress; no database/cache
+  port is published. Operators should additionally restrict backend webhook/LLM
+  egress at the host/firewall layer.
+- Live recording chunks are capped at 25 MiB and API request rates are limited at
+  the production proxy. Queue retries and webhook retries are bounded. A single
+  media object is capped, though aggregate tenant quotas are not yet implemented.
+
+## 8. Findings from the Production Readiness 2.0 sweep
+
+No Critical finding was identified.
+
+| ID | Severity | Finding | Resolution |
+|---|---|---|---|
+| PR2-SEC-01 | High | Password reset/deactivation left issued sessions valid | Fixed: database session generation checked on every protected request |
+| PR2-SEC-02 | High | Recap list re-exposed bearer tokens under weaker read permission | Fixed: approve-only management, creation-only token, hash at rest, no-cache headers |
+| PR2-SEC-03 | High | Avatar/logo loaders could read a known key from another storage namespace | Fixed: strict namespace and image revalidation |
+| PR2-SEC-04 | High | GDT response filenames/ZIP members could escape the export directory | Fixed: basename, extension, member-count, size and compression checks |
+| PR2-SEC-05 | High | Remote GDT API URL could use cleartext HTTP for a bearer key | Fixed: HTTPS required except explicit localhost development |
+| PR2-SEC-06 | Medium | Protocol accepted empty/fabricated citations and unconstrained types/text | Fixed: strict schema bounds and all-or-nothing real-source resolution |
+| PR2-SEC-07 | Medium | PNG/JPEG magic-only validation allowed malformed images and retained EXIF | Fixed: bounded full decode and metadata-stripping re-encode |
+| PR2-SEC-08 | Medium | Service account could enumerate another organization's templates | Fixed: global plus account-organization filter |
+| PR2-SEC-09 | Medium | Offline queue was shared across browser logins | Fixed: immutable user ownership; legacy entries quarantined |
+| PR2-SEC-10 | Medium | Login/public/API surfaces lacked production abuse throttling | Fixed: dedicated Nginx zones returning 429 |
+| PR2-SEC-11 | Medium | Webhook response read and target age were unbounded | Fixed: delivery-time revalidation, timeout, 64-KiB capture, no redirects/proxy env |
+| PR2-SEC-12 | Low | Local ICS and inbound GDT parsing had no explicit file/event caps | Fixed: byte, line and event limits |
+| PR2-SEC-13 | Medium | Reference webhook verifier accepted correctly signed replays forever | Fixed: five-minute past/future timestamp tolerance |
+
+## 9. Accepted residual risks and required deployment controls
+
+| Risk | Rating | Acceptance / required control |
+|---|---|---|
+| Public recap bearer URL can be forwarded by a recipient | Medium | Inherent feature trade-off; short chosen expiry, immediate revocation, approved/minimal content and secure communication channel required |
+| DNS rebinding can theoretically occur between validation and socket connect | Medium | Admin-only configuration plus repeated validation; production firewall must block backend access to private/link-local/metadata ranges |
+| Raw offline audio is not application-encrypted inside IndexedDB | Medium | Needed for offline recovery; use managed, encrypted devices and separate browser/OS profiles; do not enable on shared unmanaged endpoints |
+| Voiceprint similarity threshold is not population-calibrated and embeddings are biometric-like data | Medium | Suggestion only, explicit enrollment/human confirmation; obtain lawful basis/consent and disable/delete where not permitted |
+| No aggregate per-user/organization storage quota | Medium | Single-object and permission/rate limits exist; operator monitors storage and restricts upload permission until quotas are added |
+| Live whole-prefix retranscription cost grows with recording length | Medium | Auth/permission, 25-MiB request and proxy rate limits; intended for short previews, authoritative pass remains separate |
+| Ask citations cannot prove the generated wording is semantically entailed | Medium | IDs are closed-set verified and sources are visible; human review required for consequential use |
+| FHIR `DocumentReference` is not validated against an official profile/schema | Low | Base R4 shape only and local export; receiving-system conformance testing required before clinical interchange |
+| Backups and configured external LLM providers can expose all in-scope content | High if misconfigured | Operator must encrypt/restrict backups and use an approved private provider with suitable retention/processing terms |
+| Nginx per-IP throttling can affect many users behind one NAT | Low | Conservative bursts; tune zones for site topology while preserving tighter login/public limits |
+
+## 10. Review triggers
+
+Repeat this review before adding another unauthenticated route, OAuth/SSO, a hosted
+LLM, object storage, a new file parser/renderer, automatic (non-suggested) biometric
+identity, write-capable FHIR, public internet exposure, multi-tenant hosting, or a
+change to retention/backup semantics. Any new endpoint must state its authentication,
+permission, organization/team, CSRF, rate, size and logging behavior in tests.

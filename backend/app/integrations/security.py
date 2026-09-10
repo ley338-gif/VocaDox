@@ -27,6 +27,7 @@ from urllib.parse import urlsplit
 
 KEY_PREFIX_BYTES = 4  # -> 8 hex chars
 SECRET_BYTES = 32  # -> 43 url-safe base64 chars, well above the 12-char password floor
+DEFAULT_SIGNATURE_TOLERANCE_SECONDS = 5 * 60
 
 SIGNATURE_HEADER = "X-VocaDox-Signature"
 EVENT_HEADER = "X-VocaDox-Event"
@@ -64,7 +65,14 @@ def sign_payload(secret: str, body: bytes, *, timestamp: int | None = None) -> s
     return f"t={ts},v1={digest}"
 
 
-def verify_signature(secret: str, body: bytes, signature_header: str) -> bool:
+def verify_signature(
+    secret: str,
+    body: bytes,
+    signature_header: str,
+    *,
+    tolerance_seconds: int = DEFAULT_SIGNATURE_TOLERANCE_SECONDS,
+    now: int | None = None,
+) -> bool:
     """Reference verification example for webhook receivers (also used by
     this codebase's own test receiver). Returns False for any malformed
     header rather than raising, since this runs on attacker-controlled
@@ -78,6 +86,9 @@ def verify_signature(secret: str, body: bytes, signature_header: str) -> bool:
     try:
         ts = int(ts_raw)
     except ValueError:
+        return False
+    current = int(time.time()) if now is None else now
+    if tolerance_seconds < 0 or abs(current - ts) > tolerance_seconds:
         return False
     expected = sign_payload(secret, body, timestamp=ts)
     expected_v1 = expected.split("v1=", 1)[1]

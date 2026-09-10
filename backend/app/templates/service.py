@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.service import record_event
@@ -43,8 +43,15 @@ async def get_template_by_key(session: AsyncSession, key: str) -> Template | Non
     return result.scalar_one_or_none()
 
 
-async def list_templates(session: AsyncSession) -> list[Template]:
-    result = await session.execute(select(Template).order_by(Template.key.asc()))
+async def list_templates(
+    session: AsyncSession, *, organization_id: uuid.UUID | None = None
+) -> list[Template]:
+    stmt = select(Template)
+    if organization_id is not None:
+        stmt = stmt.where(
+            or_(Template.organization_id.is_(None), Template.organization_id == organization_id)
+        )
+    result = await session.execute(stmt.order_by(Template.key.asc()))
     return list(result.scalars().all())
 
 

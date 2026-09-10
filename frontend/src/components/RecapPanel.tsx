@@ -16,6 +16,7 @@ import {
   listShareLinks,
   recapExportUrl,
   revokeShareLink,
+  type CreatedShareLink,
 } from "../api/recap";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/useAuth";
@@ -46,6 +47,7 @@ function ShareLinksSection({ conversationId }: { conversationId: string }) {
   const { csrfToken, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [ttlHours, setTtlHours] = useState(TTL_OPTIONS[1].hours);
+  const [createdLink, setCreatedLink] = useState<CreatedShareLink | null>(null);
 
   const linksQuery = useQuery({
     queryKey: ["recap-share-links", conversationId],
@@ -54,8 +56,10 @@ function ShareLinksSection({ conversationId }: { conversationId: string }) {
 
   const createMutation = useMutation({
     mutationFn: () => createShareLink(conversationId, ttlHours, csrfToken ?? ""),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ["recap-share-links", conversationId] }),
+    onSuccess: (link) => {
+      setCreatedLink(link);
+      void queryClient.invalidateQueries({ queryKey: ["recap-share-links", conversationId] });
+    },
   });
 
   const revokeMutation = useMutation({
@@ -98,29 +102,46 @@ function ShareLinksSection({ conversationId }: { conversationId: string }) {
         </Button>
       </div>
 
+      {createdLink && !createdLink.revoked_at && (
+        <div className={styles.shareLinkItem} role="status">
+          <span className={styles.shareLinkUrl}>
+            {`${window.location.origin}/share/recap/${createdLink.token}`}
+          </span>
+          <span className={styles.shareLinkMeta}>
+            Jetzt kopieren — das geheime Token wird aus Sicherheitsgründen nur einmal angezeigt.
+          </span>
+          <Button
+            variant="tertiary"
+            type="button"
+            aria-label="Neu erstellten Link kopieren"
+            onClick={() =>
+              void navigator.clipboard.writeText(
+                `${window.location.origin}/share/recap/${createdLink.token}`
+              )
+            }
+          >
+            <Copy size={16} aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+
       {activeLinks.length > 0 && (
         <ul className={styles.shareLinkList}>
           {activeLinks.map((link) => {
-            const url = `${window.location.origin}/share/recap/${link.token}`;
             return (
               <li key={link.id} className={styles.shareLinkItem}>
-                <span className={styles.shareLinkUrl}>{url}</span>
+                <span className={styles.shareLinkUrl}>Aktiver Freigabe-Link</span>
                 <span className={styles.shareLinkMeta}>
                   läuft ab am {formatExpiry(link.expires_at)} · {link.access_count}× abgerufen
                 </span>
                 <Button
                   variant="tertiary"
                   type="button"
-                  aria-label="Link kopieren"
-                  onClick={() => void navigator.clipboard.writeText(url)}
-                >
-                  <Copy size={16} aria-hidden="true" />
-                </Button>
-                <Button
-                  variant="tertiary"
-                  type="button"
                   aria-label="Link widerrufen"
-                  onClick={() => revokeMutation.mutate(link.id)}
+                  onClick={() => {
+                    if (createdLink?.id === link.id) setCreatedLink(null);
+                    revokeMutation.mutate(link.id);
+                  }}
                 >
                   <Trash2 size={16} aria-hidden="true" />
                 </Button>

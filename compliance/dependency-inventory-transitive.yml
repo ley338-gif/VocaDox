@@ -3126,7 +3126,7 @@ dependencies:
   ecosystem: pypi
   version: 12.3.0
   scope: runtime
-  direct: false
+  direct: true
   license: MIT-CMU
   approval_status: approved
 - name: pip-requirements-parser

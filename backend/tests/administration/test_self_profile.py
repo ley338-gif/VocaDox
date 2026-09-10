@@ -8,7 +8,14 @@ control, ever, no matter what the request body contains.
 
 from __future__ import annotations
 
+import base64
+
 from tests.administration.conftest import login
+
+_TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUB"
+    "AScY42YAAAAASUVORK5CYII="
+)
 
 
 async def test_get_me_includes_profile_fields(client, seeded) -> None:  # noqa: ANN001
@@ -98,11 +105,7 @@ async def test_upload_and_use_own_avatar_without_user_manage(client, seeded) -> 
     upload/assign/view must work anyway; only the admin `/admin/users/*`
     surface is user:manage-gated."""
     headers = await login(client, "bob", "another very strong pw 456")
-    png_bytes = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00"
-        b"\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    png_bytes = _TINY_PNG
     upload_resp = await client.post(
         "/api/v1/auth/me/avatar",
         files={"file": ("avatar.png", png_bytes, "image/png")},
@@ -120,7 +123,7 @@ async def test_upload_and_use_own_avatar_without_user_manage(client, seeded) -> 
     # Serving is also permission-relaxed to "any authenticated user".
     get_resp = await client.get(f"/api/v1/admin/users/avatar/{asset_key}", headers=headers)
     assert get_resp.status_code == 200
-    assert get_resp.content == png_bytes
+    assert get_resp.content.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 async def test_patch_me_requires_authentication(client, seeded) -> None:  # noqa: ANN001

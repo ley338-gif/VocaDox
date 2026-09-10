@@ -15,6 +15,7 @@ contained follow-up (see the module docstring's own disclosure norm).
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -120,9 +121,7 @@ async def generate_recap(
     return recap
 
 
-async def approve_recap(
-    session: AsyncSession, *, recap: Recap, approved_by: User
-) -> Recap:
+async def approve_recap(session: AsyncSession, *, recap: Recap, approved_by: User) -> Recap:
     """Only ever reachable from a route requiring `recap:approve` — the AI
     never calls this."""
     if recap.current_revision_id is None:
@@ -157,7 +156,7 @@ async def create_share_link(
     recap: Recap,
     ttl_hours: int,
     created_by_user_id: uuid.UUID | None,
-) -> RecapShareLink:
+) -> tuple[RecapShareLink, str]:
     if recap.current_revision_id is None:
         raise ShareLinkNotAvailableError("no revision to share")
     revision = await session.get(RecapRevision, recap.current_revision_id)
@@ -165,15 +164,16 @@ async def create_share_link(
         raise ShareLinkNotAvailableError("recap must be approved before it can be shared")
     ttl_hours = min(max(ttl_hours, 1), MAX_SHARE_LINK_TTL_HOURS)
 
+    token = secrets.token_urlsafe(32)
     link = RecapShareLink(
         conversation_id=conversation_id,
-        token=secrets.token_urlsafe(32),
+        token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
         expires_at=datetime.now(UTC) + timedelta(hours=ttl_hours),
         created_by_user_id=created_by_user_id,
     )
     session.add(link)
     await session.flush()
-    return link
+    return link, token
 
 
 async def list_share_links(
@@ -198,7 +198,10 @@ async def get_valid_share_link(session: AsyncSession, *, token: str) -> RecapSha
     deliberately collapsed into the same "not available" outcome by the
     caller, matching this project's established never-distinguish-404-
     reasons posture for anything reachable without normal authorization."""
-    result = await session.execute(select(RecapShareLink).where(RecapShareLink.token == token))
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    result = await session.execute(
+        select(RecapShareLink).where(RecapShareLink.token_hash == token_hash)
+    )
     link = result.scalar_one_or_none()
     if link is None:
         return None

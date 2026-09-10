@@ -21,21 +21,21 @@ import {
   removeQueuedRecording,
 } from "./offlineQueue";
 
-export function useOfflineQueueSync(csrfToken: string | null) {
+export function useOfflineQueueSync(csrfToken: string | null, userId: string | null) {
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const refreshCount = useCallback(async () => {
-    if (!isOfflineQueueSupported()) return;
-    const queued = await listQueuedRecordings();
+    if (!isOfflineQueueSupported() || !userId) return;
+    const queued = await listQueuedRecordings(userId);
     setPendingCount(queued.length);
-  }, []);
+  }, [userId]);
 
   const flush = useCallback(async () => {
-    if (!csrfToken || !isOfflineQueueSupported() || isSyncing) return;
+    if (!csrfToken || !userId || !isOfflineQueueSupported() || isSyncing) return;
     setIsSyncing(true);
     try {
-      const queued = await listQueuedRecordings();
+      const queued = await listQueuedRecordings(userId);
       const sorted = [...queued].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       for (const entry of sorted) {
         try {
@@ -61,7 +61,7 @@ export function useOfflineQueueSync(csrfToken: string | null) {
       setIsSyncing(false);
       await refreshCount();
     }
-  }, [csrfToken, isSyncing, refreshCount]);
+  }, [csrfToken, userId, isSyncing, refreshCount]);
 
   useEffect(() => {
     void refreshCount();
@@ -70,7 +70,7 @@ export function useOfflineQueueSync(csrfToken: string | null) {
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [csrfToken]);
+  }, [csrfToken, userId]);
 
   return { pendingCount, isSyncing };
 }

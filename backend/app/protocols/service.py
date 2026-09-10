@@ -102,6 +102,24 @@ def _resolve_sources(
     return resolved
 
 
+def _require_resolved_sources(
+    segments_by_sequence: dict[int, TranscriptSegment],
+    claimed_sequences: list[int],
+    *,
+    context: str,
+) -> list[TranscriptSegment]:
+    resolved = _resolve_sources(segments_by_sequence, claimed_sequences)
+    if len(resolved) != len(set(claimed_sequences)):
+        raise ProtocolGenerationValidationError(
+            f"LLM response contains nonexistent transcript citations in {context}"
+        )
+    if not resolved:
+        raise ProtocolGenerationValidationError(
+            f"LLM response contains an ungrounded {context}"
+        )
+    return resolved
+
+
 async def run_protocol_generation(
     session: AsyncSession,
     *,
@@ -157,8 +175,10 @@ async def run_protocol_generation(
 
     item_count = 0
     for section_position, gen_section in enumerate(validated.sections):
-        section_sources = _resolve_sources(
-            segments_by_sequence, gen_section.source_segment_sequences
+        section_sources = _require_resolved_sources(
+            segments_by_sequence,
+            gen_section.source_segment_sequences,
+            context=f"section {section_position}",
         )
         start_ms = min((s.start_ms for s in section_sources), default=None)
         end_ms = max((s.end_ms for s in section_sources), default=None)
@@ -182,8 +202,10 @@ async def run_protocol_generation(
             )
 
         for item_position, gen_item in enumerate(gen_section.items):
-            item_sources = _resolve_sources(
-                segments_by_sequence, gen_item.source_segment_sequences
+            item_sources = _require_resolved_sources(
+                segments_by_sequence,
+                gen_item.source_segment_sequences,
+                context=f"section {section_position} item {item_position}",
             )
             item = ProtocolItem(
                 protocol_section_id=section.id,
