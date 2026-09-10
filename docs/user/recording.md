@@ -97,9 +97,16 @@ hochladen** (upload recording), VocaDox saves the finished recording on
 your device (not just in memory — it survives closing the app/browser)
 and shows "Kein Netz — die Aufnahme wurde lokal gespeichert…". You don't
 need to do anything else: the next time your device has a working
-connection, VocaDox uploads it automatically in the background. A small
-indicator ("N Aufnahmen warten") in the top bar shows whether anything
-is still queued.
+connection, VocaDox uploads it automatically in the background. The top bar
+shows whether the recording is safely stored locally, waiting for a connection,
+being uploaded, or safely transferred.
+
+Temporary connection or server problems are retried automatically with a short,
+increasing wait between attempts. If the server permanently rejects a recording,
+the top bar shows **Upload fehlgeschlagen**. You can retry it there. Deleting a
+failed local recording requires confirmation because it may be the only remaining
+copy. A local recording is otherwise removed only after the server confirms the
+upload; repeating the upload does not create a duplicate.
 
 This only covers a recording that's already **finished** (you clicked
 Stop) at the moment of upload — an in-progress recording still needs an

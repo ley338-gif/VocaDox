@@ -128,9 +128,11 @@ verification remains an open research/quality problem.
 - Privacy-zone transcript segments are excluded before extraction. Redaction is a
   fact state consumed by one renderer used by documents, search, Ask and recap
   input, reducing inconsistent downstream masking.
-- Offline recordings remain only in IndexedDB until upload succeeds. Each entry is
-  bound to the immutable VocaDox user ID; another login on the same browser neither
-  counts nor uploads it. Legacy unowned entries are quarantined.
+- Offline recordings remain only in IndexedDB until upload succeeds or the owner
+  explicitly confirms deletion after a permanent failure. Each entry is bound to
+  the immutable VocaDox user ID; another login on the same browser neither counts
+  nor uploads it. Legacy unowned entries are quarantined. Stable local and server
+  idempotency keys prevent retry-created duplicate assets.
 - Voice embeddings are organization-scoped, not returned by APIs, enrolled only by
   an explicit authorized action and used only for suggestions that require human
   confirmation. Deleting the known-speaker record deletes its embedding.

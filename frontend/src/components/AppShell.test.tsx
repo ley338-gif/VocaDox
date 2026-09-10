@@ -5,7 +5,17 @@ import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
 
 vi.mock("../auth/useAuth", () => ({ useAuth: () => ({ user: { displayName: "Test", avatarAssetKey: null }, csrfToken: null, hasPermission: () => true, logout: vi.fn() }) }));
-vi.mock("../recording/useOfflineQueueSync", () => ({ useOfflineQueueSync: () => ({ pendingCount: 0 }) }));
+vi.mock("../recording/useOfflineQueueSync", () => ({
+  useOfflineQueueSync: () => ({
+    pendingCount: 0,
+    failedCount: 0,
+    isSyncing: false,
+    isOnline: true,
+    recentlyCompleted: 0,
+    retryFailed: vi.fn(),
+    discardFailed: vi.fn(),
+  }),
+}));
 vi.mock("../api/admin", () => ({ getDashboard: () => new Promise(() => {}), avatarUrl: () => null }));
 
 function show(components?: { healthy: boolean }[]) {
