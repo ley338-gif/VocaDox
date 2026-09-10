@@ -86,7 +86,7 @@ import styles from "./ConversationDetailPage.module.css";
 const TAB_LABELS: Record<Tab, string> = {
   overview: "Übersicht",
   document: "Dokumentation",
-  review: "Review",
+  review: "Prüfung",
   audio: "Audio",
   transcript: "Transkript",
   facts: "Fakten",

@@ -71,7 +71,7 @@ export const ADMIN_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "AI",
+    title: "KI",
     items: [
       { to: "/admin/models", label: "Modelle", icon: Cpu, permission: "provider:read" },
       { to: "/admin/speech", label: "Sprache", icon: AudioLines, permission: "provider:read" },
@@ -94,7 +94,7 @@ export const ADMIN_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "Integrations",
+    title: "Integrationen",
     items: [
       { to: "/admin/service-accounts", label: "Service Accounts", icon: KeyRound, permission: "service-account:read" },
       { to: "/admin/webhooks", label: "Webhooks", icon: Webhook, permission: "webhook:read" },
