@@ -7,7 +7,7 @@ _note: "Full resolved dependency tree (direct + transitive) for both ecosystems.
   \ \u2014 it ships in the worker-speech/worker-diarization images only, never in the api/frontend images\
   \ (see backend/worker.Dockerfile)."
 summary:
-  approved: 499
+  approved: 502
   review_required: 3
   blocked: 0
   unknown: 0
@@ -354,6 +354,13 @@ dependencies:
   scope: dev
   direct: false
   license: MIT
+  approval_status: approved
+- name: '@playwright/test'
+  ecosystem: npm
+  version: 1.63.0
+  scope: dev
+  direct: true
+  license: Apache-2.0
   approval_status: approved
 - name: '@redocly/ajv'
   ecosystem: npm
@@ -1909,6 +1916,20 @@ dependencies:
   direct: false
   license: MIT
   approval_status: approved
+- name: playwright
+  ecosystem: npm
+  version: 1.63.0
+  scope: dev
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
+- name: playwright-core
+  ecosystem: npm
+  version: 1.63.0
+  scope: dev
+  direct: false
+  license: Apache-2.0
+  approval_status: approved
 - name: pluralize
   ecosystem: npm
   version: 8.0.0
@@ -3126,7 +3147,7 @@ dependencies:
   ecosystem: pypi
   version: 12.3.0
   scope: runtime
-  direct: false
+  direct: true
   license: MIT-CMU
   approval_status: approved
 - name: pip-requirements-parser

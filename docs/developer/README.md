@@ -111,3 +111,26 @@ the existing "no external services needed at test time" convention. The
 Alembic migration itself (`0002_identity_rbac.py`) is verified separately
 against a real Postgres — see `PHASE_1_VALIDATION_REPORT.md`'s
 Reproducibility section for the exact commands.
+
+### Real-infrastructure golden path
+
+CI also runs `tests/integration_real/test_golden_path.py` in a separate job
+against PostgreSQL 17.6 and Valkey 8.0. It uses deterministic local providers,
+but the application database, server-side login session, transactional outbox,
+queues and workers are real. The test covers conversation creation, synthetic
+media ingest, transcript processing, evidence-linked fact and protocol
+generation, deterministic document composition, approval and export. It is
+opt-in (`VOCADOX_REAL_INFRA_TESTS=1`) so the ordinary fast suite still requires
+no external services.
+
+### Browser golden path
+
+`cd frontend && npm run test:e2e` runs two focused Playwright checks in
+Chromium. The main journey drives the real React UI through login,
+conversation creation, audio upload, transcript/fact/protocol generation,
+the evidence-source jump to the exact transcript segment, review, document
+approval and text export. A second journey verifies that a normal user is
+denied access to administration routes and does not see their navigation
+entry. API responses are deterministic in this browser suite; the separate
+real-infrastructure golden path above covers the same evidence chain through
+the FastAPI application, PostgreSQL, Valkey, outbox and workers.

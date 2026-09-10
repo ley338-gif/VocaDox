@@ -104,7 +104,7 @@ the same interface-then-implementation pattern Phase 0 established for
 - **Sessions**: opaque `secrets.token_urlsafe(32)` tokens, no user data
   encoded; httponly, `SameSite=Lax`, `Secure`-by-default cookie
   (`VOCADOX_SESSION_COOKIE_SECURE`, disabled only in the plain-HTTP local
-  dev compose stack, documented inline in `deploy/docker-compose.yml`);
+  dev compose stack, documented inline in `deploy/compose.dev.yml`);
   server-side TTL (Valkey `EX`, default 12h) plus a defensive
   `expires_at` check in `SessionStore.get`; immediate invalidation on
   logout (`DELETE`, not a soft flag).

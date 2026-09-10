@@ -6,9 +6,11 @@ stdlib `tomllib` (Python 3.11+, no new dependency)."""
 from __future__ import annotations
 
 import os
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
+
+import tomllib
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +28,7 @@ class BridgeConfig:
     processed_dir: Path
     failed_dir: Path
     export_dir: Path
+    max_inbound_size_bytes: int = 1024 * 1024
 
     # Which export format to request once a document is approved.
     export_format: str = "gdt-pdf"  # or "gdt-text"
@@ -73,6 +76,12 @@ def load_config(toml_path: Path | None = None) -> BridgeConfig:
             "base_url and api_key are required (set GDT_BRIDGE_BASE_URL / "
             "GDT_BRIDGE_API_KEY, or provide them in the config TOML file)"
         )
+    parsed_base_url = urlsplit(str(base_url))
+    local_dev_host = parsed_base_url.hostname in {"localhost", "127.0.0.1", "::1"}
+    if parsed_base_url.scheme != "https" and not (
+        parsed_base_url.scheme == "http" and local_dev_host
+    ):
+        raise ValueError("base_url must use https:// (http:// is allowed only for localhost)")
 
     return BridgeConfig(
         base_url=str(base_url),
@@ -81,6 +90,7 @@ def load_config(toml_path: Path | None = None) -> BridgeConfig:
         processed_dir=Path(get("processed_dir", "./gdt_processed")),
         failed_dir=Path(get("failed_dir", "./gdt_failed")),
         export_dir=Path(get("export_dir", "./gdt_export")),
+        max_inbound_size_bytes=int(get("max_inbound_size_bytes", 1024 * 1024)),
         export_format=str(get("export_format", "gdt-pdf")),
         poll_interval_seconds=float(get("poll_interval_seconds", 15.0)),
         poll_backoff_max_seconds=float(get("poll_backoff_max_seconds", 300.0)),

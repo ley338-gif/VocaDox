@@ -120,6 +120,7 @@ async def login(
         username=user.username,
         ip_address=_client_ip(request),
         user_agent=_user_agent(request),
+        session_generation=user.session_generation,
     )
     await record_event(
         db,
@@ -238,9 +239,7 @@ async def update_me_endpoint(
     return await _current_user_response(db, user)
 
 
-@router.post(
-    "/me/avatar", response_model=AvatarUploadResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/me/avatar", response_model=AvatarUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_my_avatar_endpoint(
     file: UploadFile,
     _user: User = Depends(get_current_user),
@@ -350,9 +349,7 @@ async def get_avatar_endpoint(
     return Response(content=data, media_type=content_type)
 
 
-@admin_users_router.post(
-    "", response_model=UserDetailResponse, status_code=status.HTTP_201_CREATED
-)
+@admin_users_router.post("", response_model=UserDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_user_endpoint(
     payload: UserCreateRequest,
     actor: User = Depends(_require_user_manage),
@@ -419,10 +416,11 @@ async def update_user_endpoint(
     """Also the deactivation endpoint (`is_active: false`) — spec: admin UI
     to "list/view/create/deactivate users" never hard-deletes a user row."""
     found = await _get_user_or_404(db, user_id)
-    changes = payload.model_dump(
-        exclude_unset=True, exclude={"group_ids", "organization_ids"}
-    )
+    changes = payload.model_dump(exclude_unset=True, exclude={"group_ids", "organization_ids"})
+    was_active = found.is_active
     found = await update_user(db, found, **changes)
+    if was_active and not found.is_active:
+        found.session_generation += 1
     if payload.group_ids is not None:
         await set_user_groups(db, user_id=found.id, group_ids=payload.group_ids)
     if payload.organization_ids is not None:
@@ -463,6 +461,10 @@ async def set_user_password_endpoint(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
+    # Existing bearer cookies must not outlive an administrator-initiated
+    # credential reset. Every protected request compares this database
+    # generation with the immutable value captured in its Valkey session.
+    found.session_generation += 1
     await record_event(
         db,
         event_type="user.password_reset_by_admin",

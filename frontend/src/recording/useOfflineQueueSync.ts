@@ -1,76 +1,128 @@
-/**
- * Post-GA P2-3: flushes the IndexedDB offline recording queue whenever
- * the browser reports it's back online (plus once on mount, in case
- * connectivity returned while the app wasn't loaded). Mounted once at
- * the app shell so it runs regardless of which page the user is on.
- *
- * Deliberately sequential, one entry at a time, oldest first: a mobile
- * connection regaining signal is often still weak, and firing many
- * concurrent large-audio uploads at once would be more likely to fail
- * all of them than to succeed. A single failure stops the flush for this
- * pass (the next `online` event or app load retries the whole queue) --
- * simpler and safer than partial bookkeeping of "which ones already
- * failed this pass".
- */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { addMarker, finalizeRecording } from "../api/conversations";
 import {
   isOfflineQueueSupported,
   listQueuedRecordings,
+  removeFailedRecordings,
   removeQueuedRecording,
+  resetFailedRecordings,
+  RETRY_BASE_DELAY_MS,
+  updateQueuedRecording,
 } from "./offlineQueue";
+import { processOfflineQueue } from "./offlineQueueSync";
 
-export function useOfflineQueueSync(csrfToken: string | null) {
+const readOnline = () => typeof navigator === "undefined" || navigator.onLine;
+
+export function useOfflineQueueSync(csrfToken: string | null, userId: string | null) {
   const [pendingCount, setPendingCount] = useState(0);
+  const [failedCount, setFailedCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(readOnline);
+  const [nextRetryAt, setNextRetryAt] = useState<number | null>(null);
+  const [recentlyCompleted, setRecentlyCompleted] = useState(0);
+  const syncingRef = useRef(false);
 
-  const refreshCount = useCallback(async () => {
-    if (!isOfflineQueueSupported()) return;
-    const queued = await listQueuedRecordings();
+  const refresh = useCallback(async () => {
+    if (!isOfflineQueueSupported() || !userId) {
+      setPendingCount(0);
+      setFailedCount(0);
+      return;
+    }
+    const queued = await listQueuedRecordings(userId);
     setPendingCount(queued.length);
-  }, []);
+    setFailedCount(queued.filter((entry) => entry.status === "failed").length);
+  }, [userId]);
 
   const flush = useCallback(async () => {
-    if (!csrfToken || !isOfflineQueueSupported() || isSyncing) return;
+    if (!csrfToken || !userId || !isOfflineQueueSupported() || syncingRef.current) return;
+    syncingRef.current = true;
     setIsSyncing(true);
     try {
-      const queued = await listQueuedRecordings();
-      const sorted = [...queued].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-      for (const entry of sorted) {
-        try {
-          await finalizeRecording(entry.conversationId, entry.blob, entry.idempotencyKey, csrfToken);
-          await Promise.allSettled(
-            entry.markers.map((marker) =>
-              addMarker(
-                entry.conversationId,
-                { timestamp_ms: Math.round(marker.timestampMs), label: marker.label },
-                csrfToken
-              )
-            )
-          );
-          await removeQueuedRecording(entry.id);
-        } catch {
-          // Still offline, or the server rejected it -- stop this pass;
-          // the entry stays queued and the next online/mount trigger
-          // retries from the top.
-          break;
-        }
+      const result = await processOfflineQueue(
+        {
+          list: () => listQueuedRecordings(userId),
+          update: updateQueuedRecording,
+          remove: removeQueuedRecording,
+          upload: (entry) =>
+            finalizeRecording(
+              entry.conversationId,
+              entry.blob,
+              entry.idempotencyKey,
+              csrfToken
+            ),
+          uploadMarker: (entry, marker) =>
+            addMarker(
+              entry.conversationId,
+              { timestamp_ms: Math.round(marker.timestampMs), label: marker.label },
+              csrfToken
+            ),
+        },
+        { online: readOnline() }
+      );
+      setNextRetryAt(result.nextRetryAt);
+      if (result.completedCount > 0) {
+        setRecentlyCompleted(result.completedCount);
+        window.setTimeout(() => setRecentlyCompleted(0), 5_000);
       }
+    } catch {
+      setNextRetryAt(Date.now() + RETRY_BASE_DELAY_MS);
     } finally {
+      syncingRef.current = false;
       setIsSyncing(false);
-      await refreshCount();
+      try {
+        await refresh();
+      } catch {
+        // IndexedDB can be temporarily unavailable (for example in private mode).
+      }
     }
-  }, [csrfToken, isSyncing, refreshCount]);
+  }, [csrfToken, refresh, userId]);
+
+  const retryFailed = useCallback(async () => {
+    if (!userId) return;
+    await resetFailedRecordings(userId);
+    await refresh();
+    await flush();
+  }, [flush, refresh, userId]);
+
+  const discardFailed = useCallback(async () => {
+    if (!userId) return;
+    await removeFailedRecordings(userId);
+    await refresh();
+  }, [refresh, userId]);
 
   useEffect(() => {
-    void refreshCount();
+    void refresh();
     void flush();
-    const handleOnline = () => void flush();
+    const handleOnline = () => {
+      setIsOnline(true);
+      void flush();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      void flush();
+    };
     window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [csrfToken]);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [flush, refresh]);
 
-  return { pendingCount, isSyncing };
+  useEffect(() => {
+    if (nextRetryAt === null || !isOnline) return;
+    const timeout = window.setTimeout(() => void flush(), Math.max(0, nextRetryAt - Date.now()));
+    return () => window.clearTimeout(timeout);
+  }, [flush, isOnline, nextRetryAt]);
+
+  return {
+    pendingCount,
+    failedCount,
+    isSyncing,
+    isOnline,
+    recentlyCompleted,
+    retryFailed,
+    discardFailed,
+  };
 }

@@ -17,7 +17,7 @@ from app.providers.llm import FakeLLMProvider, LLMModelUnavailableError, OllamaL
 
 def test_llm_base_url_has_no_default() -> None:
     """The old default (`http://ollama:11434`) pointed at a container that
-    no longer exists in `deploy/docker-compose.yml` — there must be no
+    no longer exists in `deploy/compose.dev.yml` — there must be no
     replacement default either, since there's no well-known bundled host
     any more."""
     assert Settings.model_fields["llm_base_url"].default is None

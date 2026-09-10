@@ -21,7 +21,7 @@ from pathlib import Path
 from app.media.service import spool_upload
 from app.media.validation import UploadValidationError
 from app.providers.storage import StorageProvider
-from app.templates.letterhead import sniff_image_format
+from app.templates.letterhead import sniff_image_format, validate_and_normalize_image
 
 _AVATAR_NAMESPACE = "identity/avatars"
 
@@ -38,12 +38,11 @@ async def upload_avatar(
     Raises `UploadValidationError` (empty/oversized/unrecognized format),
     same as every other upload path in this codebase."""
     spooled = await spool_upload(chunks, temp_dir=temp_dir, max_size_bytes=max_size_bytes)
-    detected = sniff_image_format(spooled.head)
-    if detected is None:
+    try:
+        detected = validate_and_normalize_image(spooled.path, max_size_bytes=max_size_bytes)
+    except UploadValidationError:
         spooled.path.unlink(missing_ok=True)
-        raise UploadValidationError(
-            "unsupported or unrecognized image format (supported: PNG, JPEG)"
-        )
+        raise
     try:
         return await storage.save_stream(
             spooled.path, suffix=f".{detected.extension}", namespace=_AVATAR_NAMESPACE
@@ -57,10 +56,13 @@ async def load_avatar(storage: StorageProvider, asset_key: str) -> tuple[bytes, 
     """Returns `(bytes, content_type)`, or `None` if the asset is missing/
     unreadable -- never raises, so a stale/deleted avatar degrades to "no
     avatar" instead of 500ing a user list."""
+    if not asset_key.startswith(f"{_AVATAR_NAMESPACE}/"):
+        return None
     try:
         data = await storage.load(asset_key)
     except Exception:
         return None
     detected = sniff_image_format(data[:16])
-    content_type = detected.content_type if detected is not None else "application/octet-stream"
-    return data, content_type
+    if detected is None:
+        return None
+    return data, detected.content_type

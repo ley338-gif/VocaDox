@@ -725,7 +725,7 @@ async def api_list_templates(
     account: ServiceAccount = Depends(_require_template_read),  # noqa: ARG001
     db: AsyncSession = Depends(get_session),
 ) -> list[TemplateResponse]:
-    templates = await list_templates(db)
+    templates = await list_templates(db, organization_id=account.organization_id)
     return [TemplateResponse.model_validate(t) for t in templates]
 
 

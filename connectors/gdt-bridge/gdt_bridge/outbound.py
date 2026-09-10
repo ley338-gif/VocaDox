@@ -22,19 +22,56 @@ from gdt_bridge.state import InFlightItem, StateStore
 logger = logging.getLogger("gdt_bridge.outbound")
 
 _APPROVED_STATUS = "approved"
+MAX_ARCHIVE_SIZE_BYTES = 100 * 1024 * 1024
+MAX_ARCHIVE_MEMBER_BYTES = 50 * 1024 * 1024
+MAX_ARCHIVE_COMPRESSION_RATIO = 100
+
+
+def _safe_output_filename(name: str, *, suffix: str) -> str:
+    """Accept a single, control-character-free basename only."""
+    if (
+        not name
+        or name in {".", ".."}
+        or "/" in name
+        or "\\" in name
+        or ":" in name
+        or any(ord(char) < 32 or ord(char) == 127 for char in name)
+        or not name.lower().endswith(suffix)
+    ):
+        raise ValueError(f"unsafe export filename: {name!r}")
+    return name
+
+
+def _validate_archive_member(info: zipfile.ZipInfo, *, suffix: str) -> str:
+    name = _safe_output_filename(info.filename, suffix=suffix)
+    if info.flag_bits & 0x1:
+        raise ValueError("encrypted export archive members are not supported")
+    if info.file_size > MAX_ARCHIVE_MEMBER_BYTES:
+        raise ValueError("export archive member exceeds size limit")
+    compressed = max(info.compress_size, 1)
+    if info.file_size / compressed > MAX_ARCHIVE_COMPRESSION_RATIO:
+        raise ValueError("export archive member exceeds compression-ratio limit")
+    return name
 
 
 def _write_gdt_pdf_bundle(exported: ExportedFile, export_dir: Path) -> None:
+    if len(exported.content) > MAX_ARCHIVE_SIZE_BYTES:
+        raise ValueError("gdt-pdf export bundle exceeds size limit")
     with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
-        pdf_names = [n for n in archive.namelist() if n.endswith(".pdf")]
-        gdt_names = [n for n in archive.namelist() if n.endswith(".gdt")]
-        if not pdf_names or not gdt_names:
+        infos = archive.infolist()
+        if len(infos) != 2:
+            raise ValueError("gdt-pdf export bundle must contain exactly one PDF and one GDT file")
+        pdf_infos = [info for info in infos if info.filename.lower().endswith(".pdf")]
+        gdt_infos = [info for info in infos if info.filename.lower().endswith(".gdt")]
+        if len(pdf_infos) != 1 or len(gdt_infos) != 1:
             raise ValueError(f"gdt-pdf export bundle missing expected members: {archive.namelist()}")
-        pdf_bytes = archive.read(pdf_names[0])
-        gdt_text = archive.read(gdt_names[0]).decode("cp1252")
+        pdf_name = _validate_archive_member(pdf_infos[0], suffix=".pdf")
+        gdt_name = _validate_archive_member(gdt_infos[0], suffix=".gdt")
+        pdf_bytes = archive.read(pdf_infos[0])
+        gdt_text = archive.read(gdt_infos[0]).decode("cp1252")
 
-    pdf_path = export_dir / pdf_names[0]
-    gdt_path = export_dir / gdt_names[0]
+    pdf_path = export_dir / pdf_name
+    gdt_path = export_dir / gdt_name
     pdf_path.write_bytes(pdf_bytes)
     # The backend can only ever emit a bare filename in field 6305 (it
     # has no knowledge of this connector's local filesystem) -- rewrite
@@ -44,7 +81,10 @@ def _write_gdt_pdf_bundle(exported: ExportedFile, export_dir: Path) -> None:
 
 
 def _write_gdt_text_file(exported: ExportedFile, export_dir: Path) -> None:
-    (export_dir / exported.filename).write_bytes(exported.content)
+    if len(exported.content) > MAX_ARCHIVE_MEMBER_BYTES:
+        raise ValueError("GDT export exceeds size limit")
+    filename = _safe_output_filename(exported.filename, suffix=".gdt")
+    (export_dir / filename).write_bytes(exported.content)
 
 
 async def check_and_export_one(
@@ -72,7 +112,7 @@ async def check_and_export_one(
         store.mark_exported(item.id)
         logger.info("exported conversation %s to %s", item.conversation_id, export_dir)
         return True
-    except Exception as exc:  # noqa: BLE001 - disclosed to the state store, not swallowed
+    except Exception as exc:
         logger.exception("export failed for conversation %s", item.conversation_id)
         store.mark_failed(item.id, error=str(exc))
         return True

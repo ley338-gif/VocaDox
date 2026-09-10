@@ -24,6 +24,7 @@ from app.recap.api_schemas import (
     CreateShareLinkRequest,
     RecapResponse,
     RecapRevisionResponse,
+    ShareLinkCreatedResponse,
     ShareLinkResponse,
 )
 from app.recap.models import Recap, RecapRevision, RecapShareLink
@@ -196,7 +197,7 @@ async def export_recap_endpoint(
 
 @router.post(
     "/{conversation_id}/recap/share-links",
-    response_model=ShareLinkResponse,
+    response_model=ShareLinkCreatedResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_share_link_endpoint(
@@ -205,7 +206,7 @@ async def create_share_link_endpoint(
     user: User = Depends(_require_approve),
     db: AsyncSession = Depends(get_session),
     _csrf: None = Depends(require_csrf),
-) -> ShareLinkResponse:
+) -> ShareLinkCreatedResponse:
     """Requires `recap:approve` -- the same trust level already required
     to approve the recap in the first place; sharing it externally is at
     least as consequential as approving it."""
@@ -214,7 +215,7 @@ async def create_share_link_endpoint(
     )
     recap = await _get_recap_or_404(db, conversation_id)
     try:
-        link = await create_share_link(
+        link, token = await create_share_link(
             db,
             conversation_id=conversation_id,
             recap=recap,
@@ -237,17 +238,19 @@ async def create_share_link_endpoint(
     )
     await db.commit()
     await db.refresh(link)
-    return ShareLinkResponse.model_validate(link)
+    return ShareLinkCreatedResponse(
+        **ShareLinkResponse.model_validate(link).model_dump(), token=token
+    )
 
 
 @router.get("/{conversation_id}/recap/share-links", response_model=list[ShareLinkResponse])
 async def list_share_links_endpoint(
     conversation_id: uuid.UUID,
-    user: User = Depends(get_current_user),
+    user: User = Depends(_require_approve),
     db: AsyncSession = Depends(get_session),
 ) -> list[ShareLinkResponse]:
     await authorize_conversation_access(
-        db, user=user, conversation_id=conversation_id, permission_code="recap:read"
+        db, user=user, conversation_id=conversation_id, permission_code="recap:approve"
     )
     links = await list_share_links(db, conversation_id=conversation_id)
     return [ShareLinkResponse.model_validate(link) for link in links]

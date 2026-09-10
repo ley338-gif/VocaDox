@@ -34,7 +34,7 @@ A single worker process handling all four job types would be simpler
 today, but would force NORMALIZE/TRANSCRIBE (CPU-or-GPU, Whisper-sized
 VRAM) and DIARIZE (separate GPU-sized VRAM, different pretrained
 pipeline) onto the same process/GPU allocation. Splitting now means:
-- `deploy/docker-compose.yml`'s `deploy.resources.reservations.devices`
+- `deploy/compose.dev.yml`'s `deploy.resources.reservations.devices`
   block can be uncommented independently per service — e.g. speech on
   GPU 0, diarization on GPU 1, or diarization staying CPU-only while
   speech gets the GPU — without any code change.
@@ -51,7 +51,7 @@ recovery is a lease/heartbeat expiry sweep
 (`app/processing/service.reclaim_stale_jobs`), not distributed consensus.
 
 ## Consequences
-- `deploy/docker-compose.yml` builds `worker-speech`/`worker-diarization`
+- `deploy/compose.dev.yml` builds `worker-speech`/`worker-diarization`
   from the same `backend/worker.Dockerfile` context — one image, two
   `command:` overrides.
 - The `api` (`backend` service) and `frontend` service never request GPU

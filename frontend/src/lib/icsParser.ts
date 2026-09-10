@@ -26,12 +26,16 @@ export interface CalendarEvent {
   location: string | null;
 }
 
+const MAX_ICS_EVENTS = 5_000;
+const MAX_ICS_LINE_CHARS = 16_384;
+
 function unfoldLines(text: string): string[] {
   // RFC 5545 line folding: a continuation line starts with a single
   // space or tab and must be joined onto the previous logical line.
   const rawLines = text.split(/\r\n|\n|\r/);
   const unfolded: string[] = [];
   for (const line of rawLines) {
+    if (line.length > MAX_ICS_LINE_CHARS) continue;
     if ((line.startsWith(" ") || line.startsWith("\t")) && unfolded.length > 0) {
       unfolded[unfolded.length - 1] += line.slice(1);
     } else {
@@ -99,6 +103,7 @@ export function parseIcs(text: string): CalendarEvent[] {
           end: current.end ?? null,
           location: current.location ?? null,
         });
+        if (events.length >= MAX_ICS_EVENTS) break;
       }
       inEvent = false;
       continue;

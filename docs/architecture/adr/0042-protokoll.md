@@ -24,9 +24,17 @@ Document composition is deterministic (spec §23's rejected "write a report" arc
 
 A more accurate design would run topic segmentation, then section classification, then per-section summarization, then fact/decision/action-item extraction, then source mapping, as separate stages. VocaDox has no existing multi-turn-pipeline infrastructure, and building one safely is real, separate scope. Phase 4's own extraction is already "one structured call per category" (`app.intelligence.service._extract_category`) — this reuses that same shape at the level of "one call producing the whole section+item tree," via `LLMProvider.complete_structured()` against `app.protocols.schemas.ProtocolGenerationResult`.
 
-### Source traceability mirrors Phase 4's evidence-fabrication guard exactly
+### Source traceability is an all-or-nothing generation invariant
 
-The prompt requires every section and item to cite transcript segment `sequence` numbers (`app.transcription.rendering.render_transcript`'s `[SEG n]` numbering — the same mechanism Phase 4 extraction already uses). `app.protocols.service.run_protocol_generation` resolves each claimed sequence against a real `TranscriptSegment` of *this* transcript and silently drops anything that doesn't resolve — a hallucinated citation is never trusted, never surfaced as if it were real evidence (`ProtocolSource`, mirroring `app.evidence.models.FactEvidence`).
+The prompt requires every section and item to cite transcript segment `sequence`
+numbers (`app.transcription.rendering.render_transcript`'s `[SEG n]` numbering —
+the same mechanism Phase 4 extraction already uses). Phase 14 tightened this
+boundary: the structured schema requires at least one bounded citation list per
+present section/item, and `app.protocols.service.run_protocol_generation`
+resolves every claimed sequence against a real `TranscriptSegment` of *this*
+transcript. One empty or fabricated citation rejects the entire provider output;
+partial acceptance could otherwise hide an integrity failure. An entirely empty
+protocol remains valid when the transcript contains no safely groundable content.
 
 ### Reuses the extraction worker/queue
 

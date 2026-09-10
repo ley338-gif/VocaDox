@@ -1,5 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { AudioLines, ChevronLeft, ChevronRight, LogOut, RefreshCw, Search, ShieldCheck, UserCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  AudioLines,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UserCircle,
+} from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
@@ -40,7 +52,7 @@ function matchesNarrowViewport(): boolean {
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, csrfToken, hasPermission, logout } = useAuth();
-  const { pendingCount: pendingOfflineRecordings } = useOfflineQueueSync(csrfToken);
+  const offlineQueue = useOfflineQueueSync(csrfToken, user?.userId ?? null);
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(readCollapsedPreference);
@@ -225,15 +237,58 @@ export function AppShell({ children }: { children: ReactNode }) {
             />
           </form>
           <div className={styles.topbarSpacer} />
-          {pendingOfflineRecordings > 0 && (
-            <span
+          {(offlineQueue.pendingCount > 0 || offlineQueue.recentlyCompleted > 0) && (
+            <div
               className={styles.offlineQueueBadge}
-              role="status"
-              title="Wird automatisch hochgeladen, sobald wieder eine Verbindung besteht"
+              aria-live="polite"
             >
-              <RefreshCw size={14} aria-hidden="true" /> {pendingOfflineRecordings}{" "}
-              {pendingOfflineRecordings === 1 ? "Aufnahme wartet" : "Aufnahmen warten"}
-            </span>
+              {offlineQueue.recentlyCompleted > 0 && offlineQueue.pendingCount === 0 ? (
+                <>
+                  <CheckCircle2 size={14} aria-hidden="true" /> Sicher übertragen
+                </>
+              ) : offlineQueue.failedCount > 0 ? (
+                <>
+                  <AlertTriangle size={14} aria-hidden="true" /> {offlineQueue.failedCount}{" "}
+                  {offlineQueue.failedCount === 1 ? "Upload fehlgeschlagen" : "Uploads fehlgeschlagen"}
+                  <button
+                    type="button"
+                    className={styles.offlineQueueAction}
+                    onClick={() => void offlineQueue.retryFailed()}
+                  >
+                    Erneut versuchen
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.offlineQueueIconAction}
+                    aria-label="Fehlgeschlagene lokale Aufnahmen löschen"
+                    title="Fehlgeschlagene lokale Aufnahmen löschen"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Lokale Aufnahmen endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+                        )
+                      ) {
+                        void offlineQueue.discardFailed();
+                      }
+                    }}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
+                </>
+              ) : offlineQueue.isSyncing ? (
+                <>
+                  <RefreshCw size={14} aria-hidden="true" /> Wird hochgeladen
+                </>
+              ) : !offlineQueue.isOnline ? (
+                <>
+                  <RefreshCw size={14} aria-hidden="true" /> Lokal gespeichert – wartet auf Verbindung
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={14} aria-hidden="true" /> Lokal gespeichert – Upload wartet
+                </>
+              )}
+            </div>
           )}
           <div className={styles.topbarRight} ref={userMenuRef}>
             <button type="button" className={styles.userButton} aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((open) => !open)}>

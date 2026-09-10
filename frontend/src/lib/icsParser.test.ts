@@ -56,6 +56,30 @@ describe("parseIcs", () => {
     ].join("\r\n");
     expect(parseIcs(incomplete)).toHaveLength(0);
   });
+
+  it("ignores oversized physical lines", () => {
+    const oversized = [
+      "BEGIN:VEVENT",
+      "UID:oversized-line",
+      "DTSTART:20260910T140000Z",
+      `SUMMARY:${"x".repeat(16_385)}`,
+      "END:VEVENT",
+    ].join("\r\n");
+    expect(parseIcs(oversized)).toHaveLength(0);
+  });
+
+  it("caps the number of parsed events", () => {
+    const events = Array.from({ length: 5_001 }, (_, index) =>
+      [
+        "BEGIN:VEVENT",
+        `UID:event-${index}`,
+        "DTSTART:20260910T140000Z",
+        `SUMMARY:Event ${index}`,
+        "END:VEVENT",
+      ].join("\r\n")
+    ).join("\r\n");
+    expect(parseIcs(events)).toHaveLength(5_000);
+  });
 });
 
 describe("upcomingEvents", () => {

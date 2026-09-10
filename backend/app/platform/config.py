@@ -8,8 +8,9 @@ values are logged at startup beyond non-sensitive metadata.
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import unquote, urlsplit
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     app_name: str = "VocaDox"
@@ -216,6 +218,75 @@ class Settings(BaseSettings):
         description="Max conversations evaluated per retention-cleanup run, to bound a single "
         "run's duration/lock footprint on a large deployment.",
     )
+
+    @model_validator(mode="after")
+    def validate_production_safety(self) -> Settings:
+        """Reject configuration that is unsafe for a production process.
+
+        Development keeps its deliberately convenient defaults. Production
+        is opt-in via ``VOCADOX_ENVIRONMENT=production`` and fails closed so
+        a copied development environment cannot silently become a deployment.
+        """
+        if self.environment.strip().casefold() != "production":
+            return self
+
+        problems: list[str] = []
+
+        if not self.session_cookie_secure:
+            problems.append("VOCADOX_SESSION_COOKIE_SECURE must be true")
+        if self.database_echo:
+            problems.append("VOCADOX_DATABASE_ECHO must be false")
+
+        try:
+            database = urlsplit(self.database_url)
+            database_password = unquote(database.password or "")
+        except ValueError:
+            database = None
+            database_password = ""
+
+        if database is None or database.scheme != "postgresql+asyncpg":
+            problems.append("VOCADOX_DATABASE_URL must use postgresql+asyncpg")
+        if not database_password:
+            problems.append("VOCADOX_DATABASE_URL must contain a database password")
+        elif database_password.casefold() in {
+            "changeme",
+            "password",
+            "postgres",
+            "vocadox",
+        }:
+            problems.append("the database password is a known development/default value")
+        elif len(database_password) < 16:
+            problems.append("the database password must be at least 16 characters")
+
+        for origin in self.cors_allow_origins:
+            normalized_origin = origin.strip()
+            try:
+                parsed_origin = urlsplit(normalized_origin)
+            except ValueError:
+                parsed_origin = None
+
+            if "*" in normalized_origin:
+                problems.append("VOCADOX_CORS_ALLOW_ORIGINS must not contain wildcards")
+            elif (
+                parsed_origin is None
+                or parsed_origin.scheme != "https"
+                or not parsed_origin.hostname
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+                or parsed_origin.path not in {"", "/"}
+                or parsed_origin.query
+                or parsed_origin.fragment
+            ):
+                problems.append(
+                    "each production CORS origin must be an HTTPS origin without path, "
+                    "credentials, query, or fragment"
+                )
+
+        if problems:
+            details = "; ".join(dict.fromkeys(problems))
+            raise ValueError(f"unsafe production configuration: {details}")
+
+        return self
 
 
 @lru_cache

@@ -170,7 +170,7 @@ copied in) from wherever `backup_root` actually lives.
    base-image bump changes that, and the deployed Postgres server major
    version is not bumped to match, `pg_dump`/`pg_restore` can fail with
    the same class of "unrecognized configuration parameter" error this
-   phase found and fixed (see `deploy/docker-compose.yml`'s comment on
+   phase found and fixed (see `deploy/compose.dev.yml`'s comment on
    the `postgres` service and `compliance/container-inventory.yml`).
    Keep them in sync.
 

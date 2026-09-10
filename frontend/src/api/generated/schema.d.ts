@@ -5572,6 +5572,43 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /**
+         * ShareLinkCreatedResponse
+         * @description Creation-only response. The bearer token is never persisted in
+         *     recoverable form and never appears in subsequent list responses.
+         */
+        ShareLinkCreatedResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Created By User Id */
+            created_by_user_id: string | null;
+            /** Access Count */
+            access_count: number;
+            /** Last Accessed At */
+            last_accessed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Token */
+            token: string;
+        };
         /** ShareLinkResponse */
         ShareLinkResponse: {
             /**
@@ -5584,8 +5621,6 @@ export interface components {
              * Format: uuid
              */
             conversation_id: string;
-            /** Token */
-            token: string;
             /**
              * Expires At
              * Format: date-time
@@ -11846,7 +11881,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ShareLinkResponse"];
+                    "application/json": components["schemas"]["ShareLinkCreatedResponse"];
                 };
             };
             /** @description Validation Error */

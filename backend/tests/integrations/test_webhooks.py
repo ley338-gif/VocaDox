@@ -17,7 +17,12 @@ import json
 import uuid
 
 import pytest
-from app.integrations.security import UnsafeWebhookURLError, validate_webhook_url, verify_signature
+from app.integrations.security import (
+    UnsafeWebhookURLError,
+    sign_payload,
+    validate_webhook_url,
+    verify_signature,
+)
 from app.integrations.service import attempt_delivery, dispatch_with_retry
 
 from tests.conversations.conftest import login
@@ -194,11 +199,17 @@ async def test_real_signed_delivery_to_local_receiver_and_signature_verification
     assert verify_signature(webhook.secret, tampered, signature_header) is False
     # A signature signed with the WRONG secret also does not verify.
     assert verify_signature("wrong-secret-entirely", body, signature_header) is False
-
     assert received["headers"]["X-VocaDox-Event"] == "conversation.created"
     payload_sent = json.loads(body)
     assert payload_sent["conversation_id"] == "abc123"
 
+
+def test_signature_verifier_rejects_replayed_or_future_payload() -> None:
+    body = b'{"event_type":"conversation.created"}'
+    signature = sign_payload("secret", body, timestamp=1_000)
+    assert verify_signature("secret", body, signature, now=1_301) is False
+    assert verify_signature("secret", body, signature, now=699) is False
+    assert verify_signature("secret", body, signature, now=1_300) is True
 
 async def test_retry_with_backoff_is_bounded_and_records_every_attempt(
     db_sessionmaker, http_receiver

@@ -181,3 +181,15 @@ out) and the practical GDT mechanisms for each direction.
     practice. `render_gdt_pdf_reference` raises rather than emitting a
     partial block, so a bug here fails loudly during development instead
     of silently at a real practice.
+
+### Phase 14 security addendum (2026-09-10)
+
+The bridge treats both watched files and API export payloads as hostile. Remote
+API endpoints require HTTPS (loopback HTTP remains a development exception),
+inbound files are capped at 1 MiB and must resolve to a regular file directly
+inside the configured import directory, and output names must be control-free
+basenames with the expected suffix. A PDF bundle contains exactly one PDF and one
+GDT member and is rejected on traversal names, encryption, excessive compressed
+or expanded size, or a compression ratio above the configured safety bound.
+These checks intentionally live in the standalone connector as well as backend
+export validation because the trust boundary is the downloaded byte stream.

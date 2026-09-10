@@ -31,6 +31,9 @@ dependencies = [
     # both permissive-licensed (compliance/dependency-inventory.yml).
     "python-docx>=1.2,<2.0",
     "reportlab>=5.0,<6.0",
+    # Validate and normalize user-controlled PNG/JPEG uploads before they
+    # reach browser or document renderers; also strips EXIF/private metadata.
+    "pillow>=12.3,<13.0",
 ]
 # NOTE on audio metadata extraction: `mutagen` was evaluated as a
 # candidate for MP3/M4A/WebM duration/codec/sample-rate extraction and
@@ -47,7 +50,7 @@ dependencies = [
 [project.optional-dependencies]
 # Phase 3 real speech/diarization providers — installed ONLY in the
 # worker-speech/worker-diarization container images (see
-# deploy/docker-compose.yml, deploy/worker.Dockerfile), never in the api/
+# deploy/compose.dev.yml, deploy/worker.Dockerfile), never in the api/
 # frontend images and never required by the mandatory (fake-provider) test
 # suite. See docs/architecture/adr/0014-speech-provider-selection.md and
 # 0015-diarization-provider-selection.md for the full license evaluation;

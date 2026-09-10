@@ -4,7 +4,14 @@ pre-existing `user:manage` permission."""
 
 from __future__ import annotations
 
+import base64
+
 from tests.administration.conftest import login
+
+_TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUB"
+    "AScY42YAAAAASUVORK5CYII="
+)
 
 
 async def test_list_users_requires_permission(client, seeded) -> None:  # noqa: ANN001
@@ -40,12 +47,26 @@ async def test_create_view_deactivate_user_lifecycle(client, seeded) -> None:  #
     assert get_resp.status_code == 200
     assert get_resp.json()["email"] == "dave@example.test"
 
+    dave_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "dave", "password": "a brand new strong password"},
+    )
+    assert dave_login.status_code == 200
+    dave_session = client.cookies["vocadox_session"]
+    headers = await login(client, "carol", "yet another strong pw 789")
+
     # Deactivation, not deletion — the user row still exists afterward.
     deactivate_resp = await client.patch(
         f"/api/v1/admin/users/{user['id']}", json={"is_active": False}, headers=headers
     )
     assert deactivate_resp.status_code == 200, deactivate_resp.text
     assert deactivate_resp.json()["is_active"] is False
+
+    stale_session = await client.get(
+        "/api/v1/auth/me",
+        headers={"Cookie": f"vocadox_session={dave_session}"},
+    )
+    assert stale_session.status_code == 401
 
     still_listed = await client.get("/api/v1/admin/users", headers=headers)
     assert any(u["username"] == "dave" and u["is_active"] is False for u in still_listed.json())
@@ -145,11 +166,7 @@ async def test_assign_user_organizations(client, seeded) -> None:  # noqa: ANN00
 
 async def test_upload_and_serve_avatar(client, seeded) -> None:  # noqa: ANN001
     headers = await login(client, "carol", "yet another strong pw 789")
-    png_bytes = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00"
-        b"\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    png_bytes = _TINY_PNG
     upload_resp = await client.post(
         "/api/v1/admin/users/avatar",
         files={"file": ("avatar.png", png_bytes, "image/png")},
@@ -161,7 +178,7 @@ async def test_upload_and_serve_avatar(client, seeded) -> None:  # noqa: ANN001
     get_resp = await client.get(f"/api/v1/admin/users/avatar/{asset_key}", headers=headers)
     assert get_resp.status_code == 200
     assert get_resp.headers["content-type"] == "image/png"
-    assert get_resp.content == png_bytes
+    assert get_resp.content.startswith(b"\x89PNG\r\n\x1a\n")
 
     users_resp = await client.get("/api/v1/admin/users", headers=headers)
     bob_id = next(u["id"] for u in users_resp.json() if u["username"] == "bob")
@@ -184,6 +201,16 @@ async def test_upload_avatar_rejects_non_image(client, seeded) -> None:  # noqa:
     assert resp.status_code == 422
 
 
+async def test_avatar_endpoint_rejects_other_storage_namespaces(
+    client, seeded, processing_env  # noqa: ANN001
+) -> None:
+    headers = await login(client, "carol", "yet another strong pw 789")
+    _app, _sessionmaker, _queue, storage = processing_env
+    media_key = await storage.save(b"secret audio", suffix=".wav", namespace="media/source")
+    resp = await client.get(f"/api/v1/admin/users/avatar/{media_key}", headers=headers)
+    assert resp.status_code == 404
+
+
 async def test_admin_set_password_lifecycle(client, seeded) -> None:  # noqa: ANN001
     headers = await login(client, "carol", "yet another strong pw 789")
     create_resp = await client.post(
@@ -197,12 +224,29 @@ async def test_admin_set_password_lifecycle(client, seeded) -> None:  # noqa: AN
     )
     user_id = create_resp.json()["id"]
 
+    # Capture an already-issued Frank session before the administrator
+    # changes the credential. The reset must revoke this cookie too, not
+    # merely make the old password unusable for future logins.
+    frank_login = await client.post(
+        "/api/v1/auth/login",
+        json={"username": "frank", "password": "franks original password"},
+    )
+    assert frank_login.status_code == 200
+    frank_session = client.cookies["vocadox_session"]
+    headers = await login(client, "carol", "yet another strong pw 789")
+
     reset_resp = await client.post(
         f"/api/v1/admin/users/{user_id}/set-password",
         json={"new_password": "a completely new password"},
         headers=headers,
     )
     assert reset_resp.status_code == 204, reset_resp.text
+
+    stale_session = await client.get(
+        "/api/v1/auth/me",
+        headers={"Cookie": f"vocadox_session={frank_session}"},
+    )
+    assert stale_session.status_code == 401
 
     # The old password no longer works; the new one does.
     old_login = await client.post(

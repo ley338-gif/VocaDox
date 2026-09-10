@@ -31,3 +31,19 @@ MADR-style (Status / Context / Decision / Consequences), numbered sequentially. 
 - [0027](0027-synchronous-document-composition.md) — Document composition runs synchronously, not via ProcessingJob
 - [0028](0028-dynamic-template-extraction-schemas.md) — Template-defined extraction categories build Pydantic schemas dynamically
 - [0029](0029-remove-bundled-ollama.md) — Remove the bundled Ollama Compose service (GA-blocker fix, amends 0024)
+- [0030](0030-search-index-dual-dialect.md) — PostgreSQL search index with SQLite test fallback
+- [0031](0031-vocabulary-wer-real-audio.md) — Vocabulary evaluation against conversation audio
+- [0032](0032-voiceprint-suggestion-never-auto-assign.md) — Voiceprint suggestions never auto-assign speakers
+- [0033](0033-completeness-score-composition.md) — Template completeness score composition
+- [0034](0034-quality-report-explicit-sample-no-persistence.md) — Explicit, non-persistent quality-report samples
+- [0035](0035-live-transcript-whole-prefix-retranscription.md) — Ephemeral whole-prefix live transcription
+- [0036](0036-system-audio-capture-bot-free.md) — Bot-free tab/screen audio capture
+- [0037](0037-calendar-ics-import.md) — Local ICS import instead of live OAuth sync
+- [0038](0038-pwa-offline-recording-queue.md) — PWA offline recording queue
+- [0039](0039-fhir-documentreference-over-gdt.md) — FHIR DocumentReference integration
+- [0040](0040-fact-redaction-and-recap-share-links.md) — Fact redaction and expiring recap shares
+- [0041](0041-gdt-export-and-connector-prototype.md) — GDT export and connector prototype
+- [0042](0042-protokoll.md) — Structured conversation protocol
+- [0043](0043-development-production-deployment-separation.md) — Separate development and production deployments
+- [0044](0044-ci-security-analysis-and-sbom.md) — CodeQL, layered secret scanning, and shipped-image SBOMs
+- [0045](0045-chunked-live-transcript-target.md) — Linear, overlap-window live-transcript target architecture

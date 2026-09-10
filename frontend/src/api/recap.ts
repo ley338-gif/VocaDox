@@ -86,13 +86,16 @@ export function recapExportUrl(conversationId: string, format: "text" | "docx" |
 export interface ShareLink {
   id: string;
   conversation_id: string;
-  token: string;
   expires_at: string;
   revoked_at: string | null;
   created_by_user_id: string | null;
   access_count: number;
   last_accessed_at: string | null;
   created_at: string;
+}
+
+export interface CreatedShareLink extends ShareLink {
+  token: string;
 }
 
 export function listShareLinks(conversationId: string): Promise<ShareLink[]> {
@@ -103,7 +106,7 @@ export function createShareLink(
   conversationId: string,
   ttlHours: number,
   csrfToken: string
-): Promise<ShareLink> {
+): Promise<CreatedShareLink> {
   return request(`/conversations/${conversationId}/recap/share-links`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
