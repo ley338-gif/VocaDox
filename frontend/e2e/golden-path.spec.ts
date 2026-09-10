@@ -450,7 +450,7 @@ test("operator completes the evidence-preserving browser golden path", async ({ 
   await expect(page.getByRole("tab", { name: "Transkript" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(`#transcript-segment-${SEGMENT_ID}`)).toBeInViewport();
 
-  await page.getByRole("tab", { name: "Review" }).click();
+  await page.getByRole("tab", { name: "Prüfung" }).click();
   await expect(page.getByText("Keine offenen Review-Punkte")).toBeVisible();
 
   await page.getByRole("tab", { name: "Dokumentation" }).click();
