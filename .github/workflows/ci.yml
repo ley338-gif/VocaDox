@@ -11,6 +11,21 @@ on:
     branches: [main]
 
 jobs:
+  secret-scan:
+    name: Secret scan (repository content)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+
+      - name: Fail on detected secrets
+        run: |
+          docker run --rm -v "$PWD:/workspace:ro" \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            fs --scanners secret --exit-code 1 /workspace
+
   backend:
     name: Backend (lint / typecheck / test)
     runs-on: ubuntu-latest
@@ -453,6 +468,37 @@ jobs:
 
       - name: Build GDT bridge image (shipped connector)
         run: docker build -t vocadox-gdt-bridge:ci ./connectors/gdt-bridge
+
+      - name: Generate CycloneDX SBOMs for shipped images
+        run: |
+          mkdir -p sbom
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/sbom:/out" \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --format cyclonedx --output /out/backend.cdx.json vocadox-backend:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/sbom:/out" \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --format cyclonedx --output /out/frontend.cdx.json vocadox-frontend:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/sbom:/out" \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --format cyclonedx --output /out/worker.cdx.json vocadox-worker:ci
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/sbom:/out" \
+            aquasec/trivy:0.56.2@sha256:26245f364b6f5d223003dc344ec1eb5eb8439052bfecb31d79aeba0c74344b3a \
+            image --format cyclonedx --output /out/gdt-bridge.cdx.json vocadox-gdt-bridge:ci
+
+      - name: Validate generated SBOMs
+        run: |
+          test "$(find sbom -maxdepth 1 -name '*.cdx.json' -type f | wc -l)" -eq 4
+          for sbom_file in sbom/*.cdx.json; do
+            jq -e '.bomFormat == "CycloneDX" and (.specVersion | length > 0) and (.components | type == "array")' "$sbom_file" >/dev/null
+          done
+
+      - name: Retain shipped-image SBOMs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-sboms-${{ github.sha }}
+          path: sbom/*.cdx.json
+          if-no-files-found: error
+          retention-days: 90
 
       # Trivy itself: Apache-2.0, license-checked (see
       # compliance/container-inventory.yml), pinned image, never installed

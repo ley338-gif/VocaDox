@@ -30,8 +30,9 @@ After the release pull request is merged:
 
 1. Create an annotated `vX.Y.Z` tag on the merge commit.
 2. Build artifacts from that tag, never from an uncommitted working tree.
-3. Generate and retain an SBOM for each shipped image once the Phase 14 SBOM
-   workflow is available.
+3. Download and retain the `container-sboms-<commit SHA>` artifact generated
+   by CI for the tagged commit. Verify that it contains the four shipped-image
+   CycloneDX documents listed in `docs/security/ci-security-controls.md`.
 4. Publish release notes from the matching changelog section and link the
    validation report.
 5. Verify image/application versions and the documented fresh-install and
