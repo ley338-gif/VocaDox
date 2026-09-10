@@ -184,6 +184,25 @@
   margin-right: var(--space-3);
 }
 
+.offlineQueueAction,
+.offlineQueueIconAction {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.offlineQueueAction:hover {
+  text-decoration: underline;
+}
+
+.offlineQueueIconAction {
+  display: inline-flex;
+  color: var(--color-danger);
+}
+
 .searchForm {
   flex: 1;
   min-width: 0;

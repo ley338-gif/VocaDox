@@ -44,10 +44,11 @@ constructed from an actual HTTP response) — see `RecordingWorkspace.tsx
 from `upload-failed`) reflects that the recording is now safely
 persisted and needs no more user action; `useOfflineQueueSync` (mounted
 once in `AppShell`) flushes the queue sequentially, oldest first, on
-`online` events and once per app load, so a queued recording resumes
-uploading automatically the next time connectivity returns — including
-after the tab/app was fully closed and reopened, which the previous
-in-memory-only retry state could never survive.
+`online` events, once per app load and after a bounded exponential retry
+delay, so a queued recording resumes uploading automatically the next
+time connectivity returns — including after the tab/app was fully closed
+and reopened, which the previous in-memory-only retry state could never
+survive.
 
 **3. IndexedDB is used directly, hand-wrapped, not through a library.**
 `idb` (or similar) would be a reasonable dependency for a larger
@@ -63,6 +64,17 @@ logs in next on the same browser profile. This is an authorization boundary, not
 encryption: managed-device storage encryption and separate OS/browser profiles
 remain required for sensitive offline recordings.
 
+**Phase 14 reliability addendum: queue state is durable and visible.** Database
+version 2 records `pending`, `waiting-for-network`, `uploading` and `failed`
+states together with attempt count, next retry and a non-sensitive error class.
+An `uploading` entry found after an app restart is recovered as `pending`.
+Transient network/408/425/429/5xx failures retry from five seconds up to a
+five-minute cap; a permanent 4xx response becomes a user-visible failed item and
+does not starve later recordings. The local key combines owner ID and the
+server-authoritative idempotency key, so enqueueing the same take twice replaces
+the local entry and server retries cannot create a second media asset. A
+single-flight guard prevents overlapping background flushes.
+
 **4. PWA icons are generated with Pillow, an existing backend
 dependency, not a new frontend one.** No image-editing tool exists in
 this environment and no icon design asset was supplied; a two-line
@@ -76,11 +88,12 @@ assets exist, requiring no code change (just replacing the PNG files).
 
 - No new npm dependency (`package.json`/`package-lock.json` unchanged),
   no new backend dependency (Pillow was already installed).
-- The offline queue's sequential, stop-on-first-failure flush means a
-  weak-but-present connection that can upload the oldest queued
-  recording but not a later one will still leave later ones queued
-  until the next `online` event — a deliberate simplicity trade-off
-  documented in `useOfflineQueueSync`'s own docstring, not a bug.
+- Upload is sequential. A transient failure stops that pass to protect a weak
+  connection; a permanent rejection is marked failed and processing continues.
+  Failed recordings remain local until the user explicitly retries or confirms
+  deletion. Successful recordings are removed immediately after the server
+  confirms the idempotent upload. Marker delivery remains best-effort and does
+  not retain another full audio copy.
 - `sw.js`'s cache-as-you-go strategy means a stale cached asset could in
   principle be served briefly after a deploy if the network fetch itself
   fails at exactly the wrong moment — acceptable for app-shell
