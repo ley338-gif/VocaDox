@@ -30,12 +30,13 @@ merely because they appear in this plan.
   the new public recap endpoint and other new surfaces.
 - Backup/restore tooling and operational documentation exist, but Phase 14
   still needs tagged-release deployment, restore, and upgrade evidence.
-- GitHub API inspection found no protection and no repository ruleset on
-  `main`. Merge commits, squash merges, and rebase merges are all enabled, and
-  merged branches are not deleted automatically. A later focused repository
-  protection change must add required checks/no-force-push/no-delete rules and
-  select the intended merge policy; this inventory does not mutate repository
-  settings.
+- Initial GitHub API inspection found no protection or ruleset on `main`.
+  Protection was activated on 2026-09-10 with pull-request-only changes,
+  strict required checks, administrator enforcement, linear history,
+  conversation resolution, and deletion/force-push blocking. Squash is now the
+  only merge method. New Phase 14 checks are added to the required set only
+  after their workflow reaches `main`; see
+  `docs/security/repository-protection.md`.
 
 ## Pull-request sequence and acceptance criteria
 
