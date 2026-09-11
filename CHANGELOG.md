@@ -12,6 +12,18 @@ release.
 
 ### Added
 
+- **R0 (research roadmap, post-GA)**: local, provider-agnostic diarization
+  accuracy evaluation framework (DER/JER, pure stdlib) wired into the
+  Evaluation Lab as a new `diarization_accuracy` run type
+  (`POST /admin/evaluation/diarization-accuracy`, new "Sprechererkennung
+  (DER/JER)" Admin UI tab) — the test-infrastructure fix for Phase 12
+  Finding #12 ("genuine multi-voice diarization accuracy has never been
+  empirically verified"). Includes a dev-only FastMSS integration
+  (`tools/dev/fastmss/`, GPL-3.0, never installed/vendored/shipped — see
+  `compliance/exceptions.yml`) for generating real, genuinely-distinct-
+  voice fixtures at three overlap levels. See
+  `PHASE_R0_VALIDATION_REPORT.md` and ADR-0047.
+
 - Conversation participants can now be added from the organization's
   registered-user directory, not just as free-text names or existing Known
   Speakers. The link (`conversation_participants.user_id`) is persisted

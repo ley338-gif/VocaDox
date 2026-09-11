@@ -141,6 +141,18 @@ class Settings(BaseSettings):
         "gated model (e.g. pyannote's pipeline) once, at admin-initiated install time. Never "
         "read by the API or worker request path, never logged, never exposed via any endpoint.",
     )
+    # R0 (research roadmap, post-GA): optional override pointing the
+    # diarization-accuracy Evaluation Lab run (app.analytics.diarization_eval)
+    # at a real, developer-generated fixture batch (e.g. FastMSS output --
+    # see tools/dev/fastmss/) instead of the tiny synthetic smoke fixtures
+    # bundled at app/analytics/diarization_smoke_fixtures/. Never set in
+    # CI or by default; entirely local filesystem, never a URL.
+    diarization_fixtures_dir: str | None = Field(
+        default=None,
+        description="Local directory of <overlap_level>/<fixture_id>.{wav,rttm} pairs "
+        "(app.analytics.diarization_fixtures.discover_fixtures) to use instead of the bundled "
+        "synthetic smoke fixtures. Unset by default and in CI.",
+    )
     # -- LLM / fact extraction (Phase 4) --------------------------------------
     llm_provider: str = Field(
         default="fake",

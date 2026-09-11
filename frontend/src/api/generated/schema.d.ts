@@ -2009,6 +2009,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/evaluation/diarization-accuracy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Diarization Accuracy Endpoint
+         * @description R0 (research roadmap, post-GA): runs the currently configured
+         *     diarization provider's real `diarize()` against local RTTM-ground-
+         *     truthed fixtures at three overlap levels and records DER/JER as a
+         *     first-class Evaluation Lab run -- see
+         *     app.analytics.diarization_eval and PHASE_R0_VALIDATION_REPORT.md.
+         *     Takes no request body: unlike vocabulary-comparison (which is scoped to
+         *     one conversation's own audio), this always evaluates against the
+         *     fixed local fixture set (the bundled synthetic smoke set, or
+         *     VOCADOX_DIARIZATION_FIXTURES_DIR if configured).
+         */
+        post: operations["run_diarization_accuracy_endpoint_api_v1_admin_evaluation_diarization_accuracy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/evaluation/quality-report": {
         parameters: {
             query?: never;
@@ -10448,6 +10476,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_diarization_accuracy_endpoint_api_v1_admin_evaluation_diarization_accuracy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvaluationRunResponse"];
                 };
             };
         };

@@ -244,3 +244,35 @@ async def test_prompt_comparison_runs_real_metrics(client: AsyncClient, seeded) 
     assert run["status"] == "completed"
     assert run["subject_a"]["kind"] == "prompt_version"
     assert run["result_a"]["facts_expected"] == 4
+
+
+async def test_diarization_accuracy_requires_permission(client: AsyncClient, seeded) -> None:  # noqa: ANN001
+    headers = await login(client, "alice", "a very strong password 123")
+    resp = await client.post("/api/v1/admin/evaluation/diarization-accuracy", headers=headers)
+    assert resp.status_code == 403
+
+
+async def test_diarization_accuracy_end_to_end(client: AsyncClient, seeded) -> None:  # noqa: ANN001
+    """R0: runs FakeDiarizationProvider (CI has no `ai` extra / real
+    pyannote installed -- see .github/workflows/ci.yml) against the
+    bundled synthetic smoke fixtures at all three overlap levels and
+    stores DER/JER as an Evaluation Lab record -- proves the API/service/
+    eval-engine wiring end-to-end; see PHASE_R0_VALIDATION_REPORT.md for
+    what this specific run does and does not prove about real-voice
+    diarization accuracy."""
+    headers = await login(client, "carol", "yet another strong pw 789")
+    resp = await client.post("/api/v1/admin/evaluation/diarization-accuracy", headers=headers)
+    assert resp.status_code == 201, resp.text
+    run = resp.json()
+    assert run["run_type"] == "diarization_accuracy"
+    assert run["status"] == "completed"
+    assert run["subject_a"]["kind"] == "diarization_provider"
+    assert run["subject_a"]["provider"] == "fake"
+    result_a = run["result_a"]
+    assert result_a["mean_der"] is not None
+    levels = {row["overlap_level"] for row in result_a["by_overlap_level"]}
+    assert levels == {"none", "some", "heavy"}
+
+    list_resp = await client.get("/api/v1/admin/evaluation/runs", headers=headers)
+    assert list_resp.status_code == 200, list_resp.text
+    assert any(item["run_type"] == "diarization_accuracy" for item in list_resp.json()["items"])
