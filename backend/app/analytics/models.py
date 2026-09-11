@@ -34,6 +34,13 @@ class EvaluationRunType(StrEnum):
     # applied and once without -- Word Error Rate against the human-
     # corrected transcript as ground truth (app.analytics.wer).
     VOCABULARY_COMPARISON = "vocabulary_comparison"
+    # R0 (research roadmap, post-GA): real diarization DER/JER run against
+    # local, RTTM-ground-truthed fixtures at three overlap levels (see
+    # app.analytics.diarization_eval / app.analytics.diarization_fixtures).
+    # `subject_a` is always the diarization provider under test; `subject_b`
+    # is reserved (left null) for R1's planned pyannote-vs-Sortformer
+    # comparison, which reuses this exact run type rather than a new one.
+    DIARIZATION_ACCURACY = "diarization_accuracy"
 
 
 class EvaluationRunStatus(StrEnum):

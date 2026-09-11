@@ -30,6 +30,7 @@ from app.analytics.schemas import (
     VocabularyComparisonRequest,
 )
 from app.analytics.service import (
+    DiarizationFixturesNotFoundError,
     IncompleteChecklistError,
     InvalidLifecycleTransitionError,
     VocabularyComparisonNotPossibleError,
@@ -39,6 +40,7 @@ from app.analytics.service import (
     list_lifecycle_events,
     provider_for_model_profile,
     quality_metrics,
+    run_diarization_accuracy_eval,
     run_model_comparison,
     run_prompt_comparison,
     run_vocabulary_comparison,
@@ -46,13 +48,14 @@ from app.analytics.service import (
     transition_model_lifecycle,
 )
 from app.audit.service import record_event
-from app.core.ai_providers import get_speech_provider
+from app.core.ai_providers import get_diarization_provider, get_speech_provider
 from app.core.storage import get_storage_provider
 from app.documents.export_formats import ExportSection, render_docx, render_pdf
 from app.identity.deps import require_csrf, require_permission
 from app.identity.models import User
 from app.platform.db.session import get_session
 from app.profiles.models import ModelProfile
+from app.providers.diarization import DiarizationProvider
 from app.providers.speech_to_text import SpeechToTextProvider
 from app.providers.storage import StorageProvider
 from app.templates.models import PromptVersion
@@ -266,6 +269,48 @@ async def run_vocabulary_comparison_endpoint(
         event_metadata={
             "evaluation_run_id": str(run.id),
             "run_type": EvaluationRunType.VOCABULARY_COMPARISON.value,
+            "status": run.status,
+        },
+    )
+    await db.commit()
+    await db.refresh(run)
+    return EvaluationRunResponse.model_validate(run)
+
+
+@router.post(
+    "/evaluation/diarization-accuracy",
+    response_model=EvaluationRunResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def run_diarization_accuracy_endpoint(
+    actor: User = Depends(_require_evaluation_run),
+    db: AsyncSession = Depends(get_session),
+    diarization_provider: DiarizationProvider = Depends(get_diarization_provider),
+    _csrf: None = Depends(require_csrf),
+) -> EvaluationRunResponse:
+    """R0 (research roadmap, post-GA): runs the currently configured
+    diarization provider's real `diarize()` against local RTTM-ground-
+    truthed fixtures at three overlap levels and records DER/JER as a
+    first-class Evaluation Lab run -- see
+    app.analytics.diarization_eval and PHASE_R0_VALIDATION_REPORT.md.
+    Takes no request body: unlike vocabulary-comparison (which is scoped to
+    one conversation's own audio), this always evaluates against the
+    fixed local fixture set (the bundled synthetic smoke set, or
+    VOCADOX_DIARIZATION_FIXTURES_DIR if configured)."""
+    try:
+        run = await run_diarization_accuracy_eval(
+            db, diarization_provider, actor_user_id=actor.id
+        )
+    except DiarizationFixturesNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await record_event(
+        db,
+        event_type="evaluation_run.completed",
+        user_id=actor.id,
+        username=actor.username,
+        event_metadata={
+            "evaluation_run_id": str(run.id),
+            "run_type": EvaluationRunType.DIARIZATION_ACCURACY.value,
             "status": run.status,
         },
     )

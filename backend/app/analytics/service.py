@@ -27,11 +27,14 @@ from __future__ import annotations
 import uuid
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.diarization_eval import run_diarization_eval
+from app.analytics.diarization_fixtures import discover_fixtures, load_smoke_fixtures
 from app.analytics.eval_engine import EvalSubject, run_eval_subject
 from app.analytics.fixtures import FIXTURE_KEY
 from app.analytics.models import EvaluationRun, EvaluationRunType, ModelProfileLifecycleEvent
@@ -42,9 +45,11 @@ from app.intelligence.models import ExtractedFact, FactCorrection, FactReviewSta
 from app.intelligence.prompts import SYSTEM_PROMPT, get_builtin_category_instruction
 from app.intelligence.schemas import EXTRACTION_CATEGORIES
 from app.media.models import MediaAsset, MediaKind
+from app.platform.config import get_settings
 from app.processing.models import JobType, ProcessingJob, ProcessingStatus
 from app.profiles.models import ModelLifecycleStatus, ModelProfile
 from app.profiles.resolver import NoSystemDefaultProfileError, resolve_effective_config
+from app.providers.diarization import DiarizationProvider
 from app.providers.llm import LLMProvider
 from app.providers.speech_to_text import SpeechToTextProvider
 from app.providers.storage import StorageProvider
@@ -513,6 +518,81 @@ async def run_vocabulary_comparison(
         wer_with = round(word_error_rate(ground_truth, hypothesis_with), 4)
         run.result_a = {"word_error_rate": wer_without}
         run.result_b = {"word_error_rate": wer_with}
+        run.status = "completed"
+    except Exception as exc:  # noqa: BLE001 - a failed comparison must be visible, not raised
+        run.status = "failed"
+        run.error_message_safe = f"{type(exc).__name__}: {exc}"[:1000]
+    run.created_by_user_id = actor_user_id
+    run.completed_at = datetime.now(UTC)
+    await db.flush()
+    return run
+
+
+class DiarizationFixturesNotFoundError(ValueError):
+    """Raised when the configured fixture source (smoke set or a custom
+    `VOCADOX_DIARIZATION_FIXTURES_DIR`) has no usable RTTM+audio pairs."""
+
+
+async def run_diarization_accuracy_eval(
+    db: AsyncSession,
+    diarization_provider: DiarizationProvider,
+    *,
+    actor_user_id: uuid.UUID | None,
+) -> EvaluationRun:
+    """R0 (research roadmap, post-GA): runs the configured diarization
+    provider's real `diarize()` against local RTTM-ground-truthed fixtures
+    at three overlap levels (none/some/heavy) and records DER/JER, per
+    fixture and aggregated per overlap level, as a first-class Evaluation
+    Lab record -- see app.analytics.diarization_eval's module docstring for
+    why this is the concrete mechanism closing Phase 12 Finding #12's
+    test-infrastructure gap, and PHASE_R0_VALIDATION_REPORT.md for what is
+    and is not yet empirically proven by a given run (in particular: the
+    default smoke fixtures are synthetic two-tone audio, not real speech --
+    point VOCADOX_DIARIZATION_FIXTURES_DIR at a real FastMSS-generated batch,
+    see tools/dev/fastmss/, for a run that actually speaks to real-voice
+    accuracy).
+
+    Entirely local -- `diarization_provider.diarize()` never uploads
+    fixture audio anywhere; this only measures whatever provider is already
+    configured (VOCADOX_DIARIZATION_PROVIDER), same as every other real
+    Evaluation Lab run in this module.
+    """
+    settings = get_settings()
+    fixture_dir_setting = settings.diarization_fixtures_dir
+    if fixture_dir_setting:
+        fixtures = discover_fixtures(Path(fixture_dir_setting), source="custom")
+        fixture_source = f"custom:{fixture_dir_setting}"
+    else:
+        fixtures = load_smoke_fixtures()
+        fixture_source = "smoke"
+
+    if not fixtures:
+        raise DiarizationFixturesNotFoundError(
+            f"no diarization fixtures found (source={fixture_source})"
+        )
+
+    status = diarization_provider.status()
+    run = EvaluationRun(
+        run_type=EvaluationRunType.DIARIZATION_ACCURACY.value,
+        fixture_key=fixture_source,
+        subject_a={
+            "kind": "diarization_provider",
+            "provider": status.provider,
+            "model": status.model,
+            "model_revision": status.model_revision,
+        },
+        # Reserved for R1's second-provider (Sortformer) comparison -- see
+        # EvaluationRunType.DIARIZATION_ACCURACY's docstring.
+        subject_b={"kind": "diarization_provider", "note": "reserved for R1"},
+    )
+    db.add(run)
+    await db.flush()
+
+    try:
+        summary = await run_diarization_eval(
+            diarization_provider, fixtures, fixture_source=fixture_source
+        )
+        run.result_a = summary.as_public_dict()
         run.status = "completed"
     except Exception as exc:  # noqa: BLE001 - a failed comparison must be visible, not raised
         run.status = "failed"
