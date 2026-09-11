@@ -44,6 +44,12 @@ On the consent step, if your browser supports it, you'll see an
   without VocaDox connecting to the meeting service at all** — VocaDox
   only ever receives the audio your browser is already sharing, the
   exact same mechanism screen-recording tools use.
+- **Mikrofon + Ton von Tab/Bildschirm** — records both together on one
+  track: your own voice through the microphone *and* the other
+  participants via the shared tab/screen. Use this instead of plain
+  "Ton von Tab/Bildschirm" whenever you (the person running the
+  session) also speak and want your side captured too — with just tab
+  audio, your microphone isn't recorded at all.
 
 When the browser's share dialog appears, make sure to enable **"Share
 tab audio"** (Chrome/Edge) or your browser's equivalent — picking a tab
@@ -53,9 +59,11 @@ requires picking a tab/screen even though only its audio is used —
 VocaDox never records or stores any video, the video track is discarded
 immediately.
 
-This choice is available only in browsers whose `getDisplayMedia` API
-supports it (current Chrome/Edge; Firefox's tab-audio support varies by
-version) — where it isn't, only **Mikrofon** is offered.
+These tab/screen choices are available only in browsers whose
+`getDisplayMedia` API supports it (current Chrome/Edge; Firefox's
+tab-audio support varies by version) — where it isn't, only **Mikrofon**
+is offered. The combined option additionally needs the Web Audio API
+(`AudioContext`), present in all browsers that support the above.
 
 ## Live transcript & live draft (preview only)
 

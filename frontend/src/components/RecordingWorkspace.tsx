@@ -9,6 +9,7 @@ import { enqueueRecording, isOfflineQueueSupported } from "../recording/offlineQ
 import { useLiveTranscript } from "../recording/useLiveTranscript";
 import {
   type AudioSource,
+  isCombinedAudioCaptureSupported,
   isRecordingSupported,
   isSystemAudioCaptureSupported,
   useRecorder,
@@ -94,6 +95,18 @@ export function RecordingWorkspace({
                 VocaDox tritt niemals selbst einem Meeting bei; Sie wählen im Freigabedialog Ihres
                 Browsers selbst, welcher Tab/Bildschirm erfasst wird.
               </label>
+              {isCombinedAudioCaptureSupported() && (
+                <label>
+                  <input
+                    type="radio"
+                    name="audio-source"
+                    checked={audioSource === "both"}
+                    onChange={() => setAudioSource("both")}
+                  />{" "}
+                  Mikrofon + Ton von Tab/Bildschirm — nimmt Ihre eigene Stimme über das Mikrofon
+                  und den freigegebenen Tab/Bildschirm gemeinsam auf einer Spur auf.
+                </label>
+              )}
             </fieldset>
           )}
           <div className={styles.controls}>
@@ -175,7 +188,9 @@ export function RecordingWorkspace({
           {recorder.errorMessage ??
             (audioSource === "system-audio"
               ? "Freigabe von Tab/Bildschirm wurde verweigert oder abgebrochen. Versuchen Sie es erneut und wählen Sie einen Tab/Bildschirm zur Freigabe."
-              : "Mikrofonzugriff wurde verweigert. Erlauben Sie den Mikrofonzugriff in Ihren Browser-Einstellungen und versuchen Sie es erneut.")}
+              : audioSource === "both"
+                ? "Mikrofon- oder Tab-/Bildschirm-Freigabe wurde verweigert oder abgebrochen. Versuchen Sie es erneut und erlauben Sie beides."
+                : "Mikrofonzugriff wurde verweigert. Erlauben Sie den Mikrofonzugriff in Ihren Browser-Einstellungen und versuchen Sie es erneut.")}
           <div style={{ marginTop: "var(--space-2)" }}>
             <Button
               variant="secondary"
