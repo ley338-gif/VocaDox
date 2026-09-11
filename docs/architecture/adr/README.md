@@ -47,3 +47,5 @@ MADR-style (Status / Context / Decision / Consequences), numbered sequentially. 
 - [0043](0043-development-production-deployment-separation.md) — Separate development and production deployments
 - [0044](0044-ci-security-analysis-and-sbom.md) — CodeQL, layered secret scanning, and shipped-image SBOMs
 - [0045](0045-chunked-live-transcript-target.md) — Linear, overlap-window live-transcript target architecture
+- [0046](0046-progressive-disclosure-for-workspace-complexity.md) — Progressive disclosure for workspace complexity
+- [0047](0047-r0-diarization-eval-framework.md) — R0 diarization evaluation framework: metric, fixture source, and provider-agnostic interface

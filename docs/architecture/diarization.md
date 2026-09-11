@@ -56,3 +56,20 @@ placeholder in that case rather than a fabricated calibrated value (see
 `app/providers/diarization.py`'s `PyannoteDiarizationProvider.diarize`
 docstring comment). Don't compare this value across providers as if it
 were a universal probability.
+
+## R0: accuracy evaluation (DER/JER)
+
+Phase 12's GA validation report disclosed a real gap: no fixture in this
+project before R0 (research roadmap, post-GA) ever used two genuinely
+distinct voices to test diarization — every "2-speaker" fixture was the
+same synthetic voice at different playback rates. R0 adds a local,
+provider-agnostic DER/JER eval framework
+(`app/analytics/diarization_eval.py`, `diarization_metrics.py`, `rttm.py`,
+`diarization_fixtures.py`), wired into the Evaluation Lab as
+`EvaluationRunType.DIARIZATION_ACCURACY`
+(`POST /admin/evaluation/diarization-accuracy`) — see ADR-0047 for the
+metric/fixture-source/interface decisions and
+`PHASE_R0_VALIDATION_REPORT.md` for what has and has not yet been
+empirically proven with it. Works against any `DiarizationProvider`
+(today: `PyannoteDiarizationProvider`/`FakeDiarizationProvider`; R1 adds a
+second real provider with no change to this eval mechanism).
