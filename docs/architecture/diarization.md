@@ -70,6 +70,9 @@ provider-agnostic DER/JER eval framework
 (`POST /admin/evaluation/diarization-accuracy`) — see ADR-0047 for the
 metric/fixture-source/interface decisions and
 `PHASE_R0_VALIDATION_REPORT.md` for what has and has not yet been
-empirically proven with it. Works against any `DiarizationProvider`
-(today: `PyannoteDiarizationProvider`/`FakeDiarizationProvider`; R1 adds a
-second real provider with no change to this eval mechanism).
+empirically proven with it. Works against any `DiarizationProvider` — as
+predicted, R1 added `SortformerDiarizationProvider` (NVIDIA NeMo Streaming
+Sortformer 4-Speaker v2) with no change to this eval mechanism at all; see
+ADR-0048 and `PHASE_R1_VALIDATION_REPORT.md`. Switch
+`VOCADOX_DIARIZATION_PROVIDER` between `pyannote` and `sortformer` and
+re-run `POST /admin/evaluation/diarization-accuracy` to compare the two.

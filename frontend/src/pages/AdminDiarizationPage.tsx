@@ -6,7 +6,15 @@ import { Badge } from "../design-system/Badge";
 import { Card } from "../design-system/Card";
 import { Skeleton } from "../design-system/States";
 
-/** Phase 7 Admin Portal Diarization page — same pattern as AdminSpeechPage. */
+/** Phase 7 Admin Portal Diarization page — same pattern as AdminSpeechPage.
+ * R1 (research roadmap, post-GA): the "Anbieter" field below is already
+ * provider-agnostic (it renders whatever `DiarizationProviderStatus.provider`
+ * the configured `VOCADOX_DIARIZATION_PROVIDER` reports — "pyannote.audio" or
+ * "nvidia-sortformer") — no code change was needed for the status card to
+ * show a second provider. The note below is the one addition: since
+ * switching providers is an ops-level env var, not a UI control (see
+ * ADR-0048), this makes the two valid real options discoverable here rather
+ * than only in docs/admin/model-installation.md. */
 export function AdminDiarizationPage() {
   const overviewQuery = useQuery({ queryKey: ["admin", "models"], queryFn: getModelsOverview });
   const diarization = overviewQuery.data?.diarization;
@@ -44,6 +52,28 @@ export function AdminDiarizationPage() {
             )}
           </dl>
         </Card>
+      )}
+      {diarization && (
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <Card>
+            <p style={{ fontWeight: 600, margin: "0 0 var(--space-2) 0" }}>
+              Unterstützte Anbieter
+            </p>
+            <p style={{ margin: "0 0 var(--space-3) 0", color: "var(--text-secondary)" }}>
+              Der aktive Anbieter wird über <code>VOCADOX_DIARIZATION_PROVIDER</code> auf
+              Server-Ebene konfiguriert (kein UI-Umschalter) — siehe
+              docs/admin/model-installation.md.
+            </p>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <Badge tone={diarization.provider === "pyannote.audio" ? "success" : "neutral"}>
+                pyannote.audio
+              </Badge>
+              <Badge tone={diarization.provider === "nvidia-sortformer" ? "success" : "neutral"}>
+                nvidia-sortformer
+              </Badge>
+            </div>
+          </Card>
+        </div>
       )}
     </AdminLayout>
   );

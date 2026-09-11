@@ -10,6 +10,7 @@ from app.providers.diarization import (
     DiarizationProvider,
     FakeDiarizationProvider,
     PyannoteDiarizationProvider,
+    SortformerDiarizationProvider,
 )
 from app.providers.llm import FakeLLMProvider, LLMProvider
 from app.providers.speech_to_text import (
@@ -26,6 +27,7 @@ __all__ = [
     "DiarizationProvider",
     "FakeDiarizationProvider",
     "PyannoteDiarizationProvider",
+    "SortformerDiarizationProvider",
     "LLMProvider",
     "FakeLLMProvider",
     "StorageProvider",

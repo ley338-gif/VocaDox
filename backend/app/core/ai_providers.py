@@ -23,6 +23,8 @@ from app.providers.diarization import (
     FakeDiarizationProvider,
     PyannoteConfig,
     PyannoteDiarizationProvider,
+    SortformerConfig,
+    SortformerDiarizationProvider,
 )
 from app.providers.llm import (
     FakeLLMProvider,
@@ -54,6 +56,15 @@ def get_speech_provider() -> SpeechToTextProvider:
 
 
 def get_diarization_provider() -> DiarizationProvider:
+    """R1 (research roadmap, post-GA): `VOCADOX_DIARIZATION_PROVIDER` now
+    also accepts 'sortformer' — NVIDIA NeMo's Streaming Sortformer
+    4-Speaker v2, a second, real `DiarizationProvider` used to actually
+    compare against pyannote via the Evaluation Lab's DER/JER run (see
+    docs/architecture/adr/0048-sortformer-second-diarization-provider.md,
+    PHASE_R1_VALIDATION_REPORT.md). Switching this setting is the one
+    mechanism an admin/developer uses to pick which provider a
+    diarization-accuracy Evaluation Lab run measures — no separate
+    per-request selector exists (same posture as 'pyannote' today)."""
     settings = get_settings()
     if settings.diarization_provider == "pyannote":
         from app.cli.install_models import hf_cache_dir
@@ -65,6 +76,13 @@ def get_diarization_provider() -> DiarizationProvider:
                 device=settings.diarization_device,
                 hf_cache_dir=str(hf_cache_dir(Path(settings.model_volume_root))),
             )
+        )
+    if settings.diarization_provider == "sortformer":
+        model_dir = str(
+            Path(settings.model_volume_root) / settings.diarization_sortformer_model_dir_name
+        )
+        return SortformerDiarizationProvider(
+            SortformerConfig(model_dir=model_dir, device=settings.diarization_device)
         )
     return FakeDiarizationProvider()
 

@@ -72,6 +72,12 @@ class ModelProfile:
     requires_token: bool
     license_note: str
     dependent_repos: tuple[DependentRepo, ...] = ()
+    # R1: restrict the primary repo's own download to matching files only
+    # (huggingface_hub `allow_patterns` glob syntax) -- e.g. the Sortformer
+    # repo also carries a `.gguf` quantization and demo `figures/*.gif`
+    # VocaDox never needs; empty tuple (the default) downloads everything,
+    # matching Phase 3's original pyannote-profile behavior unchanged.
+    allow_patterns: tuple[str, ...] = ()
 
 
 def _register(profile: ModelProfile) -> None:
@@ -157,6 +163,42 @@ _register(
 )
 
 
+# R1 (research roadmap, post-GA): a SECOND, real diarization provider
+# (NVIDIA NeMo Streaming Sortformer 4-Speaker v2) so R0's DER/JER eval
+# framework has more than one real provider to compare pyannote against.
+# Unlike pyannote's multi-repo pipeline, this ships as ONE self-contained
+# `.nemo` checkpoint file (verified via the Hugging Face model API's own
+# `siblings` file listing, 2026-09-12) -- a single-file download, no
+# `dependent_repos` needed. `requires_token=False`: the HF API's `gated`
+# field for this repo is `false` (verified directly, not assumed from the
+# model card's own usage-sample boilerplate, which mentions "you need a
+# Hugging Face token" for `from_pretrained` -- that mention is about
+# HF's general authenticated-download convenience/rate-limit path, not an
+# actual terms-acceptance gate; see ADR-0048 for the full account).
+_register(
+    ModelProfile(
+        name="diarization-sortformer",
+        repo_id="nvidia/diar_streaming_sortformer_4spk-v2",
+        revision="5240a64075176943f677d30fa2171c780229f341",
+        marker_file="diar_streaming_sortformer_4spk-v2.nemo",
+        requires_token=False,
+        license_note=(
+            "CC BY 4.0 (verified: "
+            "https://huggingface.co/nvidia/diar_streaming_sortformer_4spk-v2 model card's "
+            "own License section, and independently via the Hugging Face model API's "
+            "`license` tag, 2026-09-12) -- not gated (HF API `gated: false`), commercial "
+            "use and redistribution permitted with attribution to NVIDIA."
+        ),
+        # Repo also contains a `.gguf` quantization and demo `figures/*.gif`
+        # this provider never loads -- restrict the download to the one
+        # `.nemo` checkpoint VocaDox's SortformerDiarizationProvider
+        # actually uses (allow_patterns verified against the repo's own
+        # `siblings` file listing via the Hugging Face model API, 2026-09-12).
+        allow_patterns=("diar_streaming_sortformer_4spk-v2.nemo",),
+    )
+)
+
+
 def hf_cache_dir(model_volume_root: Path) -> Path:
     """Shared Hugging Face cache for every profile's dependent repos —
     deliberately separate from each profile's own `local_dir` snapshot
@@ -209,6 +251,7 @@ def install(profile: ModelProfile, *, model_volume_root: Path, token: str | None
             revision=profile.revision,
             local_dir=str(target_dir),
             token=token,
+            allow_patterns=list(profile.allow_patterns) or None,
         )
         if not _is_installed(target_dir, profile.marker_file):
             print(
