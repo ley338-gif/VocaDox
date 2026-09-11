@@ -106,15 +106,51 @@ export interface VocabularyEvalResult {
   word_error_rate: number;
 }
 
+// R0 (research roadmap, post-GA): per-fixture and per-overlap-level DER/JER
+// -- see backend app.analytics.diarization_eval.DiarizationEvalSummary.as_public_dict.
+export interface DiarizationOverlapLevelResult {
+  overlap_level: "none" | "some" | "heavy";
+  fixture_count: number;
+  mean_der: number | null;
+  mean_jer: number | null;
+}
+
+export interface DiarizationFixtureResult {
+  fixture_id: string;
+  overlap_level: "none" | "some" | "heavy";
+  der: number | null;
+  jer: number | null;
+  reference_speaker_count: number;
+  hypothesis_speaker_count: number | null;
+  duration_seconds: number;
+  error: string | null;
+}
+
+export interface DiarizationEvalResult {
+  provider: string;
+  model: string;
+  model_revision: string | null;
+  fixture_source: string;
+  mean_der: number | null;
+  mean_jer: number | null;
+  latency_seconds: number;
+  by_overlap_level: DiarizationOverlapLevelResult[];
+  per_fixture: DiarizationFixtureResult[];
+}
+
 export interface EvaluationRun {
   id: string;
-  run_type: "model_comparison" | "prompt_comparison" | "vocabulary_comparison";
+  run_type:
+    | "model_comparison"
+    | "prompt_comparison"
+    | "vocabulary_comparison"
+    | "diarization_accuracy";
   status: "running" | "completed" | "failed";
   fixture_key: string;
   subject_a: Record<string, unknown>;
   subject_b: Record<string, unknown>;
-  result_a: EvalResult | VocabularyEvalResult | null;
-  result_b: EvalResult | VocabularyEvalResult | null;
+  result_a: EvalResult | VocabularyEvalResult | DiarizationEvalResult | null;
+  result_b: EvalResult | VocabularyEvalResult | DiarizationEvalResult | null;
   error_message_safe: string | null;
   created_at: string;
   completed_at: string | null;
@@ -167,6 +203,14 @@ export function runVocabularyComparison(
     "/admin/evaluation/vocabulary-comparison",
     jsonInit("POST", { conversation_id: conversationId }, csrfToken)
   );
+}
+
+// R0 (research roadmap, post-GA): runs the configured diarization
+// provider's real diarize() against local RTTM fixtures at three overlap
+// levels. Takes no body -- always scored against the fixed local fixture
+// set (see backend app.analytics.diarization_eval).
+export function runDiarizationAccuracyEval(csrfToken: string): Promise<EvaluationRun> {
+  return request("/admin/evaluation/diarization-accuracy", jsonInit("POST", {}, csrfToken));
 }
 
 // -- Quality report (post-GA P1-4) -----------------------------------------

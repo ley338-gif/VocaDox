@@ -2,12 +2,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import {
+  type DiarizationEvalResult,
   type EvalResult,
   type QualityReport,
   type VocabularyEvalResult,
   fetchQualityReportExport,
   generateQualityReport,
   listEvaluationRuns,
+  runDiarizationAccuracyEval,
   runModelComparison,
   runPromptComparison,
   runVocabularyComparison,
@@ -29,6 +31,12 @@ function isVocabularyResult(
   return "word_error_rate" in result;
 }
 
+function isDiarizationResult(
+  result: EvalResult | VocabularyEvalResult | DiarizationEvalResult
+): result is DiarizationEvalResult {
+  return "by_overlap_level" in result;
+}
+
 /**
  * Phase 8 Evaluation Lab (spec §50): runs the same synthetic fixture
  * through two real subjects (two `ModelProfile`s, or two `PromptVersion`s
@@ -45,7 +53,9 @@ export function AdminEvaluationLabPage() {
   const queryClient = useQueryClient();
   const canRun = hasPermission("evaluation:run");
 
-  const [mode, setMode] = useState<"model" | "prompt" | "vocabulary" | "quality-report">("model");
+  const [mode, setMode] = useState<
+    "model" | "prompt" | "vocabulary" | "diarization" | "quality-report"
+  >("model");
   const [modelA, setModelA] = useState("");
   const [modelB, setModelB] = useState("");
   const [promptA, setPromptA] = useState("");
@@ -122,6 +132,20 @@ export function AdminEvaluationLabPage() {
     }
   }
 
+  async function handleRunDiarizationAccuracyEval() {
+    if (!csrfToken) return;
+    setError(null);
+    setRunning(true);
+    try {
+      await runDiarizationAccuracyEval(csrfToken);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "evaluation", "runs"] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lauf fehlgeschlagen.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function handleGenerateQualityReport() {
     if (!csrfToken || qualityReportConversationIds.length === 0) return;
     setError(null);
@@ -168,11 +192,14 @@ export function AdminEvaluationLabPage() {
           <Tabs
             idPrefix="evallab-mode"
             activeId={mode}
-            onChange={(id) => setMode(id as "model" | "prompt" | "vocabulary" | "quality-report")}
+            onChange={(id) =>
+              setMode(id as "model" | "prompt" | "vocabulary" | "diarization" | "quality-report")
+            }
             items={[
               { id: "model", label: "Modellvergleich" },
               { id: "prompt", label: "Promptvergleich" },
               { id: "vocabulary", label: "Fachwortschatz" },
+              { id: "diarization", label: "Sprechererkennung (DER/JER)" },
               { id: "quality-report", label: "Qualitätsbericht" },
             ]}
           />
@@ -263,6 +290,21 @@ export function AdminEvaluationLabPage() {
                 {running ? "Läuft…" : "Vergleich starten"}
               </Button>
             </div>
+          </TabPanel>
+
+          <TabPanel id="diarization" activeId={mode} idPrefix="evallab-mode">
+            <p style={{ color: "var(--text-muted)", marginBottom: "var(--space-3)" }}>
+              R0 (Forschungs-Roadmap): führt die echte Sprechererkennung des konfigurierten
+              Anbieters gegen lokale, mit RTTM-Referenz versehene Testdaten bei drei
+              Überlappungsgraden (keine/etwas/stark) aus und berechnet Diarization Error Rate
+              (DER) sowie Jaccard Error Rate (JER) je Testdatei und je Überlappungsgrad. Nutzt
+              standardmäßig die mitgelieferten synthetischen Testdaten (Vorbedingungscheck,
+              nicht echte Stimmen) — für echte Stimmen siehe{" "}
+              <code>VOCADOX_DIARIZATION_FIXTURES_DIR</code>.
+            </p>
+            <Button onClick={() => void handleRunDiarizationAccuracyEval()} disabled={running}>
+              {running ? "Läuft…" : "DER/JER-Lauf starten"}
+            </Button>
           </TabPanel>
 
           <TabPanel id="quality-report" activeId={mode} idPrefix="evallab-mode">
@@ -399,8 +441,32 @@ export function AdminEvaluationLabPage() {
               {run.error_message_safe && (
                 <p style={{ color: "var(--color-danger)" }}>{run.error_message_safe}</p>
               )}
+              {run.result_a && isDiarizationResult(run.result_a) && (
+                <table style={{ width: "100%", marginTop: "var(--space-3)", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ textAlign: "left", borderBottom: "1px solid var(--border-default)" }}>
+                      <th>Überlappungsgrad</th>
+                      <th>Testdateien</th>
+                      <th>DER (Ø)</th>
+                      <th>JER (Ø)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {run.result_a.by_overlap_level.map((level) => (
+                      <tr key={level.overlap_level}>
+                        <td>{level.overlap_level}</td>
+                        <td>{level.fixture_count}</td>
+                        <td>{formatPct(level.mean_der)}</td>
+                        <td>{formatPct(level.mean_jer)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
               {run.result_a &&
                 run.result_b &&
+                !isDiarizationResult(run.result_a) &&
+                !isDiarizationResult(run.result_b) &&
                 (isVocabularyResult(run.result_a) && isVocabularyResult(run.result_b) ? (
                   <table style={{ width: "100%", marginTop: "var(--space-3)", borderCollapse: "collapse" }}>
                     <thead>
