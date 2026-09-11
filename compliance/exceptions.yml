@@ -60,6 +60,48 @@ exceptions:
     expiry_date: "2027-09-09"
     notes: "Re-review if tqdm is vendored, modified, or statically incorporated into VocaDox code."
 
+  - dependency_name: FastMSS
+    ecosystem: other  # git-cloned dev tool, never a pip/npm package -- not in dependency-inventory.yml
+    reason: >
+      R0 (research roadmap, post-GA) dev-only synthetic multi-speaker test
+      fixture generator (https://github.com/popcornell/FastMSS,
+      GPL-3.0 -- verified from the repository's own LICENSE file/README,
+      2026-09-12). GPL-3.0 is in `license-policy.yml`'s `blocked` bucket,
+      but this exception applies because the actual use here has none of
+      the properties that bucket exists to prevent: FastMSS is never
+      installed as a Python/Node dependency of any VocaDox package (not in
+      backend/pyproject.toml under any extra, not in frontend/package.json),
+      never vendored/copied into this repository's source, never imported
+      by any VocaDox module, and never present in any Docker image this
+      project builds or ships (backend, worker, frontend, GDT bridge -- see
+      compliance/container-inventory.yml, which has no entry for it,
+      correctly). It is a standalone external tool a developer clones and
+      runs on their own machine (see tools/dev/fastmss/README.md), invoked
+      only via subprocess like any other external CLI (e.g. ffmpeg), whose
+      *output data files* (synthesized meeting waveforms + RTTM text ground
+      truth -- not source code, and not GPL-encumbered by association any
+      more than a document a GPL-licensed word processor saved would be)
+      are copied into a local, non-distributed test-fixture directory
+      (backend/app/analytics/diarization_smoke_fixtures/ holds only this
+      project's own tiny synthetic two-tone placeholder fixtures, generated
+      by backend/scripts/generate_diarization_smoke_fixtures.py, NOT
+      FastMSS output -- a real FastMSS-generated batch is never committed
+      to this repository at all, only used locally via
+      VOCADOX_DIARIZATION_FIXTURES_DIR). No VocaDox source is combined with
+      FastMSS source in any single work, satisfying GPL-3.0's own
+      "aggregation, not derivative work" carve-out even under a maximally
+      cautious reading.
+    approved_by: "R0 kickoff (2026-09-12 owner GO) — standing autonomous GO per [[github-workflow-autonomy]]"
+    expiry_date: "2027-09-12"
+    notes: >
+      Re-review immediately if FastMSS is ever added to backend/pyproject.toml
+      (any extra), vendored/copied into this repository, run as part of any
+      Dockerfile or CI workflow, or if any FastMSS-generated fixture batch
+      is ever committed to this repository rather than kept local
+      (VOCADOX_DIARIZATION_FIXTURES_DIR points at a local, gitignored
+      directory outside the repo in every documented usage). See
+      PHASE_R0_VALIDATION_REPORT.md for what R0 actually shipped.
+
 # NOTE: an earlier draft of this remediation briefly upgraded the frontend
 # to vite@8.2.1, which pulled in `lightningcss` (MPL-2.0, dev-only) as a
 # transitive optional dependency and would have needed an exception entry
