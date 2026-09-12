@@ -243,3 +243,49 @@ models:
     disk_size_mb: null  # not measured -- no real download performed in this sandbox; the repo's own file listing shows one .nemo checkpoint (exact size not retrievable from the HF API's file metadata without a real download)
     runtime_requirements: "nemo_toolkit[asr]>=2.0,<3.0 (Apache-2.0, see dependency-inventory.yml/ADR-0048; NOT independently build-verified in this PR's sandbox -- uv lock resolved successfully, a full worker Docker image build was not attempted here) + CPU-pinned torch/torchaudio/torchcodec (already installed for pyannote); CPU or NVIDIA GPU"
     approval_status: approved
+
+  # R2 (research roadmap, post-GA): second, real speech-to-text provider,
+  # added following the exact same shape R1 proved for diarization
+  # (Sortformer) — a provider-agnostic interface + factory selection + a
+  # real model-inventory entry. See
+  # docs/architecture/adr/0049-nemotron-second-stt-provider.md for the full
+  # evaluation, in particular the OpenMDW-1.1 license research (a license
+  # this project had not encountered before R2 — verified against the
+  # actual license text, not assumed equivalent to a standard permissive
+  # license from a summary).
+  - name: nvidia/nemotron-3.5-asr-streaming-0.6b
+    purpose: Speech-to-text (transcription), R2 alternative speech profile (NemotronSpeechProvider) — a second real STT provider alongside faster-whisper-small, PoC-scoped (not yet run through a real WER comparison — see Known Limitations, PHASE_R2_VALIDATION_REPORT.md)
+    provider: NVIDIA
+    version: "ea30d66debe3740a08b573244286791d423d6b3e"  # HF revision (commit), pinned — never a floating tag; verified via the HF model API's own `sha` field, 2026-09-12
+    source: "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b"
+    license: OpenMDW-1.1
+    commercial_use: true
+    redistribution: true
+    usage_restrictions: >
+      OpenMDW-1.1 ("Open Model Weights" license, https://openmdw.ai/license/1-1/)
+      is a permissive, MIT-like license this project had NOT encountered
+      before R2 (faster-whisper is MIT, pyannote/Sortformer are MIT/CC-BY-4.0,
+      Ollama/Qwen is Apache-2.0) — its full text was fetched and read
+      directly, not assumed equivalent to a standard permissive license
+      from a research summary. Findings: grants free use/modification/
+      distribution of the model weights with no field-of-use or
+      responsible-use-policy restriction incorporated as a legal term (no
+      medical/healthcare/high-risk carve-out); no attribution requirement
+      beyond retaining a copy of the license text and any copyright/origin
+      notices on redistribution; explicitly imposes no restriction on
+      outputs generated using the model; includes a defensive patent-
+      AND-copyright litigation termination clause (broader than Apache-2.0's
+      patent-only retaliation clause, narrower than nothing); standard
+      AS-IS warranty disclaimer. NOT gated — verified directly against the
+      Hugging Face model API (`gated: false`), not merely assumed from the
+      model card's prose. No genuine license-policy blocker was found for
+      commercial medical-documentation use; see ADR-0049 for the full
+      research record and reasoning.
+    sha256: null  # not yet computed -- no real download was performed in this session's sandbox (no network budget for a multi-GB test download); see Known Limitations, PHASE_R2_VALIDATION_REPORT.md
+    bundled: false
+    downloaded_at_install: true
+    download_method: "Admin-initiated: `docker compose run --rm model-manager install stt-nemotron` (app/cli/model_manager.py + app/cli/install_models.py's new `stt-nemotron` ModelProfile, allow_patterns-restricted to the single `.nemo` checkpoint file). Never called by any API route or the worker's normal request path."
+    bundled_with_product: false
+    disk_size_mb: null  # not measured -- no real download performed in this sandbox
+    runtime_requirements: "nemo_toolkit[asr]>=2.0,<3.0 (Apache-2.0, already in the [ai] extra as of R1 — no new dependency added for R2, see dependency-inventory.yml/ADR-0048) + CPU-pinned torch/torchaudio/torchcodec (already installed); CPU or NVIDIA GPU"
+    approval_status: approved
