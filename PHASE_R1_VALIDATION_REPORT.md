@@ -137,46 +137,44 @@ answer here — exactly the discipline R0 established and R1 continues.
 - Frontend: `npm run typecheck` / `npm run lint` / `npm run test` (vitest,
   64 passed, unchanged from R0 — no new suite needed for one static info
   card) / `npm run build` all clean.
-- **NOT run in this session** (disclosed, not silently skipped):
-  - `docker build -f backend/worker.Dockerfile` with the new `nemo_toolkit`
-    dependency actually present — the mandatory CI job that does this
-    (`.github/workflows/ci.yml`) will run it for real once this PR is
-    opened; this is the first genuine test of whether the full `[ai]`
-    extra actually installs and the worker image actually builds with
-    NeMo in it. This is real risk this report does not paper over: a
-    resolver succeeding is not the same as a real multi-stage Docker build
-    succeeding, and this project's own history (ADR-0017's torchaudio/
-    torchcodec findings) shows resolver-level success has previously
-    still hidden real import/runtime failures.
-  - `compliance/generate_transitive_inventory.py` — **not** re-run in this
-    session. Its own docstring requires the raw pip-licenses scan to run
-    on Linux (several resolved packages are platform-conditional between
-    this session's Windows sandbox and the `ubuntu-latest` CI runner), so
-    a locally-regenerated file would not match what CI's own compliance
-    job produces and would risk committing an inaccurate transitive
-    license classification for ~80 new packages. `compliance/
-    dependency-inventory-transitive.yml` is therefore left as R0 committed
-    it; CI's compliance job (which regenerates this file on Linux and
-    fails on either drift or a genuinely blocked/unknown license) is
-    expected to fail on this PR's first run, and is the plan of record for
-    discovering and fixing the real classification — via targeted
-    follow-up commits to `PACKAGE_LICENSE_OVERRIDES`
-    (`compliance/generate_transitive_inventory.py`) or, if warranted, a
-    `compliance/exceptions.yml` entry — not a guess made from this sandbox.
-  - `python compliance/check_licenses.py` — not re-run locally for the
-    same reason (it reads the transitive file above, which was not
-    regenerated here).
-  - `frontend/openapi.json` / generated TS client — not regenerated;
-    unaffected by this PR (no backend response schema changed — the
-    diarization overview endpoint was already `Record<string, unknown>`
-    on the frontend side and provider-agnostic on the backend, so no
-    OpenAPI drift is expected).
-
-**This report's CI section will be updated with the real outcome of the
-worker Docker build and compliance job once this PR's CI actually runs —
-see the PR itself for the final, authoritative CI status; this document
-was written and committed alongside the implementation, not after
-confirming a fully green run.**
+- **This PR's CI actually ran and initially failed for real** (License
+  compliance job) — 16 transitive packages introduced by
+  `nemo_toolkit[asr]` resolved to `unknown` (bare "BSD"/"ISC License
+  (ISCL)"/"Apache V2.0"/non-normalized strings pip-licenses couldn't
+  classify). Each was individually verified against its own PyPI metadata
+  and/or upstream LICENSE file (clause count confirmed for every bare
+  "BSD" entry, not assumed) and fixed with real
+  `PACKAGE_LICENSE_OVERRIDES`/`license-policy.yml` entries — see the
+  follow-up commit and `compliance/exceptions.yml`'s new `soxr` entry
+  (LGPL-2.1-or-later, static-linking nuance disclosed explicitly) for the
+  full account. This is exactly the "commit incrementally, poll CI, fix
+  for real" discipline this project's own history establishes, not a
+  gap papered over after the fact.
+- **`compliance/generate_transitive_inventory.py` WAS re-run for real**,
+  after the CI failure above, in a local Linux container (Docker Desktop's
+  Linux engine) reproducing CI's exact steps
+  (`UV_PROJECT_ENVIRONMENT=/tmp/ai_venv uv sync --project backend --locked
+  --no-dev --extra ai --no-editable`, then `pip-licenses`, then the
+  regeneration script) rather than guessed from the Windows sandbox this
+  session otherwise ran in (this file's own docstring warns Windows output
+  will not byte-match Linux CI's). Result: **594 total resolved packages,
+  590 approved / 4 review_required / 0 blocked / 0 unknown** —
+  `compliance/check_licenses.py` now genuinely passes locally, not just in
+  CI. This also means **`uv sync --locked --no-dev --extra ai --no-editable`
+  was confirmed to actually succeed on Linux** — real, positive evidence
+  that was NOT available when this report was first drafted (see the
+  now-superseded caveat in "Known Limitations" below, kept in the ADR/git
+  history rather than silently rewritten).
+- `docker build -f backend/worker.Dockerfile` (the full multi-stage image
+  build, including the FFmpeg/system-package layers, not just the `uv
+  sync` step verified above) was still not attempted locally in this
+  session — this remains the one thing only CI's own Docker-build job can
+  confirm; see the PR for its outcome.
+- `frontend/openapi.json` / generated TS client — not regenerated;
+  unaffected by this PR (no backend response schema changed — the
+  diarization overview endpoint was already `Record<string, unknown>`
+  on the frontend side and provider-agnostic on the backend, so no
+  OpenAPI drift is expected, and CI's own drift-check job confirmed this).
 
 ## License Disposition
 
@@ -204,12 +202,17 @@ confirming a fully green run.**
   `VOCADOX_DIARIZATION_PROVIDER`), not a developer-only test-fixture tool,
   so it gets the same inventory treatment `pyannote/speaker-diarization-3.1`
   and its dependent repos already have.
-- **`nemo_toolkit`'s own ~80-package transitive dependency tree**: license
-  classification genuinely unknown as of this report — see "NOT run in
-  this session" above. This is the one real, disclosed compliance gap R1
-  leaves open, with a concrete named mechanism (CI's compliance job +
-  targeted override commits) to close it, not a silent assumption that it
-  will be fine.
+- **`nemo_toolkit`'s own transitive dependency tree**: fully classified as
+  of this report's final state — real CI feedback (License compliance job)
+  surfaced 16 initially-`unknown` packages, each individually verified
+  against its own PyPI metadata / upstream LICENSE file and resolved to
+  `approved` (see the follow-up commit), plus one new genuine
+  `review_required` case, `soxr` (LGPL-2.1-or-later, statically links a
+  copy of libsoxr) — recorded as a real `compliance/exceptions.yml` entry
+  with the static-linking reasoning made explicit, following this
+  project's existing certifi/pathspec/tqdm precedent. Final state:
+  `python compliance/check_licenses.py` → PASS, 594 total transitive
+  packages (590 approved / 4 review_required / 0 blocked / 0 unknown).
 
 ## Known Limitations / Assumptions (disclosed, not blocking merge of R1 itself)
 
@@ -226,19 +229,25 @@ confirming a fully green run.**
    pyannote install) AND additionally installing a real Sortformer
    checkpoint. See "Concrete answer to the empirical question" above for
    the exact remaining manual steps.
-3. **The worker Docker image build with `nemo_toolkit` was not attempted
-   locally** — `uv lock` resolved cleanly, which is real, positive
-   evidence, but is not the same guarantee a full `docker build -f
-   backend/worker.Dockerfile` gives. This PR's CI run is the first real
-   test of that; if it fails, the plan is to fix it with real, targeted
-   follow-up commits (pin adjustments, extra system packages NeMo may
-   need at build time, etc.), the same iterative-CI-fix discipline this
-   project's own git history already demonstrates (e.g. ADR-0017's
-   real-build-driven 3.x->4.x pyannote pin reversal).
-4. **`compliance/dependency-inventory-transitive.yml` was not regenerated**
-   — see "Test/CI Summary" and "License Disposition" above for the full
-   reasoning and the concrete plan (CI's own Linux-based compliance job +
-   follow-up commits) to close this before merge.
+3. **The full multi-stage worker Docker image build was not attempted
+   locally** — `uv sync --locked --no-dev --extra ai --no-editable` WAS
+   confirmed to succeed for real, in a Linux container reproducing CI's
+   exact command (see "Test/CI Summary" — this is stronger evidence than
+   the `uv lock` resolver check this limitation originally only had), but
+   that is still not the same guarantee a full `docker build -f
+   backend/worker.Dockerfile` gives (system packages, layer ordering,
+   the FFmpeg/torchcodec shared-library setup already documented in that
+   Dockerfile). This PR's CI Docker-build job is the remaining real test
+   of that; if it fails, the plan is to fix it with real, targeted
+   follow-up commits, the same iterative-CI-fix discipline this project's
+   own git history already demonstrates (e.g. ADR-0017's real-build-driven
+   3.x->4.x pyannote pin reversal).
+4. **`compliance/dependency-inventory-transitive.yml` regeneration**:
+   closed during this PR, not left open — see "License Disposition" and
+   "Test/CI Summary" above. Recorded here for the historical record: this
+   report originally (before CI ran) disclosed this as an open item to be
+   closed by a follow-up commit; that follow-up happened within this same
+   PR once CI's real failure identified exactly what needed fixing.
 5. **No combined two-provider `EvaluationRun`** — `subject_b` stays R0's
    reserved placeholder; comparing providers today means two separate
    Evaluation Lab runs (switch `VOCADOX_DIARIZATION_PROVIDER`, re-run),
@@ -256,14 +265,24 @@ confirming a fully green run.**
 
 ## Findings Register
 
-No process or product-correctness finding in the Stage P0/R0 sense (a
-CI-fix-and-repush cycle) — this report is written before this PR's CI has
-actually run, so any such finding from a real CI failure will be recorded
-as a follow-up commit's message instead, per this project's standing
-"commit incrementally, poll CI, fix for real" discipline, not retrofitted
-into this document's initial text.
+One real CI-fix-and-repush cycle, in the Stage P0/R0 sense: this PR's
+first CI run genuinely failed the License compliance job — 16 transitive
+packages `nemo_toolkit[asr]` newly pulled in resolved to `unknown` because
+pip-licenses could only report ambiguous/non-normalized raw strings for
+them (bare `"BSD"`, `"ISC License (ISCL)"`, `"Apache V2.0"`, and others).
+Each was individually verified for real (PyPI JSON metadata and, for every
+ambiguous bare `"BSD"` entry, the package's actual upstream LICENSE file
+to confirm 2- vs 3-clause) and fixed with real `PACKAGE_LICENSE_OVERRIDES`/
+`license-policy.yml` entries in a follow-up commit — plus one new,
+genuinely-`review_required` dependency (`soxr`, LGPL-2.1-or-later with a
+real static-linking nuance) recorded as an explicit `compliance/
+exceptions.yml` entry rather than silently overridden. This is recorded
+here as the real finding it is, not smoothed over: the initial
+implementation commit under-anticipated how much of `nemo_toolkit`'s
+~80-package addition would need individual license verification, and the
+fix came from reading CI's actual failure output, not from guessing.
 
-The one real finding worth recording explicitly: the R1 task's framing
+A second, smaller finding: the R1 task's framing
 initially treated Sortformer as presumptively license-clean based on the
 research letter's summary alone — checking the Hugging Face model API
 directly (not just the model card's prose) surfaced the gating-language
