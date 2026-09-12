@@ -118,6 +118,32 @@ worker-diarization service (see `deploy/compose.dev.yml`/`compose.prod.yml`)
 compare DER/JER via the Evaluation Lab (`POST
 /admin/evaluation/diarization-accuracy`), one run per provider.
 
+## Installing the Nemotron speech-to-text model (R2, research roadmap)
+
+```sh
+docker compose run --rm model-manager install stt-nemotron
+```
+
+No token needed — NVIDIA's `nvidia/nemotron-3.5-asr-streaming-0.6b` is
+verified **not gated** (checked directly against the Hugging Face model
+API, same discipline as R1's Sortformer entry — see
+`docs/architecture/adr/0049-nemotron-second-stt-provider.md`). Licensed
+under **OpenMDW-1.1** (NVIDIA's "Open Model Weights" license), not
+previously used by this project — its full text was read directly before
+this model was added; no field-of-use restriction, commercial use and
+redistribution permitted (see the ADR and `compliance/model-inventory.yml`
+for the full research). Downloads a single self-contained `.nemo`
+checkpoint file (no dependent repos) into
+`vocadox_models_data:/app/data/models/speech-nemotron`. To actually use
+it, set `VOCADOX_SPEECH_PROVIDER=nemotron` for the worker-speech service
+(see `deploy/compose.dev.yml`/`compose.prod.yml`) — an admin can have
+both `speech-default` (faster-whisper) and `speech-nemotron` installed
+side by side and switch between them. **PoC-scoped disclosure**: unlike
+R1's Sortformer-vs-pyannote wiring, R2 does not (yet) wire this into an
+Evaluation Lab WER comparison endpoint — see PHASE_R2_VALIDATION_REPORT.md
+for why, and `app.analytics.wer.word_error_rate` for the existing WER
+primitive a future comparison run would reuse.
+
 ## Verifying the install
 
 ```sh
