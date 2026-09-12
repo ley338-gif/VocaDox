@@ -434,17 +434,26 @@ class SortformerDiarizationProvider(DiarizationProvider):
 
             turns: list[SpeakerTurn] = []
             labels: set[str] = set()
-            # Model card's documented output shape: one list of
-            # "begin_seconds, end_seconds, speaker_index" segments per input
-            # audio file: predicted_segments[0] for our single-file call.
+            # Real output shape (verified against a real installed
+            # checkpoint, not just the model card): predicted_segments[0] is
+            # a list of single space-separated strings, one per segment --
+            # "<start_seconds> <end_seconds> speaker_<index>", e.g.
+            # "0.080 1.200 speaker_0" -- NOT a list of (start, end, index)
+            # tuples as the model card's prose suggested. Indexing a string
+            # by position (segment[0]/[1]/[2]) silently reads its first
+            # three *characters* instead of its three fields, which is why
+            # this previously raised "could not convert string to float:
+            # '.'" on every real fixture the R0 eval framework was pointed
+            # at -- this provider had never actually been run against real
+            # audio before that.
             for segment in predicted_segments[0]:
-                start, end, speaker_index = segment[0], segment[1], segment[2]
-                label = f"SPEAKER_{int(speaker_index):02d}"
+                start_str, end_str, speaker_str = segment.split()
+                label = f"SPEAKER_{speaker_str.rsplit('_', 1)[-1].zfill(2)}"
                 labels.add(label)
                 turns.append(
                     SpeakerTurn(
-                        start_seconds=float(start),
-                        end_seconds=float(end),
+                        start_seconds=float(start_str),
+                        end_seconds=float(end_str),
                         speaker_label=label,
                         # No per-turn confidence score documented for this
                         # model's diarize() output -- same honest 1.0
