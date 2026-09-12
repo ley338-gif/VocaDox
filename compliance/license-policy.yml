@@ -53,6 +53,10 @@ approved:
   # license expression), never assumed from the abbreviation alone.
   - BSL-1.0             # Boost Software License 1.0 — permissive. (component of torch's license expression; NOT Business Source License 1.1)
   - MIT-CMU             # Pillow's actual PyPI license_expression — an MIT variant with a Carnegie Mellon University attribution clause, still fully permissive. Not a standalone SPDX-registered id but verified via Pillow's own PyPI metadata and LICENSE file, 2026-08-18. (pillow, transitive of pyannote.audio's matplotlib dependency)
+  # --- Added R1 (research roadmap, post-GA), nemo_toolkit[asr] transitive scan (2026-09-12) ---
+  - CNRI-Python          # Old CNRI/Python 1.6.1 license — OSI-approved, permissive, no copyleft obligation. Verified as the second component of regex's own SPDX expression "Apache-2.0 AND CNRI-Python" (PyPI JSON), 2026-09-12. Since this is an AND expression, resolve_status already requires both components independently approved — this entry is what makes that resolve, no PACKAGE_LICENSE_OVERRIDES entry needed for `regex` itself.
+  - "Artistic License"   # Perl's original Artistic License — verified genuinely dual/triple-licensed for text-unidecode (PyPI description: "You can redistribute it and/or modify this port under the terms of either: Artistic License, or GPL or GPLv2+", 2026-09-12) — an OR expression, so the licensee may choose Artistic License and ignore the GPL alternatives entirely; same "OR: best status wins" logic already applied to numpy's compound expression above. NOT approved as a blanket substitute for GPL anywhere else — this entry is scoped to packages that are genuinely, verifiably dual-licensed like this one, not a general GPL-avoidance loophole.
+  - "Public Domain"      # Plain public-domain dedication (verified via wget's own PyPI info.license field, 2026-09-12) — same permissive, no-copyleft rationale already given for CC0-1.0/0BSD above, just a different (non-SPDX-registered) label for the same substance.
 
 review_required:
   - MPL-2.0

@@ -153,6 +153,34 @@ PACKAGE_LICENSE_OVERRIDES: dict[tuple[str, str], str] = {
     # raw.githubusercontent.com/pyannoteAI/pyannoteai-sdk-python/main/LICENSE, 2026-08-18. See
     # docs/architecture/adr/0017-diarization-provider-selection.md for the full note on why this dependency
     # exists and is safe despite being a commercial-product SDK.
+
+    # --- R1 (research roadmap, post-GA), nemo_toolkit[asr] transitive scan (2026-09-12) ---
+    # Every one of these reported an ambiguous or non-SPDX-normalized raw
+    # license string from pip-licenses (bare "BSD" with no clause count,
+    # "ISC License (ISCL)", "Apache V2.0", "Apache License, Version 2.0")
+    # — each individually verified via the package's own PyPI JSON
+    # info.license field and/or its actual GitHub LICENSE file text (clause
+    # count confirmed for every bare "BSD" entry below), not guessed from
+    # the parent nemo_toolkit/pyannote-adjacent ecosystem's own license.
+    # `regex` ("Apache-2.0 AND CNRI-Python") and `text-unidecode`
+    # (genuinely dual/triple-licensed — Artistic License/GPL/GPLv2+) and
+    # `wget` ("Public Domain") needed no override here: their raw strings
+    # already parse correctly via split_spdx_expression's AND/OR handling
+    # once `compliance/license-policy.yml` listed their components —
+    # see that file's own comments for the verification.
+    ("pypi", "dill"): "BSD-3-Clause",  # PyPI info.license: "BSD-3-Clause" explicitly; description confirms "3-clause BSD license", 2026-09-12.
+    ("pypi", "fsspec"): "BSD-3-Clause",  # PyPI classifiers only say "BSD License"; confirmed 3-clause via the project's own LICENSE file (github.com/fsspec/filesystem_spec), 2026-09-12.
+    ("pypi", "ipython_pygments_lexers"): "BSD-3-Clause",  # Split out of the IPython project; confirmed 3-clause via ipython/ipython's own LICENSE file, 2026-09-12.
+    ("pypi", "kaldi-python-io"): "Apache-2.0",  # PyPI info.license reports the non-normalized string "Apache V2.0", 2026-09-12.
+    ("pypi", "multiprocess"): "BSD-3-Clause",  # PyPI info.license: "BSD-3-Clause" explicitly (uqfoundation project, same family as dill above); description confirms "3-clause BSD license", 2026-09-12.
+    ("pypi", "numba"): "BSD-2-Clause",  # PyPI classifiers only say "BSD License"; confirmed 2-clause (no endorsement clause) via numba/numba's own LICENSE file, 2026-09-12.
+    ("pypi", "overrides"): "Apache-2.0",  # PyPI info.license reports the non-normalized string "Apache License, Version 2.0", 2026-09-12.
+    ("pypi", "pexpect"): "ISC",  # pip-licenses reports "ISC License (ISCL)" (the OSI trove-classifier long form), 2026-09-12.
+    ("pypi", "prompt_toolkit"): "BSD-3-Clause",  # PyPI classifiers only say "BSD License"; confirmed 3-clause via prompt-toolkit/python-prompt-toolkit's own LICENSE file, 2026-09-12.
+    ("pypi", "ptyprocess"): "ISC",  # pip-licenses reports "ISC License (ISCL)", 2026-09-12.
+    ("pypi", "librosa"): "ISC",  # pip-licenses reports "ISC License (ISCL)", 2026-09-12.
+    ("pypi", "resampy"): "ISC",  # pip-licenses reports "ISC License (ISCL)", 2026-09-12.
+    ("pypi", "traitlets"): "BSD-3-Clause",  # pip-licenses reports bare "BSD"; PyPI's own info.license field carries the full BSD 3-Clause License text (IPython Development Team), confirming 3-clause explicitly, 2026-09-12.
 }
 
 
