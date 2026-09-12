@@ -8,6 +8,8 @@ Usage:
         VOCADOX_HUGGINGFACE_TOKEN (or --token) — the pipeline is MIT-
         licensed but gated on Hugging Face (see
         docs/architecture/adr/0017-diarization-provider-selection.md).
+    python -m app.cli.install_models diarization-sortformer  # R1, no token needed
+    python -m app.cli.install_models stt-nemotron             # R2, no token needed
     python -m app.cli.install_models --list
 
 Downloads a pinned revision from Hugging Face into
@@ -195,6 +197,41 @@ _register(
         # actually uses (allow_patterns verified against the repo's own
         # `siblings` file listing via the Hugging Face model API, 2026-09-12).
         allow_patterns=("diar_streaming_sortformer_4spk-v2.nemo",),
+    )
+)
+
+
+# R2 (research roadmap, post-GA): a SECOND, real speech-to-text provider
+# (NVIDIA NeMo Nemotron 3.5 ASR Streaming 0.6B), following the exact same
+# shape R1's `diarization-sortformer` profile established -- one
+# self-contained `.nemo` checkpoint file (verified via the Hugging Face
+# model API's own `siblings` file listing, 2026-09-12), no
+# `dependent_repos` needed. `requires_token=False`: the HF API's `gated`
+# field for this repo is `false` (verified directly), same posture as R1's
+# Sortformer entry.
+_register(
+    ModelProfile(
+        name="stt-nemotron",
+        repo_id="nvidia/nemotron-3.5-asr-streaming-0.6b",
+        revision="ea30d66debe3740a08b573244286791d423d6b3e",
+        marker_file="nemotron-3.5-asr-streaming-0.6b.nemo",
+        requires_token=False,
+        license_note=(
+            "OpenMDW-1.1 (verified: https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b "
+            "model card's own License section, and the license text itself at "
+            "https://openmdw.ai/license/1-1/, 2026-09-12) -- permissive, MIT-like: commercial "
+            "use and redistribution permitted, no field-of-use restriction, only requires "
+            "retaining the license text and copyright notices on redistribution. See "
+            "docs/architecture/adr/0049-nemotron-second-stt-provider.md for the full research."
+        ),
+        # Repo also contains model.safetensors (a duplicate weight format
+        # for the transformers/HF path), a .gguf quantization, and
+        # documentation/visualization assets this NeMo-based provider never
+        # loads -- restrict the download to the one `.nemo` checkpoint
+        # NemotronSpeechProvider actually uses (allow_patterns verified
+        # against the repo's own `siblings` file listing via the Hugging
+        # Face model API, 2026-09-12).
+        allow_patterns=("nemotron-3.5-asr-streaming-0.6b.nemo",),
     )
 )
 

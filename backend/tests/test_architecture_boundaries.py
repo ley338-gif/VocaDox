@@ -97,6 +97,9 @@ def test_domain_packages_do_not_import_concrete_provider_implementations() -> No
         # R1 (research roadmap, post-GA): second real diarization provider —
         # same rule as PyannoteDiarizationProvider above.
         "SortformerDiarizationProvider",
+        # R2 (research roadmap, post-GA): second real speech-to-text
+        # provider — same rule as FasterWhisperSpeechProvider above.
+        "NemotronSpeechProvider",
         "FfmpegMediaNormalizer",
         # Phase 4 real LLM provider — same rule.
         "OllamaLLMProvider",

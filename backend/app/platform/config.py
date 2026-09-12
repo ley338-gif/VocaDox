@@ -117,8 +117,11 @@ class Settings(BaseSettings):
     # -- Speech / diarization processing (Phase 3) ---------------------------
     speech_provider: str = Field(
         default="fake",
-        description="'fake' (tests/dev, always available) or 'faster_whisper' (real, requires "
-        "an installed model — see docs/admin/model-installation.md). Never defaults to a real "
+        description="'fake' (tests/dev, always available), 'faster_whisper' (real, requires "
+        "an installed model — see docs/admin/model-installation.md), or 'nemotron' (R2, "
+        "research roadmap, post-GA — real, requires an installed NVIDIA NeMo Nemotron 3.5 ASR "
+        "Streaming 0.6B checkpoint; see "
+        "docs/architecture/adr/0049-nemotron-second-stt-provider.md). Never defaults to a real "
         "provider so a fresh checkout without an installed model degrades safely.",
     )
     diarization_provider: str = Field(
@@ -136,6 +139,10 @@ class Settings(BaseSettings):
         "media — see docs/admin/model-installation.md). Never re-downloaded on restart.",
     )
     speech_model_dir_name: str = Field(default="speech-default")
+    # R2: separate model_volume_root subdirectory from faster-whisper's, so
+    # an admin can have both providers' checkpoints installed side by side
+    # (same rationale as diarization_sortformer_model_dir_name below).
+    speech_nemotron_model_dir_name: str = Field(default="speech-nemotron")
     diarization_model_dir_name: str = Field(default="diarization-default")
     # R1: separate model_volume_root subdirectory from pyannote's, so an
     # admin can have both providers' checkpoints installed side by side
