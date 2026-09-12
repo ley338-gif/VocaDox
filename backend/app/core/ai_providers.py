@@ -37,6 +37,8 @@ from app.providers.speech_to_text import (
     FakeSpeechProvider,
     FasterWhisperConfig,
     FasterWhisperSpeechProvider,
+    NemotronConfig,
+    NemotronSpeechProvider,
     SpeechToTextProvider,
 )
 
@@ -46,11 +48,24 @@ def get_queue_backend() -> QueueBackend:
 
 
 def get_speech_provider() -> SpeechToTextProvider:
+    """R2 (research roadmap, post-GA): `VOCADOX_SPEECH_PROVIDER` now also
+    accepts 'nemotron' — NVIDIA NeMo's Nemotron 3.5 ASR Streaming 0.6B, a
+    second, real `SpeechToTextProvider` (see
+    docs/architecture/adr/0049-nemotron-second-stt-provider.md,
+    PHASE_R2_VALIDATION_REPORT.md). Same "explicit env var, no silent
+    real-provider default" posture as `get_diarization_provider`."""
     settings = get_settings()
     if settings.speech_provider == "faster_whisper":
         model_dir = str(Path(settings.model_volume_root) / settings.speech_model_dir_name)
         return FasterWhisperSpeechProvider(
             FasterWhisperConfig(model_dir=model_dir, device=settings.speech_device)
+        )
+    if settings.speech_provider == "nemotron":
+        model_dir = str(
+            Path(settings.model_volume_root) / settings.speech_nemotron_model_dir_name
+        )
+        return NemotronSpeechProvider(
+            NemotronConfig(model_dir=model_dir, device=settings.speech_device)
         )
     return FakeSpeechProvider()
 

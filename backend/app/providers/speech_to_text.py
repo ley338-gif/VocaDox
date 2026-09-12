@@ -14,6 +14,21 @@ docs/architecture/adr/0016-speech-provider-selection.md for the full
 evaluation) is the Phase 3 production provider. `FakeSpeechProvider`
 remains available and is what CI/unit tests/GPU-less dev use exclusively
 — never the real provider (see .github/workflows/ci.yml).
+
+`NemotronSpeechProvider` (R2, research roadmap, post-GA — see
+docs/architecture/adr/0049-nemotron-second-stt-provider.md) is a SECOND,
+genuinely independent `SpeechToTextProvider` implementation, wrapping
+NVIDIA NeMo's `nvidia/nemotron-3.5-asr-streaming-0.6b` (OpenMDW-1.1, not
+gated — verified directly against the license text and the Hugging Face
+model API, see the ADR) the same way `FasterWhisperSpeechProvider` wraps
+faster-whisper: a locally-installed `.nemo` checkpoint, loaded fully
+offline via NeMo's own generic `ASRModel.restore_from()` API (never
+downloaded at request time), never assumed installed. **Real NeMo ASR
+inference was NOT executed in R2's own development sandbox** (no GPU, no
+`nemo_toolkit` install, no model download available there) — this
+implementation follows the model card's documented usage pattern as
+faithfully as possible but is honestly unverified end-to-end; see
+PHASE_R2_VALIDATION_REPORT.md.
 """
 
 from __future__ import annotations
@@ -298,6 +313,188 @@ class FasterWhisperSpeechProvider(SpeechToTextProvider):
         caps = detect_device_capabilities()
         return SpeechProviderStatus(
             provider="faster-whisper",
+            model=self._config.model_name,
+            model_revision=self._config.model_revision,
+            installed=installed,
+            device=device,
+            cuda_available=caps.cuda_available,
+            detail=None if installed else "model not installed at configured model_dir",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class NemotronConfig:
+    # Local directory holding the single downloaded `.nemo` checkpoint file
+    # (see app.cli.install_models's `stt-nemotron` profile) — analogous to
+    # SortformerConfig.model_dir: NeMo ships this model as one
+    # self-contained archive, not a HF "pipeline" of several repos, so
+    # there is no separate hf_cache_dir requirement here (unlike
+    # FasterWhisperConfig, which is a CTranslate2 snapshot directory, or
+    # pyannote's multi-repo cache).
+    model_dir: str
+    model_name: str = "nvidia/nemotron-3.5-asr-streaming-0.6b"
+    model_revision: str = "ea30d66debe3740a08b573244286791d423d6b3e"
+    checkpoint_filename: str = "nemotron-3.5-asr-streaming-0.6b.nemo"
+    device: str = "auto"
+
+
+class NemotronSpeechProvider(SpeechToTextProvider):
+    """Real local STT via NVIDIA NeMo's Nemotron 3.5 ASR Streaming 0.6B
+    model, loaded from a locally-installed `.nemo` checkpoint (never
+    downloaded from Hugging Face at request time in production — same
+    "admin installs explicitly" policy as `FasterWhisperSpeechProvider`,
+    see docs/admin/model-installation.md).
+
+    R2 disclosure (see PHASE_R2_VALIDATION_REPORT.md): `transcribe()`
+    below follows the model card's own documented usage pattern
+    (`nemo_asr.models.ASRModel.from_pretrained(...).transcribe([path])`)
+    as faithfully as possible, but loads fully offline via NeMo's generic
+    `.restore_from()` checkpoint loader instead (same "never let a worker
+    reach the network at inference time" policy
+    `SortformerDiarizationProvider`/`_offline_env.py` already enforce).
+    Real end-to-end inference was never actually executed against this
+    code in R2's development sandbox — no GPU, no `nemo_toolkit` install,
+    and no model download were available there. This mirrors exactly how
+    `SortformerDiarizationProvider` was disclosed in R1.
+
+    Two honest gaps versus `FasterWhisperSpeechProvider`, disclosed rather
+    than papered over:
+
+    - **No documented word- or segment-level timestamp/confidence API** in
+      the model card's simplest, documented `.transcribe(paths)` usage
+      sample (unlike faster-whisper's `segments`/`words` objects) — the
+      whole file is reported as a single segment with an honest `0.0`
+      placeholder confidence and no `words`, never fabricated per-word
+      timing this API does not document providing.
+    - **No documented duration/end-timestamp** from that same call — this
+      provider does not independently probe the audio file's duration
+      (that would require adding a new dependency or shelling out to
+      ffprobe, out of scope for this PoC — see
+      docs/architecture/adr/0049-nemotron-second-stt-provider.md), so
+      `end_seconds`/`duration_ms` are honestly `0.0`/`None` rather than
+      guessed.
+    - **`hotwords`/`initial_prompt` are accepted but unused**: no
+      documented custom-vocabulary biasing API on this model card's basic
+      usage path, unlike faster-whisper's `hotwords`/`initial_prompt`
+      params — same honest "not supported by this provider" posture
+      `SortformerDiarizationProvider` uses for `min_speakers`/
+      `max_speakers`.
+    """
+
+    def __init__(self, config: NemotronConfig) -> None:
+        self._config = config
+        self._model: Any = None
+
+    def _checkpoint_path(self) -> Path:
+        return Path(self._config.model_dir) / self._config.checkpoint_filename
+
+    def _is_installed(self) -> bool:
+        path = self._checkpoint_path()
+        return path.exists() and path.is_file() and path.stat().st_size > 0
+
+    def _resolved_device(self) -> str:
+        from app.providers.device import select_device
+
+        if self._config.device == "auto":
+            return select_device(prefer_gpu=True)
+        return self._config.device
+
+    def _ensure_loaded(self) -> Any:
+        if self._model is not None:
+            return self._model
+        if not self._is_installed():
+            raise SpeechModelUnavailableError(
+                f"speech model not installed at {self._checkpoint_path()} — run "
+                "`docker compose run --rm model-manager install stt-nemotron` "
+                "(see docs/admin/model-installation.md)"
+            )
+        try:
+            from nemo.collections.asr.models import ASRModel
+        except ImportError as exc:  # pragma: no cover
+            raise SpeechModelUnavailableError(
+                "nemo_toolkit (NeMo) is not installed in this environment"
+            ) from exc
+
+        try:
+            # `.restore_from()` is NeMo's standard fully-offline single-file
+            # checkpoint loader (the `.nemo` archive is a self-contained
+            # tarball of weights + config); the generic `ASRModel` base
+            # class dispatches to the checkpoint's own recorded concrete
+            # class at load time (documented NeMo behavior), the same
+            # reason `SortformerDiarizationProvider` uses NeMo's own
+            # concrete-class loader rather than reimplementing model
+            # introspection here. Deliberately not
+            # `from_pretrained(model_name=...)`, which would resolve
+            # against Hugging Face at call time.
+            model = ASRModel.restore_from(
+                restore_path=str(self._checkpoint_path()),
+                map_location=self._resolved_device(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise SpeechModelUnavailableError(f"failed to load speech model: {exc}") from exc
+
+        model.eval()
+        self._model = model
+        return self._model
+
+    async def transcribe(
+        self,
+        media_path: str,
+        *,
+        language_hint: str | None = None,
+        hotwords: str | None = None,
+        initial_prompt: str | None = None,
+    ) -> TranscriptionResult:
+        import asyncio
+
+        def _run() -> TranscriptionResult:
+            model = self._ensure_loaded()
+            # No documented custom-vocabulary biasing API on this model
+            # card's basic usage path -- see class docstring.
+            _ = (hotwords, initial_prompt)
+
+            output = model.transcribe([media_path], batch_size=1)
+
+            # Model card's simplest documented usage sample returns a
+            # plain list[str] (one transcript string per input file).
+            # Some NeMo versions instead return a list of `Hypothesis`
+            # objects with a `.text` attribute for the same call -- both
+            # are handled here rather than assuming one shape, the same
+            # defensive posture `PyannoteDiarizationProvider` uses for its
+            # own library-version output-shape quirk.
+            raw = output[0] if output else ""
+            text = str(getattr(raw, "text", raw)).strip()
+
+            segments: list[TranscriptSegment] = []
+            if text:
+                segments.append(
+                    TranscriptSegment(
+                        start_seconds=0.0,
+                        end_seconds=0.0,  # unknown -- see class docstring
+                        text=text,
+                        confidence=0.0,  # unknown -- see class docstring
+                        words=(),
+                        provider_segment_id="0",
+                    )
+                )
+
+            return TranscriptionResult(
+                segments=segments,
+                language=language_hint or "auto",
+                language_confidence=None,
+                duration_ms=None,
+            )
+
+        return await asyncio.to_thread(_run)
+
+    def status(self) -> SpeechProviderStatus:
+        installed = self._is_installed()
+        device = self._resolved_device()
+        from app.providers.device import detect_device_capabilities
+
+        caps = detect_device_capabilities()
+        return SpeechProviderStatus(
+            provider="nvidia-nemotron",
             model=self._config.model_name,
             model_revision=self._config.model_revision,
             installed=installed,

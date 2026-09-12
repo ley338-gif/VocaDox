@@ -59,3 +59,34 @@ The model identifier is never hardcoded in worker code — change
 `large-v3`) via `app/cli/install_models.py` if you need higher accuracy
 at the cost of speed/VRAM. This isn't wired up as a ready-made CLI
 profile yet beyond the default; treat this as an extension point.
+
+## Second provider (R2, research roadmap, post-GA): NVIDIA Nemotron 3.5 ASR Streaming 0.6B
+
+A second, real `SpeechToTextProvider` — NVIDIA NeMo's
+`nvidia/nemotron-3.5-asr-streaming-0.6b` (OpenMDW-1.1, not gated) — was
+added in R2, following the exact same shape R1 proved for diarization
+(Sortformer). See
+`docs/architecture/adr/0049-nemotron-second-stt-provider.md` and
+`PHASE_R2_VALIDATION_REPORT.md` for the full research, including the
+OpenMDW-1.1 license disposition (a license not previously used in this
+project).
+
+To use it:
+
+1. Install the checkpoint: `docker compose run --rm model-manager install
+   stt-nemotron` (no Hugging Face token required — not gated).
+2. Set `VOCADOX_SPEECH_PROVIDER=nemotron` on the `worker-speech` service.
+
+**PoC-scoped disclosure**: real NeMo ASR inference was never executed
+against this implementation in R2's development sandbox (no GPU, no
+`nemo_toolkit` install, no model download available there) — the
+provider follows the model card's documented usage pattern faithfully
+but is honestly unverified end-to-end. It also currently reports the
+whole file as a single segment with no word-level timestamps/confidence
+and an unknown (`0.0`) duration — the model card's simplest documented
+`.transcribe()` usage sample does not document a richer output shape the
+way faster-whisper's `segments`/`words` objects do. Nothing in this
+project has yet run a real Word Error Rate comparison between
+faster-whisper and Nemotron (see PHASE_R2_VALIDATION_REPORT.md's Known
+Limitations) — this is a PoC second provider, not yet a validated
+alternative to faster-whisper for production transcription.

@@ -12,6 +12,16 @@ import { Skeleton } from "../design-system/States";
  * section, distinct from the combined Models overview) — same data
  * source as AdminModelsPage's speech row, extended with the device field
  * Phase 3's `SpeechProviderStatus` already carries.
+ *
+ * R2 (research roadmap, post-GA): the "Anbieter" field above is already
+ * provider-agnostic (it renders whatever `SpeechProviderStatus.provider`
+ * the configured `VOCADOX_SPEECH_PROVIDER` reports — "faster-whisper" or
+ * "nvidia-nemotron") — no code change was needed for the status card to
+ * show a second provider. The note below is the one addition, same
+ * pattern AdminDiarizationPage's R1 change used: since switching
+ * providers is an ops-level env var, not a UI control, this makes the two
+ * valid real options discoverable here rather than only in
+ * docs/admin/model-installation.md.
  */
 export function AdminSpeechPage() {
   const overviewQuery = useQuery({ queryKey: ["admin", "models"], queryFn: getModelsOverview });
@@ -56,6 +66,28 @@ export function AdminSpeechPage() {
             )}
           </dl>
         </Card>
+      )}
+      {speech && (
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <Card>
+            <p style={{ fontWeight: 600, margin: "0 0 var(--space-2) 0" }}>
+              Unterstützte Anbieter
+            </p>
+            <p style={{ margin: "0 0 var(--space-3) 0", color: "var(--text-secondary)" }}>
+              Der aktive Anbieter wird über <code>VOCADOX_SPEECH_PROVIDER</code> auf
+              Server-Ebene konfiguriert (kein UI-Umschalter) — siehe
+              docs/admin/model-installation.md.
+            </p>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <Badge tone={speech.provider === "faster-whisper" ? "success" : "neutral"}>
+                faster-whisper
+              </Badge>
+              <Badge tone={speech.provider === "nvidia-nemotron" ? "success" : "neutral"}>
+                nvidia-nemotron
+              </Badge>
+            </div>
+          </Card>
+        </div>
       )}
     </AdminLayout>
   );
