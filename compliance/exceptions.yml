@@ -60,6 +60,37 @@ exceptions:
     expiry_date: "2027-09-09"
     notes: "Re-review if tqdm is vendored, modified, or statically incorporated into VocaDox code."
 
+  - dependency_name: soxr
+    ecosystem: pypi
+    reason: >
+      R1 (research roadmap, post-GA) transitive worker dependency, newly
+      introduced by nemo_toolkit[asr]'s audio-loading stack (via librosa).
+      Verified via PyPI (info.license_expression), 2026-09-12: LGPL-2.1-or-later
+      ("Python-SoXR is LGPL v2.1+ licensed, following libsoxr's license").
+      A real, disclosed nuance -- NOT the same clean "unmodified separate
+      package" case as certifi/pathspec/tqdm above: soxr's default PyPI wheel
+      statically links a (modified) copy of libsoxr into its compiled
+      extension module, rather than dynamically loading a system libsoxr.so.
+      This still satisfies LGPL-2.1's static-linking permission because (a)
+      libsoxr's own source is public and unmodified-except-as-documented
+      upstream (soxr's own docs enumerate its changes to libsoxr), (b) the
+      resulting artifact is an ordinary, independently swappable PyPI wheel
+      -- an end user retains the ability to substitute a different libsoxr
+      build (soxr's own docs note the conda-forge distribution does exactly
+      this, dynamically), and (c) VocaDox never modifies, vendors, or
+      statically links soxr/libsoxr into any of its own proprietary source
+      files -- it is installed and used purely as an ordinary, separately
+      versioned Python package, the same posture already applied to every
+      other worker-scope dependency in this file.
+    approved_by: "R1 kickoff (2026-09-12 owner GO) — standing autonomous GO per [[github-workflow-autonomy]]"
+    expiry_date: "2027-09-12"
+    notes: >
+      Re-review immediately if soxr is ever vendored/modified, if VocaDox
+      ever links against it in a way other than importing the ordinary
+      published wheel, or if a future audit finds the installed wheel does
+      NOT actually remain swappable (e.g. if pip starts bundling it in a way
+      that forecloses the conda-forge dynamic-linking alternative entirely).
+
   - dependency_name: FastMSS
     ecosystem: other  # git-cloned dev tool, never a pip/npm package -- not in dependency-inventory.yml
     reason: >

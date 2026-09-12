@@ -82,6 +82,18 @@ ai = [
     "torch>=2.11,<3.0",
     "torchaudio>=2.11,<3.0",
     "torchcodec>=0.16,<1.0",
+    # R1 (research roadmap, post-GA): NVIDIA NeMo, the runtime for
+    # SortformerDiarizationProvider (nvidia/diar_streaming_sortformer_4spk-v2,
+    # CC BY 4.0 — see docs/architecture/adr/0048-sortformer-second-diarization-provider.md).
+    # `nemo_toolkit` (the PyPI package) is Apache-2.0 (verified:
+    # raw.githubusercontent.com/NVIDIA/NeMo/main/LICENSE, "Apache License
+    # Version 2.0"). The `asr` extra is NeMo's own bundle covering its
+    # speaker-diarization models (there is no narrower "diarization-only"
+    # extra published upstream). NOT independently verified to actually
+    # resolve/import cleanly in a real build the way ADR-0017 verified
+    # pyannote's own pin (no GPU/network available in R1's sandbox to build
+    # and run the worker image) — see PHASE_R1_VALIDATION_REPORT.md.
+    "nemo_toolkit[asr]>=2.0,<3.0",
 ]
 dev = [
     "ruff>=0.6,<1.0",

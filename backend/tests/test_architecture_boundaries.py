@@ -94,6 +94,9 @@ def test_domain_packages_do_not_import_concrete_provider_implementations() -> No
         # like the Phase 0 Fake*/LocalFilesystemStorage precedent above.
         "FasterWhisperSpeechProvider",
         "PyannoteDiarizationProvider",
+        # R1 (research roadmap, post-GA): second real diarization provider —
+        # same rule as PyannoteDiarizationProvider above.
+        "SortformerDiarizationProvider",
         "FfmpegMediaNormalizer",
         # Phase 4 real LLM provider — same rule.
         "OllamaLLMProvider",

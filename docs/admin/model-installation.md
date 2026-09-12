@@ -97,6 +97,27 @@ dependent repos install into a separate, shared cache directory
 `app/cli/install_models.py`'s `DependentRepo` and
 `app/providers/diarization.py`.
 
+## Installing the Sortformer diarization model (R1, research roadmap)
+
+```sh
+docker compose run --rm model-manager install diarization-sortformer
+```
+
+No token needed — unlike `diarization-default`, NVIDIA's
+`nvidia/diar_streaming_sortformer_4spk-v2` is verified **not gated**
+(checked directly against the Hugging Face model API, not just the model
+card — see
+`docs/architecture/adr/0048-sortformer-second-diarization-provider.md`).
+Downloads a single self-contained `.nemo` checkpoint file (no dependent
+repos) into
+`vocadox_models_data:/app/data/models/diarization-sortformer`. To actually
+use it, set `VOCADOX_DIARIZATION_PROVIDER=sortformer` for the
+worker-diarization service (see `deploy/compose.dev.yml`/`compose.prod.yml`)
+— an admin can have both `diarization-default` (pyannote) and
+`diarization-sortformer` installed side by side and switch between them to
+compare DER/JER via the Evaluation Lab (`POST
+/admin/evaluation/diarization-accuracy`), one run per provider.
+
 ## Verifying the install
 
 ```sh

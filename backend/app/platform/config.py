@@ -123,8 +123,12 @@ class Settings(BaseSettings):
     )
     diarization_provider: str = Field(
         default="fake",
-        description="'fake' (tests/dev) or 'pyannote' (real, requires an installed, "
-        "license-accepted pyannote pipeline).",
+        description="'fake' (tests/dev), 'pyannote' (real, requires an installed, "
+        "license-accepted pyannote pipeline), or 'sortformer' (R1, research roadmap, post-GA — "
+        "real, requires an installed NVIDIA NeMo Streaming Sortformer 4-Speaker v2 checkpoint; "
+        "see docs/architecture/adr/0048-sortformer-second-diarization-provider.md). Used by "
+        "app.core.ai_providers.get_diarization_provider both for real diarization jobs AND to "
+        "select which provider a diarization-accuracy Evaluation Lab run measures.",
     )
     model_volume_root: str = Field(
         default="./data/models",
@@ -133,6 +137,11 @@ class Settings(BaseSettings):
     )
     speech_model_dir_name: str = Field(default="speech-default")
     diarization_model_dir_name: str = Field(default="diarization-default")
+    # R1: separate model_volume_root subdirectory from pyannote's, so an
+    # admin can have both providers' checkpoints installed side by side
+    # (needed to actually run a pyannote-vs-Sortformer comparison, one
+    # Evaluation Lab run per provider — see PHASE_R1_VALIDATION_REPORT.md).
+    diarization_sortformer_model_dir_name: str = Field(default="diarization-sortformer")
     speech_device: str = Field(default="auto", description="'auto' | 'cuda' | 'cpu'")
     diarization_device: str = Field(default="auto", description="'auto' | 'cuda' | 'cpu'")
     huggingface_token: str | None = Field(

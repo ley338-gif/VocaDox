@@ -313,6 +313,9 @@ services:
   #   docker compose run --rm model-manager install speech-default
   #   docker compose run --rm -e VOCADOX_HUGGINGFACE_TOKEN=<token> \
   #       model-manager install diarization-default
+  #   docker compose run --rm model-manager install diarization-sortformer
+  #       (R1, research roadmap — no token needed, see
+  #       docs/architecture/adr/0048-sortformer-second-diarization-provider.md)
   #
   # See docs/admin/model-installation.md. Fixes the Phase 3 bug where the
   # documented command against `worker-diarization` failed with "the

@@ -15,6 +15,22 @@ Hugging Face (requires accepting terms + an access token to download) —
 VocaDox never bundles or silently downloads it; an admin installs it
 explicitly (docs/admin/model-installation.md). `FakeDiarizationProvider`
 remains what CI/unit tests/GPU-less dev use exclusively.
+
+`SortformerDiarizationProvider` (R1, research roadmap, post-GA — see
+docs/architecture/adr/0048-sortformer-second-diarization-provider.md) is a
+SECOND, genuinely independent `DiarizationProvider` implementation, added
+so R0's DER/JER eval framework has more than one real provider to compare
+pyannote against (Phase 12 GA validation Finding #12). It wraps NVIDIA
+NeMo's `nvidia/diar_streaming_sortformer_4spk-v2` (CC BY 4.0, not gated —
+verified directly against the Hugging Face model API, see the ADR) the
+same way `PyannoteDiarizationProvider` wraps pyannote: a locally-installed
+`.nemo` checkpoint, loaded fully offline via NeMo's own
+`restore_from()` API (never downloaded at request time), never assumed
+installed. **Real NeMo inference was NOT executed in R1's own development
+sandbox** (no GPU, no `nemo_toolkit` install, no model download available
+there) — this implementation follows NeMo's documented model-card usage
+pattern faithfully but is honestly unverified end-to-end; see
+PHASE_R1_VALIDATION_REPORT.md.
 """
 
 from __future__ import annotations
@@ -283,6 +299,176 @@ class PyannoteDiarizationProvider(DiarizationProvider):
         installed = self._is_installed()
         return DiarizationProviderStatus(
             provider="pyannote.audio",
+            model=self._config.model_name,
+            model_revision=self._config.model_revision,
+            installed=installed,
+            detail=None if installed else "model not installed at configured model_dir",
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SortformerConfig:
+    # Local directory holding the single downloaded `.nemo` checkpoint file
+    # (see app.cli.install_models's `diarization-sortformer` profile) —
+    # analogous to PyannoteConfig.model_dir, but NeMo ships this model as
+    # one self-contained archive rather than a HF "pipeline" of several
+    # repos, so there is no separate hf_cache_dir requirement here.
+    model_dir: str
+    model_name: str = "nvidia/diar_streaming_sortformer_4spk-v2"
+    model_revision: str = "5240a64075176943f677d30fa2171c780229f341"
+    checkpoint_filename: str = "diar_streaming_sortformer_4spk-v2.nemo"
+    device: str = "auto"
+    # Streaming-inference parameters, in 80ms frames — values below are the
+    # model card's own documented defaults (see ADR-0048), not independently
+    # tuned by VocaDox. Kept configurable because the model card documents a
+    # genuine latency/accuracy tradeoff range (0.32s-30.4s) a future R-series
+    # phase may want to sweep.
+    chunk_len: int = 340
+    chunk_right_context: int = 40
+    fifo_len: int = 40
+    spkcache_update_period: int = 300
+
+
+class SortformerDiarizationProvider(DiarizationProvider):
+    """Real local diarization via NVIDIA NeMo's Streaming Sortformer
+    4-Speaker v2 model, loaded from a locally-installed `.nemo` checkpoint
+    (never downloaded from Hugging Face at request time in production —
+    same "admin installs explicitly" policy as
+    `PyannoteDiarizationProvider`, see docs/admin/model-installation.md).
+
+    R1 disclosure (see PHASE_R1_VALIDATION_REPORT.md): the `diarize()`
+    implementation below follows the model card's own documented usage
+    pattern (`SortformerEncLabelModel.diarize(audio=[path])`, plus the
+    streaming-config attributes set before inference) as faithfully as
+    possible, but real end-to-end inference was never actually executed
+    against this code in R1's development sandbox — no GPU, no
+    `nemo_toolkit` install, and no model download were available there.
+    This mirrors exactly how `PyannoteDiarizationProvider` was first
+    disclosed before Phase 3.1 closed the gap with a real Hugging Face
+    token and a real installed pipeline; the equivalent closing step here
+    is `tools/dev/fastmss/` + a real `.nemo` install (see the ADR).
+    """
+
+    def __init__(self, config: SortformerConfig) -> None:
+        self._config = config
+        self._model: Any = None
+
+    def _checkpoint_path(self) -> Any:
+        from pathlib import Path
+
+        return Path(self._config.model_dir) / self._config.checkpoint_filename
+
+    def _is_installed(self) -> bool:
+        path = self._checkpoint_path()
+        return path.exists() and path.is_file() and path.stat().st_size > 0
+
+    def _resolved_device(self) -> str:
+        from app.providers.device import select_device
+
+        if self._config.device == "auto":
+            return select_device(prefer_gpu=True)
+        return self._config.device
+
+    def _ensure_loaded(self) -> Any:
+        if self._model is not None:
+            return self._model
+        if not self._is_installed():
+            raise DiarizationModelUnavailableError(
+                f"diarization model not installed at {self._checkpoint_path()} — run "
+                "`docker compose run --rm model-manager install diarization-sortformer` "
+                "(see docs/admin/model-installation.md)"
+            )
+        try:
+            from nemo.collections.asr.models import SortformerEncLabelModel
+        except ImportError as exc:  # pragma: no cover
+            raise DiarizationModelUnavailableError(
+                "nemo_toolkit (NeMo) is not installed in this environment"
+            ) from exc
+
+        try:
+            # `.restore_from()` is NeMo's standard fully-offline single-file
+            # checkpoint loader (the `.nemo` archive is a self-contained
+            # tarball of weights + config) -- deliberately used instead of
+            # `from_pretrained(repo_id)`, which would resolve against
+            # Hugging Face at call time; VocaDox never lets a worker reach
+            # the network at inference time (same policy as
+            # PyannoteDiarizationProvider/_offline_env.py).
+            model = SortformerEncLabelModel.restore_from(
+                restore_path=str(self._checkpoint_path()),
+                map_location=self._resolved_device(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise DiarizationModelUnavailableError(
+                f"failed to load diarization model: {exc}"
+            ) from exc
+
+        model.eval()
+        # Model card's own documented streaming defaults (see SortformerConfig).
+        model.sortformer_modules.chunk_len = self._config.chunk_len
+        model.sortformer_modules.chunk_right_context = self._config.chunk_right_context
+        model.sortformer_modules.fifo_len = self._config.fifo_len
+        model.sortformer_modules.spkcache_update_period = self._config.spkcache_update_period
+        self._model = model
+        return self._model
+
+    async def diarize(
+        self,
+        media_path: str,
+        *,
+        min_speakers: int | None = None,
+        max_speakers: int | None = None,
+    ) -> DiarizationResult:
+        import asyncio
+
+        def _run() -> DiarizationResult:
+            model = self._ensure_loaded()
+            # This model is a fixed 4-speaker-max architecture (no
+            # min/max_speakers hint API documented on the model card) --
+            # both parameters are accepted for interface conformance
+            # (DiarizationProvider.diarize's shared signature) but have no
+            # effect here, same honest "not supported by this provider"
+            # posture as any parameter a given provider can't act on.
+            _ = (min_speakers, max_speakers)
+
+            predicted_segments = model.diarize(audio=[media_path], batch_size=1)
+
+            turns: list[SpeakerTurn] = []
+            labels: set[str] = set()
+            # Model card's documented output shape: one list of
+            # "begin_seconds, end_seconds, speaker_index" segments per input
+            # audio file: predicted_segments[0] for our single-file call.
+            for segment in predicted_segments[0]:
+                start, end, speaker_index = segment[0], segment[1], segment[2]
+                label = f"SPEAKER_{int(speaker_index):02d}"
+                labels.add(label)
+                turns.append(
+                    SpeakerTurn(
+                        start_seconds=float(start),
+                        end_seconds=float(end),
+                        speaker_label=label,
+                        # No per-turn confidence score documented for this
+                        # model's diarize() output -- same honest 1.0
+                        # placeholder PyannoteDiarizationProvider uses,
+                        # never a fabricated calibrated value.
+                        confidence=1.0,
+                    )
+                )
+
+            # No per-speaker embedding extraction API documented on this
+            # model card (unlike pyannote.audio 4.x's DiarizeOutput) --
+            # voiceprint-suggestion embeddings are simply absent for this
+            # provider, same honest `None` PyannoteDiarizationProvider
+            # returns when its own best-effort extraction fails.
+            return DiarizationResult(
+                turns=turns, speaker_count=len(labels), speaker_embeddings=None
+            )
+
+        return await asyncio.to_thread(_run)
+
+    def status(self) -> DiarizationProviderStatus:
+        installed = self._is_installed()
+        return DiarizationProviderStatus(
+            provider="nvidia-sortformer",
             model=self._config.model_name,
             model_revision=self._config.model_revision,
             installed=installed,
