@@ -32,6 +32,14 @@ class LLMModelUnavailableError(RuntimeError):
     the worker process."""
 
 
+class LLMServerUnreachableError(ConnectionError):
+    """Raised when the Ollama server could not be reached at all (connect
+    refused/timed out, read timeout). Unlike LLMModelUnavailableError this
+    is usually a network blip or a server restart, so it subclasses
+    ConnectionError and is classified TRANSIENT (auto-retried, capped by
+    ProcessingJob.max_attempts) — see app.processing.retry."""
+
+
 @dataclass(frozen=True, slots=True)
 class LLMResponse:
     text: str
@@ -182,10 +190,10 @@ class OllamaLLMProvider(LLMProvider):
                 )
                 response.raise_for_status()
                 return response.json()
-        except httpx.ConnectError as exc:
-            raise LLMModelUnavailableError(
-                f"could not reach Ollama server at {self._config.base_url} — is it running? "
-                "(see docs/admin/llm-provider.md)"
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            raise LLMServerUnreachableError(
+                f"could not reach Ollama server at {self._config.base_url} — is it running "
+                "and reachable from the worker container? (see docs/admin/llm-provider.md)"
             ) from exc
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:

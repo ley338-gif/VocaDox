@@ -357,6 +357,7 @@ async function installMockApi(page: Page) {
         ? [{ id: "transcript-job", job_type: "align", status: "succeeded", progress: 100, attempt: 1, max_attempts: 3, failure_class: null, error_code: null, error_message_safe: null, queued_at: NOW, started_at: NOW, completed_at: NOW }]
         : [];
       if (protocolReady) jobs.push({ ...jobs[0], id: "protocol-job", job_type: "generate_protocol" });
+      if (factsReady) jobs.push({ ...jobs[0], id: "extract-job", job_type: "extract" });
       return json(route, { conversation_status: transcriptReady ? "ready" : "uploaded", jobs });
     }
     if (path === `/conversations/${CONVERSATION_ID}/transcript`) {
