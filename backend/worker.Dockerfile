@@ -60,8 +60,8 @@ RUN apt-get update \
 # `--enable-version3`, no `--enable-gpl`/`--enable-nonfree`,
 # `libx264`/`libx265`/`libxavs2`/`libxvid` still `--disable`d, and
 # LICENSE.txt is still LGPL-3.0 text.
-ARG FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-03-13-17/ffmpeg-N-126390-g9fc8c785e2-linux64-lgpl.tar.xz
-ARG FFMPEG_SHA256=b0b27bf2212cbe74b52568d13e200215d5f01f10f95d106da06a89578619ecb3
+ARG FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-25-15-37/ffmpeg-N-126856-ged27b2c498-linux64-lgpl.tar.xz
+ARG FFMPEG_SHA256=108b9b0cae7423d6c3e391a26b9a35445c6330e7b0eab3b4540a238416f6d887
 RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
     && echo "${FFMPEG_SHA256}  /tmp/ffmpeg.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg-extract \
@@ -92,8 +92,8 @@ RUN curl -sL -o /tmp/ffmpeg.tar.xz "$FFMPEG_URL" \
 # racing BtbN's `latest` tag's multiple-times-per-day rebuilds) —
 # LICENSE.txt re-verified as LGPL-3.0 text on this exact asset before
 # trusting the hash.
-ARG FFMPEG_SHARED_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-03-13-17/ffmpeg-N-126390-g9fc8c785e2-linux64-lgpl-shared.tar.xz
-ARG FFMPEG_SHARED_SHA256=cd140dd666d191533ce4b3c0882ffce0001cb5e1d56e1ea85536b58ea28a2dbf
+ARG FFMPEG_SHARED_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-25-15-37/ffmpeg-N-126856-ged27b2c498-linux64-lgpl-shared.tar.xz
+ARG FFMPEG_SHARED_SHA256=d8e41d816bab60d5824461d9fdc8a92dbc2167fff2576e2d9a79717b6f220746
 RUN curl -sL -o /tmp/ffmpeg-shared.tar.xz "$FFMPEG_SHARED_URL" \
     && echo "${FFMPEG_SHARED_SHA256}  /tmp/ffmpeg-shared.tar.xz" | sha256sum -c - \
     && mkdir -p /tmp/ffmpeg-shared-extract \
