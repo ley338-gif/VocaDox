@@ -43,6 +43,7 @@ def classify_exception(exc: Exception) -> FailureClass:
         return FailureClass.PERMANENT
     if isinstance(exc, MemoryError):
         return FailureClass.RESOURCE
+    # Includes app.providers.llm.LLMServerUnreachableError (a ConnectionError).
     if isinstance(exc, TimeoutError | ConnectionError | OSError):
         return FailureClass.TRANSIENT
     return FailureClass.PERMANENT

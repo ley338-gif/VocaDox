@@ -9,7 +9,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   getFactEvidence,
@@ -20,6 +20,7 @@ import {
   unredactFact,
   type ExtractedFact,
 } from "../api/intelligence";
+import { getProcessingStatus } from "../api/transcription";
 import { useAuth } from "../auth/useAuth";
 import { Badge } from "../design-system/Badge";
 import { Button } from "../design-system/Button";
@@ -94,6 +95,20 @@ function FactRow({
   );
 }
 
+// error_message_safe is an exception class name — not something to show a
+// user — so the failure is explained by its FailureClass instead.
+function extractionFailureMessage(failureClass: string | null): string {
+  switch (failureClass) {
+    case "model_unavailable":
+      return "Das Sprachmodell ist nicht verfügbar. Bitte die LLM-Konfiguration prüfen.";
+    case "transient":
+    case "resource":
+      return "Das Sprachmodell war wiederholt nicht erreichbar. Bitte später erneut versuchen.";
+    default:
+      return "Die Extraktion konnte nicht abgeschlossen werden.";
+  }
+}
+
 export function FactsPanel({
   conversationId,
   audioPlayerRef,
@@ -113,13 +128,53 @@ export function FactsPanel({
     queryFn: () => listReviewIssues(conversationId),
   });
 
+  // The extract endpoint only enqueues a job (202, returns immediately),
+  // so `extractMutation.isPending` is over within milliseconds. "Is
+  // extraction running" is answered by the job list instead, polled while
+  // an extract job is queued/running — same pattern as ProtocolPanel.
+  const processingQuery = useQuery({
+    queryKey: ["processing-status", conversationId],
+    queryFn: () => getProcessingStatus(conversationId),
+    refetchInterval: (query) => {
+      const jobs = query.state.data?.jobs ?? [];
+      const active = jobs.some(
+        (j) => j.job_type === "extract" && (j.status === "queued" || j.status === "running")
+      );
+      return active ? 1500 : false;
+    },
+  });
+
+  // `jobs` is ordered by queued_at DESC, so the first extract entry is the
+  // most recent attempt.
+  const latestJob = processingQuery.data?.jobs.find((j) => j.job_type === "extract");
+  const isExtracting = latestJob?.status === "queued" || latestJob?.status === "running";
+  const [jobError, setJobError] = useState<string | null>(null);
+  // Id of the last extract job whose completion we already reacted to, so
+  // the effect fires once per job instead of on every poll tick.
+  const lastHandledJobRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!latestJob) return;
+    if (latestJob.status !== "succeeded" && latestJob.status !== "failed") return;
+    if (lastHandledJobRef.current === latestJob.id) return;
+    lastHandledJobRef.current = latestJob.id;
+    if (latestJob.status === "succeeded") {
+      setJobError(null);
+      void queryClient.invalidateQueries({ queryKey: ["facts", conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ["review-issues", conversationId] });
+    } else {
+      setJobError(extractionFailureMessage(latestJob.failure_class));
+    }
+  }, [latestJob, conversationId, queryClient]);
+
   const extractMutation = useMutation({
     mutationFn: () => triggerExtraction(conversationId, csrfToken ?? ""),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["facts", conversationId] });
-      void queryClient.invalidateQueries({ queryKey: ["review-issues", conversationId] });
+      setJobError(null);
+      void queryClient.invalidateQueries({ queryKey: ["processing-status", conversationId] });
     },
   });
+  const isBusy = extractMutation.isPending || isExtracting;
 
   const redactionMutation = useMutation({
     mutationFn: (fact: ExtractedFact) =>
@@ -138,11 +193,11 @@ export function FactsPanel({
             <Button
               variant="primary"
               type="button"
-              disabled={extractMutation.isPending}
+              disabled={isBusy}
               onClick={() => extractMutation.mutate()}
             >
-              {extractMutation.isPending ? <Spinner size={16} /> : <Sparkles size={16} aria-hidden="true" />}{" "}
-              {extractMutation.isPending ? "Extrahiere…" : "Fakten extrahieren"}
+              {isBusy ? <Spinner size={16} /> : <Sparkles size={16} aria-hidden="true" />}{" "}
+              {isBusy ? "Extrahiere…" : "Fakten extrahieren"}
             </Button>
           )
         }
@@ -154,7 +209,7 @@ export function FactsPanel({
           Unsicheres oder möglicherweise Widersprüchliches.
         </p>
 
-        {extractMutation.isPending && (
+        {isBusy && (
           <ProcessingBanner
             title="Fakten werden extrahiert…"
             description="Das Sprachmodell analysiert das Transkript — das kann bis zu einer Minute dauern."
@@ -164,6 +219,11 @@ export function FactsPanel({
           <p role="alert" style={{ color: "var(--color-danger)", marginBottom: "var(--space-4)" }}>
             Extraktion fehlgeschlagen:{" "}
             {extractMutation.error instanceof Error ? extractMutation.error.message : "Unbekannter Fehler"}
+          </p>
+        )}
+        {!isBusy && jobError && (
+          <p role="alert" style={{ color: "var(--color-danger)", marginBottom: "var(--space-4)" }}>
+            Extraktion fehlgeschlagen: {jobError}
           </p>
         )}
 
